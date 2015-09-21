@@ -1,0 +1,36 @@
+{
+    ABV:5.20000
+    Company:Mac & Jacks
+    IBU:52
+    Id:0
+    Location:Redmond, WA
+    Name:African Amber
+    Type:Amber Ale
+}
+{
+    ABV:9.80000
+    Company:Triple Horn
+    IBU:60
+    Id:1
+    Location:Woodinville, WA
+    Name:Intervention
+    Type:IPA
+}
+{
+    ABV:6.40000
+    Company:Dirty Bucket
+    IBU:72
+    Id:2
+    Location:Woodinville, WA
+    Name:Filthy Hoppin IPA
+    Type:IPA
+}
+{
+    ABV:5.50000
+    Company:homan
+    IBU:57
+    Id:3
+    Location:basement
+    Name:mine
+    Type:good
+}

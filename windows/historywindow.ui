@@ -1,0 +1,673 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>HistoryWindow</class>
+ <widget class="QMainWindow" name="HistoryWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>480</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>History</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../resources.qrc">
+    <normaloff>:/images/Logo.png</normaloff>:/images/Logo.png</iconset>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">#centralwidget, QDialog
+{
+    background-image: url(:/images/Background1.png);
+}
+
+QPushButton
+{
+    color:rgb(200,200,200,200);
+    background-color:rgb(180,180,180,100);
+    border-radius:3;
+}
+
+QPushButton:checked
+{
+    color:rgb(200,200,200,200);
+    background-color:rgb(140,140,250,100);
+    border-radius:3;
+}
+
+QLabel
+{
+    color:rgb(200,200,200,200);
+    background-color:rgb(150,150,150, 100);
+    border-radius:3;
+}
+
+#scrollPane, #paymentsScrollPane
+{
+    background-color:rgb(150,150,150,100);
+    border-radius:3;
+}
+
+QScrollBar:horizontal, QScrollBar:vertical
+{
+    height:50px;
+    width:50px;
+    background-color:rgb(120, 120, 120, 140);
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::add-page:vertical, QScrollBar::sub-page:horizontal, QScrollBar::sub-page:vertical
+{
+    background:none;
+}
+
+
+QComboBox QAbstractItemView
+{
+    background-color: rgb(120, 120, 120);
+    selection-background-color: rgb(90, 90, 90);
+}
+QComboBox
+{
+    background-color: rgb(120, 120, 120);
+    min-height:34px;
+    selection-background-color: rgb(90, 90, 90);
+}
+
+QMessageBox
+{
+    background-color: rgb(180, 180, 180);
+    background-image: url();
+}
+QMessageBox QLabel
+{
+    color:rgb(0,0,0);
+    background-color:rgb(0,0,0,0);
+}
+QMessageBox QPushButton
+{
+    color:rgb(0,0,0);
+    background-color:rgb(140,140,140);
+    padding: 20px;
+}
+</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QLabel" name="infoLabel">
+    <property name="geometry">
+     <rect>
+      <x>550</x>
+      <y>315</y>
+      <width>240</width>
+      <height>150</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color:rgb(0,0,0,0);</string>
+    </property>
+    <property name="text">
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Date:&lt;br/&gt;Beer:&lt;br/&gt;Ounces:&lt;br/&gt;Rounded:&lt;br/&gt;Price:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="closeButton">
+    <property name="geometry">
+     <rect>
+      <x>715</x>
+      <y>15</y>
+      <width>70</width>
+      <height>50</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>32</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>X</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="previewLabel">
+    <property name="geometry">
+     <rect>
+      <x>545</x>
+      <y>85</y>
+      <width>240</width>
+      <height>180</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color:rgb(0,0,0);</string>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="usersComboBox">
+    <property name="geometry">
+     <rect>
+      <x>550</x>
+      <y>270</y>
+      <width>230</width>
+      <height>38</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>14</pointsize>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="deleteButton">
+    <property name="geometry">
+     <rect>
+      <x>750</x>
+      <y>430</y>
+      <width>50</width>
+      <height>50</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Century Schoolbook L</family>
+      <pointsize>20</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color:rgb(0,0,0,0);</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="default">
+     <bool>false</bool>
+    </property>
+    <property name="flat">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="StaticScrollArea" name="scrollPane">
+    <property name="geometry">
+     <rect>
+      <x>220</x>
+      <y>80</y>
+      <width>310</width>
+      <height>390</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true"/>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::Box</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Plain</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="titleLabel">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>780</width>
+      <height>60</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>26</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(200,200,200,200);</string>
+    </property>
+    <property name="text">
+     <string>History</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="UserFilterButton" name="userFilter">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>102</y>
+      <width>180</width>
+      <height>65</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>16</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>User: All</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="KegFilterButton" name="kegFilter">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>174</y>
+      <width>180</width>
+      <height>65</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>16</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>Keg: All</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="BeerFilterButton" name="beerFilter">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>246</y>
+      <width>180</width>
+      <height>65</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>16</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>Beer: All</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="DateFilterButton" name="dateFilter">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>318</y>
+      <width>180</width>
+      <height>65</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>16</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>Dates: All</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="resetFiltersButton">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>394</y>
+      <width>180</width>
+      <height>40</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>16</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgb(145, 82, 82,170);</string>
+    </property>
+    <property name="text">
+     <string>Reset Filters</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="listButton">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>20</y>
+      <width>90</width>
+      <height>40</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>16</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>List</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="graphButton">
+    <property name="geometry">
+     <rect>
+      <x>120</x>
+      <y>20</y>
+      <width>90</width>
+      <height>40</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>16</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+    <property name="text">
+     <string>Graph</string>
+    </property>
+    <property name="flat">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="resultCountLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>436</y>
+      <width>180</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>14</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color:rgb(0,0,0,0);</string>
+    </property>
+    <property name="text">
+     <string>Results: 124</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QwtGraphFrame" name="graphFrame">
+    <property name="geometry">
+     <rect>
+      <x>225</x>
+      <y>80</y>
+      <width>560</width>
+      <height>340</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::Box</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Plain</enum>
+    </property>
+    <property name="lineWidth">
+     <number>0</number>
+    </property>
+   </widget>
+   <widget class="QComboBox" name="graphComboBox">
+    <property name="geometry">
+     <rect>
+      <x>360</x>
+      <y>428</y>
+      <width>290</width>
+      <height>38</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>14</pointsize>
+     </font>
+    </property>
+    <property name="focusPolicy">
+     <enum>Qt::NoFocus</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="backgroundTile">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>80</y>
+      <width>200</width>
+      <height>390</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="backgroundTile_2">
+    <property name="geometry">
+     <rect>
+      <x>540</x>
+      <y>80</y>
+      <width>250</width>
+      <height>390</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="resultCountLabel_2">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>80</y>
+      <width>200</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>11</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color:rgb(0,0,0,0);</string>
+    </property>
+    <property name="text">
+     <string>filters</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="backgroundTile_3">
+    <property name="geometry">
+     <rect>
+      <x>220</x>
+      <y>80</y>
+      <width>570</width>
+      <height>340</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="videoPrgoressBar">
+    <property name="geometry">
+     <rect>
+      <x>546</x>
+      <y>263</y>
+      <width>240</width>
+      <height>2</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgb(67, 133, 255,200);</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <zorder>backgroundTile_3</zorder>
+   <zorder>graphFrame</zorder>
+   <zorder>backgroundTile_2</zorder>
+   <zorder>backgroundTile</zorder>
+   <zorder>infoLabel</zorder>
+   <zorder>usersComboBox</zorder>
+   <zorder>deleteButton</zorder>
+   <zorder>scrollPane</zorder>
+   <zorder>titleLabel</zorder>
+   <zorder>userFilter</zorder>
+   <zorder>kegFilter</zorder>
+   <zorder>beerFilter</zorder>
+   <zorder>dateFilter</zorder>
+   <zorder>resetFiltersButton</zorder>
+   <zorder>graphButton</zorder>
+   <zorder>resultCountLabel</zorder>
+   <zorder>graphComboBox</zorder>
+   <zorder>previewLabel</zorder>
+   <zorder>resultCountLabel_2</zorder>
+   <zorder>listButton</zorder>
+   <zorder>closeButton</zorder>
+   <zorder>videoPrgoressBar</zorder>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>StaticScrollArea</class>
+   <extends>QFrame</extends>
+   <header>widgets/staticscrollarea.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>UserFilterButton</class>
+   <extends>QPushButton</extends>
+   <header>widgets/filters/userfilterbutton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>BeerFilterButton</class>
+   <extends>QPushButton</extends>
+   <header>widgets/filters/beerfilterbutton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>KegFilterButton</class>
+   <extends>QPushButton</extends>
+   <header>widgets/filters/kegfilterbutton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>DateFilterButton</class>
+   <extends>QPushButton</extends>
+   <header>widgets/filters/datefilterbutton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>QwtGraphFrame</class>
+   <extends>QFrame</extends>
+   <header>widgets/graph/qwtgraphframe.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>

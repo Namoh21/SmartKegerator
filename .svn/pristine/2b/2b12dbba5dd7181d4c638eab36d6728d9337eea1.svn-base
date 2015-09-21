@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/Logo.png</file>
+        <file>images/Background1.png</file>
+        <file>images/HistoryButton.png</file>
+        <file>images/SettingsButtonSmall.png</file>
+        <file>images/StarsEmpty.png</file>
+        <file>images/StarsSelected.png</file>
+        <file>images/UsersButton.png</file>
+    </qresource>
+</RCC>

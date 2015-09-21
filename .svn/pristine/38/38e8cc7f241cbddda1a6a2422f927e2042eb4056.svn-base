@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>OptionSelectDialog</class>
+ <widget class="QDialog" name="OptionSelectDialog">
+  <property name="windowModality">
+   <enum>Qt::ApplicationModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>480</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dialog</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../resources.qrc">
+    <normaloff>:/images/Logo.png</normaloff>:/images/Logo.png</iconset>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">#centralwidget, QDialog
+{
+    background-image: url(:/images/Background1.png);
+}
+
+QPushButton
+{
+    color:rgb(200,200,200,200);
+    background-color:rgb(180,180,180,100);
+    border-radius:3;
+}
+
+QPushButton:checked
+{
+    color:rgb(200,200,200,200);
+    background-color:rgb(140,140,250,100);
+    border-radius:3;
+}
+
+QLabel
+{
+    color:rgb(200,200,200,200);
+    background-color:rgb(150,150,150, 100);
+    border-radius:3;
+}
+
+#scrollPane, #scrollPane2
+{
+    background-color:rgb(150,150,150, 60);
+    border-radius:3;
+}
+
+QScrollBar:horizontal, QScrollBar:vertical
+{
+    height:50px;
+    width:50px;
+    background-color:rgb(120, 120, 120, 140);
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::add-page:vertical, QScrollBar::sub-page:horizontal,QScrollBar::sub-page:vertical
+{
+    background:none;
+}
+
+
+QComboBox QAbstractItemView
+{
+    background-color: rgb(120, 120, 120);
+    selection-background-color: rgb(90, 90, 90);
+}
+QComboBox
+{
+    background-color: rgb(120, 120, 120);
+    min-height:34px;
+    selection-background-color: rgb(90, 90, 90);
+}
+</string>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <widget class="QPushButton" name="pushButton_Cancel">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>20</y>
+     <width>110</width>
+     <height>60</height>
+    </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">color: rgb(255, 255, 255);
+background-color: rgba(200, 50, 50, 100);
+selection-color: rgb(255, 255, 0);</string>
+   </property>
+   <property name="text">
+    <string>Cancel</string>
+   </property>
+   <property name="flat">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>140</x>
+     <y>20</y>
+     <width>440</width>
+     <height>60</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>14</pointsize>
+    </font>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">color: rgb(199, 199, 199);</string>
+   </property>
+   <property name="text">
+    <string>Enter beer name</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButton_Enter">
+   <property name="geometry">
+    <rect>
+     <x>680</x>
+     <y>150</y>
+     <width>100</width>
+     <height>240</height>
+    </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">color: rgb(255, 255, 255);
+background-color: rgba(50, 200, 50, 100);
+selection-color: rgb(255, 255, 0);</string>
+   </property>
+   <property name="text">
+    <string>Enter</string>
+   </property>
+   <property name="flat">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="selectAllButton">
+   <property name="geometry">
+    <rect>
+     <x>690</x>
+     <y>20</y>
+     <width>90</width>
+     <height>60</height>
+    </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">color: rgb(255, 255, 255);
+background-color: rgba(100, 100, 100, 100);
+selection-color: rgb(50, 50, 50);</string>
+   </property>
+   <property name="text">
+    <string>Select All</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="selectNoneButton">
+   <property name="geometry">
+    <rect>
+     <x>590</x>
+     <y>20</y>
+     <width>90</width>
+     <height>60</height>
+    </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">color: rgb(255, 255, 255);
+background-color: rgba(100, 100, 100, 100);
+selection-color: rgb(50, 50, 50);</string>
+   </property>
+   <property name="text">
+    <string>Select None</string>
+   </property>
+  </widget>
+  <widget class="QFrame" name="scrollPane">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>90</y>
+     <width>600</width>
+     <height>370</height>
+    </rect>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::NoFrame</enum>
+   </property>
+   <property name="frameShadow">
+    <enum>QFrame::Plain</enum>
+   </property>
+  </widget>
+  <widget class="QScrollBar" name="verticalScrollBar">
+   <property name="geometry">
+    <rect>
+     <x>620</x>
+     <y>90</y>
+     <width>50</width>
+     <height>370</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Vertical</enum>
+   </property>
+  </widget>
+  <zorder>label</zorder>
+  <zorder>pushButton_Cancel</zorder>
+  <zorder>pushButton_Enter</zorder>
+  <zorder>selectAllButton</zorder>
+  <zorder>selectNoneButton</zorder>
+  <zorder>scrollPane</zorder>
+  <zorder>verticalScrollBar</zorder>
+ </widget>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>
