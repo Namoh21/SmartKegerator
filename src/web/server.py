@@ -100,7 +100,13 @@ app = FastAPI(title="SmartKegerator", lifespan=lifespan)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 _setup_templates(templates)
 
-# Register routers (imported here to avoid circular deps at module load)
+
+def ctx(request: Request, **kwargs) -> dict:
+    """Build a base template context dict."""
+    return {"request": request, "config": _config, **kwargs}
+
+
+# Register routers — imported after ctx/templates are defined to avoid circular import
 from web.routes import dashboard, beers, kegs, users, pours  # noqa: E402
 
 app.include_router(dashboard.router)
@@ -108,15 +114,6 @@ app.include_router(beers.router)
 app.include_router(kegs.router)
 app.include_router(users.router)
 app.include_router(pours.router)
-
-
-# ---------------------------------------------------------------------------
-# Shared template context helper (used by all routes)
-# ---------------------------------------------------------------------------
-
-def ctx(request: Request, **kwargs) -> dict:
-    """Build a base template context dict."""
-    return {"request": request, "config": _config, **kwargs}
 
 
 # ---------------------------------------------------------------------------
