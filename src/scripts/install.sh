@@ -6,10 +6,10 @@
 #   chmod +x install.sh && sudo ./install.sh
 #
 # What this does:
-#   1. Installs system packages via apt (OpenCV, PyQt6, gpiod, dlib, etc.)
-#   2. Installs remaining Python packages via pip
+#   1. Installs system packages via apt (OpenCV, PyQt6, gpiod, etc.)
+#   2. Creates a Python venv and installs pip packages into it
 #   3. Creates the data/photo/video directory tree
-#   4. Installs the systemd user service and Pi autostart entry
+#   4. Installs systemd user services and Pi autostart entry
 # =============================================================================
 set -euo pipefail
 
@@ -35,11 +35,13 @@ info "Installing for user: ${REAL_USER}  (home: ${REAL_HOME})"
 # ---------------------------------------------------------------------------
 INSTALL_DIR="${REAL_HOME}/smartkegerator"
 SRC_DIR="${INSTALL_DIR}/src"
+VENV_DIR="${INSTALL_DIR}/venv"
 DATA_DIR="${INSTALL_DIR}/data"
 PHOTOS_DIR="${INSTALL_DIR}/photos"
 VIDEOS_DIR="${INSTALL_DIR}/videos"
 LOGOS_DIR="${INSTALL_DIR}/logos"
 DB_PATH="${DATA_DIR}/smartkegerator.db"
+PYTHON="${VENV_DIR}/bin/python3"
 
 # ---------------------------------------------------------------------------
 # 1. System packages
@@ -57,7 +59,8 @@ apt-get install -y \
     libopenblas-dev \
     libhdf5-dev \
     liblapack-dev \
-    gfortran
+    gfortran \
+    python3-dev
 
 # OpenCV (system build — much faster than pip on Pi)
 apt-get install -y \
@@ -76,45 +79,62 @@ apt-get install -y \
     libgpiod-dev \
     python3-libgpiod
 
-# Adafruit DHT22 dependencies (libgpiod3 is the Bookworm name; libgpiod-dev above pulls it in)
-apt-get install -y python3-dev
-
 # YAML
 apt-get install -y python3-yaml
 
 info "System packages installed."
 
 # ---------------------------------------------------------------------------
-# 2. Python packages (pip — only what apt doesn't provide)
+# 2. Python virtual environment
+# ---------------------------------------------------------------------------
+section "Python virtual environment"
+
+# --system-site-packages lets the venv use apt-installed packages
+# (python3-opencv, python3-pyqt6, python3-libgpiod, python3-yaml)
+if [[ ! -d "${VENV_DIR}" ]]; then
+    sudo -u "${REAL_USER}" python3 -m venv --system-site-packages "${VENV_DIR}"
+    info "Virtual environment created at ${VENV_DIR}"
+else
+    info "Virtual environment already exists — skipping creation."
+fi
+
+PIP="${PYTHON} -m pip install --quiet"
+
+# Upgrade pip inside the venv first
+sudo -u "${REAL_USER}" ${PIP} --upgrade pip
+
+# ---------------------------------------------------------------------------
+# 3. Python pip packages (installed into venv)
 # ---------------------------------------------------------------------------
 section "Python pip packages"
 
-# On Bookworm, pip requires --break-system-packages to install globally
-PIP="python3 -m pip install --break-system-packages --quiet"
-
-# dlib — must build from source on Bookworm 64-bit (~20-30 min on Pi 4, please be patient)
+# dlib — must build from source on Bookworm 64-bit (~20-30 min on Pi 4)
 info "Building dlib from source — this takes 20-30 minutes on Pi 4, please wait..."
-$PIP dlib
+sudo -u "${REAL_USER}" ${PIP} dlib
 
 # face-recognition — depends on dlib above
-$PIP face-recognition
+sudo -u "${REAL_USER}" ${PIP} face-recognition
 
 # PyQtGraph for history charts
-$PIP pyqtgraph
+sudo -u "${REAL_USER}" ${PIP} pyqtgraph
 
 # Adafruit DHT22 library
-$PIP adafruit-circuitpython-dht
-
-# PyYAML (may already be present via apt; --break-system-packages is safe here)
-$PIP PyYAML
+sudo -u "${REAL_USER}" ${PIP} adafruit-circuitpython-dht
 
 # Web interface dependencies
-$PIP "fastapi>=0.110" "uvicorn[standard]>=0.27" "jinja2>=3.1" "python-multipart>=0.0.9"
+sudo -u "${REAL_USER}" ${PIP} \
+    "fastapi>=0.110" \
+    "uvicorn[standard]>=0.27" \
+    "jinja2>=3.1" \
+    "python-multipart>=0.0.9"
+
+# PyYAML (likely already visible via system-site-packages, but ensure it's present)
+sudo -u "${REAL_USER}" ${PIP} PyYAML
 
 info "Pip packages installed."
 
 # ---------------------------------------------------------------------------
-# 3. Directory tree
+# 4. Directory tree
 # ---------------------------------------------------------------------------
 section "Creating directories"
 
@@ -127,7 +147,7 @@ done
 info "Directories ready."
 
 # ---------------------------------------------------------------------------
-# 4. Copy source files (only if not already there — won't overwrite edits)
+# 5. Copy source files (only if not already there — won't overwrite edits)
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_SRC="$(dirname "${SCRIPT_DIR}")"   # parent of scripts/ = src/
@@ -153,9 +173,9 @@ if [[ -f "${CONFIG}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. systemd user service
+# 6. systemd user services
 # ---------------------------------------------------------------------------
-section "systemd user service"
+section "systemd user services"
 
 SERVICE_DIR="${REAL_HOME}/.config/systemd/user"
 mkdir -p "${SERVICE_DIR}"
@@ -169,7 +189,7 @@ After=graphical-session.target
 [Service]
 Type=simple
 WorkingDirectory=${SRC_DIR}
-ExecStart=/usr/bin/python3 ${SRC_DIR}/main.py ${CONFIG}
+ExecStart=${PYTHON} ${SRC_DIR}/main.py ${CONFIG}
 Restart=on-failure
 RestartSec=5
 Environment=DISPLAY=:0
@@ -181,9 +201,6 @@ Environment=XDG_RUNTIME_DIR=/run/user/%U
 WantedBy=graphical-session.target
 EOF
 
-chown "${REAL_USER}:${REAL_USER}" "${SERVICE_DIR}/smartkegerator.service"
-
-# Web interface service
 cat > "${SERVICE_DIR}/smartkegerator-web.service" << EOF
 [Unit]
 Description=SmartKegerator Web Interface
@@ -192,7 +209,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${SRC_DIR}
-ExecStart=/usr/bin/python3 -m uvicorn web.server:app --host 0.0.0.0 --port 8080
+ExecStart=${PYTHON} -m uvicorn web.server:app --host 0.0.0.0 --port 8080
 Restart=on-failure
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
@@ -201,39 +218,38 @@ Environment=PYTHONUNBUFFERED=1
 WantedBy=default.target
 EOF
 
-chown "${REAL_USER}:${REAL_USER}" "${SERVICE_DIR}/smartkegerator-web.service"
+chown "${REAL_USER}:${REAL_USER}" \
+    "${SERVICE_DIR}/smartkegerator.service" \
+    "${SERVICE_DIR}/smartkegerator-web.service"
 
 # Enable lingering so user services start at boot without login
 loginctl enable-linger "${REAL_USER}" 2>/dev/null || true
 
-# Enable the service as the real user
 sudo -u "${REAL_USER}" systemctl --user daemon-reload 2>/dev/null || true
 sudo -u "${REAL_USER}" systemctl --user enable smartkegerator.service 2>/dev/null || \
-    warn "Could not enable systemd service — enable manually after first login: systemctl --user enable smartkegerator.service"
+    warn "Could not enable service — run manually: systemctl --user enable smartkegerator.service"
 sudo -u "${REAL_USER}" systemctl --user enable smartkegerator-web.service 2>/dev/null || \
-    warn "Could not enable web service — enable manually: systemctl --user enable smartkegerator-web.service"
+    warn "Could not enable web service — run manually: systemctl --user enable smartkegerator-web.service"
 
 info "systemd services installed."
 
 # ---------------------------------------------------------------------------
-# 6. LXDE / Wayfire autostart (fallback for desktop environments)
+# 7. LXDE / Wayfire autostart (fallback for desktop environments)
 # ---------------------------------------------------------------------------
 section "Desktop autostart"
 
-# Wayfire (default on Bookworm)
 WAYFIRE_AUTOSTART="${REAL_HOME}/.config/wayfire/autostart"
 mkdir -p "$(dirname "${WAYFIRE_AUTOSTART}")"
 if ! grep -q "smartkegerator" "${WAYFIRE_AUTOSTART}" 2>/dev/null; then
-    echo "python3 ${SRC_DIR}/main.py ${CONFIG} &" >> "${WAYFIRE_AUTOSTART}"
+    echo "${PYTHON} ${SRC_DIR}/main.py ${CONFIG} &" >> "${WAYFIRE_AUTOSTART}"
     chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_AUTOSTART}"
     info "Added to Wayfire autostart."
 fi
 
-# LXDE (older Pi OS / fallback)
 LXDE_AUTOSTART="${REAL_HOME}/.config/lxsession/LXDE-pi/autostart"
 if [[ -d "$(dirname "${LXDE_AUTOSTART}")" ]]; then
     if ! grep -q "smartkegerator" "${LXDE_AUTOSTART}" 2>/dev/null; then
-        echo "@python3 ${SRC_DIR}/main.py ${CONFIG}" >> "${LXDE_AUTOSTART}"
+        echo "@${PYTHON} ${SRC_DIR}/main.py ${CONFIG}" >> "${LXDE_AUTOSTART}"
         chown "${REAL_USER}:${REAL_USER}" "${LXDE_AUTOSTART}"
         info "Added to LXDE autostart."
     fi
@@ -246,17 +262,19 @@ section "Installation complete"
 
 echo ""
 echo "  Source:   ${SRC_DIR}"
+echo "  Venv:     ${VENV_DIR}"
 echo "  Config:   ${CONFIG}"
 echo "  Database: ${DB_PATH}"
 echo "  Photos:   ${PHOTOS_DIR}"
 echo ""
 echo "  Next steps:"
 echo ""
-echo "  1. Run hardware setup (enables 1-Wire, camera, SPI):"
+echo "  1. Run hardware setup (enables 1-Wire, camera, GPIO):"
 echo "     sudo ${SRC_DIR}/scripts/setup_hardware.sh"
 echo ""
 echo "  2. Migrate existing data (if upgrading from the old C++ version):"
-echo "     python3 -m scripts.migrate_data --db ${DB_PATH} \\"
+echo "     cd ${SRC_DIR}"
+echo "     ${PYTHON} -m scripts.migrate_data --db ${DB_PATH} \\"
 echo "         --beers /path/to/old/logs/beers.txt \\"
 echo "         --kegs  /path/to/old/logs/kegs.txt  \\"
 echo "         --users /path/to/old/logs/users.txt  \\"
@@ -264,11 +282,11 @@ echo "         --pours /path/to/old/logs/pours.txt"
 echo ""
 echo "  3. Add beers and kegs via the CLI:"
 echo "     cd ${SRC_DIR}"
-echo "     python3 -m scripts.manage beer add --name 'IPA' --company 'Brewery' --abv 6.5"
-echo "     python3 -m scripts.manage keg add --beer-id 1 --capacity 19.5 --price 120"
-echo "     python3 -m scripts.manage tap set left --keg-id 1"
+echo "     ${PYTHON} -m scripts.manage beer add --name 'IPA' --company 'Brewery' --abv 6.5"
+echo "     ${PYTHON} -m scripts.manage keg add --beer-id 1 --capacity 19.5 --price 120"
+echo "     ${PYTHON} -m scripts.manage tap set left --keg-id 1"
 echo ""
-echo "  4. Start the app:"
+echo "  4. Start the services:"
 echo "     systemctl --user start smartkegerator"
 echo "     systemctl --user start smartkegerator-web"
 echo "     # or reboot and both start automatically"
