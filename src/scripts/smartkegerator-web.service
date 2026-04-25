@@ -1,0 +1,28 @@
+# SmartKegerator web interface systemd user service
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp smartkegerator-web.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now smartkegerator-web
+#
+# Logs:
+#   journalctl --user -u smartkegerator-web -f
+#
+# The web interface will be available at http://<pi-ip>:8080
+# Adjust WorkingDirectory/ExecStart paths if you installed elsewhere.
+
+[Unit]
+Description=SmartKegerator Web Interface
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/smartkegerator/src
+ExecStart=/usr/bin/python3 -m uvicorn web.server:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

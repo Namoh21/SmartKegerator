@@ -1,0 +1,476 @@
+"""
+Users window — add/remove users, capture training photos, trigger recognition training.
+
+Layout:
+┌─ Users ─────────────────────────────────────────────── [Close] ─┐
+│  ┌─ User list ────┐  ┌─ Detail panel ──────────────────────────┐ │
+│  │ Unknown        │  │  Name: Brian Homan                      │ │
+│  │ Brian Homan    │  │                                         │ │
+│  │ Sarah Jones    │  │  ┌─ Camera ─────────┐  ┌─ Photos ────┐ │ │
+│  │                │  │  │  Live preview    │  │ pic0.jpg    │ │ │
+│  │                │  │  │                  │  │ pic1.jpg    │ │ │
+│  │                │  │  │                  │  │ pic2.jpg    │ │ │
+│  │                │  │  │  [Capture Photo] │  │ [Delete]    │ │ │
+│  │                │  │  └──────────────────┘  └─────────────┘ │ │
+│  │                │  │                                         │ │
+│  │                │  │  [Train Recognition]    Status: Trained │ │
+│  │                │  │                                         │ │
+│  │  [Add] [Delete]│  │  Balance owed: $12.50     [Add Payment] │ │
+│  └────────────────┘  └─────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Optional
+
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtWidgets import (
+    QDialog, QDoubleSpinBox, QHBoxLayout, QInputDialog, QLabel,
+    QListWidget, QListWidgetItem, QMessageBox, QPushButton,
+    QSizePolicy, QVBoxLayout, QWidget,
+)
+
+from data.database import Database
+from data.models import User, UNKNOWN_USER_ID
+
+log = logging.getLogger(__name__)
+
+_DARK_BG = "#1a1a2e"
+_CARD_BG = "#16213e"
+_ACCENT  = "#e94560"
+_TEXT    = "#eaeaea"
+_MUTED   = "#8888aa"
+_GREEN   = "#2ecc71"
+_ORANGE  = "#e67e22"
+
+_STYLE = f"""
+    QDialog, QWidget {{
+        background-color: {_DARK_BG};
+        color: {_TEXT};
+        font-family: 'DejaVu Sans', Arial, sans-serif;
+    }}
+    QListWidget {{
+        background-color: {_CARD_BG};
+        border: 1px solid #2a2a4e;
+        border-radius: 4px;
+        font-size: 13px;
+    }}
+    QListWidget::item:selected {{
+        background-color: {_ACCENT};
+        color: white;
+    }}
+    QListWidget::item:hover {{
+        background-color: #2a2a4e;
+    }}
+    QPushButton {{
+        background-color: #2a2a4e;
+        color: {_TEXT};
+        border: 1px solid {_ACCENT};
+        border-radius: 4px;
+        padding: 6px 14px;
+        font-size: 12px;
+    }}
+    QPushButton:pressed {{ background-color: {_ACCENT}; }}
+    QPushButton#danger {{
+        border-color: {_ORANGE};
+    }}
+    QPushButton#train {{
+        background-color: {_GREEN};
+        color: #111;
+        border: none;
+        font-weight: bold;
+    }}
+    QDoubleSpinBox {{
+        background-color: {_CARD_BG};
+        color: {_TEXT};
+        border: 1px solid #2a2a4e;
+        border-radius: 4px;
+        padding: 4px 8px;
+        min-width: 90px;
+    }}
+"""
+
+
+class UsersWindow(QDialog):
+    def __init__(self, config: dict, db: Database, recognizer, camera, parent=None) -> None:
+        super().__init__(parent)
+        self._config     = config
+        self._db         = db
+        self._recognizer = recognizer
+        self._camera     = camera
+        self._selected_user: Optional[User] = None
+
+        self.setWindowTitle("User Management")
+        self.setStyleSheet(_STYLE)
+        self.setMinimumSize(820, 540)
+        self.resize(900, 580)
+
+        root = QHBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(10)
+
+        root.addWidget(self._build_user_list(), stretch=2)
+        root.addWidget(self._build_detail_panel(), stretch=5)
+
+        # Connect recognizer feedback while this window is open
+        if self._recognizer:
+            self._recognizer.training_complete.connect(self._on_training_complete)
+            self._recognizer.training_failed.connect(self._on_training_failed)
+
+        # Live camera preview — connect while window is open
+        if self._camera:
+            self._camera.frame_ready.connect(self._on_camera_frame)
+
+        self._load_users()
+
+    def closeEvent(self, event):
+        if self._camera:
+            try:
+                self._camera.frame_ready.disconnect(self._on_camera_frame)
+            except Exception:
+                pass
+        super().closeEvent(event)
+
+    # ------------------------------------------------------------------
+    # Layout — user list panel
+    # ------------------------------------------------------------------
+
+    def _build_user_list(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        header = QLabel("Users")
+        f = QFont()
+        f.setPointSize(14)
+        f.setWeight(QFont.Weight.Bold)
+        header.setFont(f)
+        header.setStyleSheet(f"color: {_ACCENT};")
+        layout.addWidget(header)
+
+        self._user_list = QListWidget()
+        self._user_list.currentRowChanged.connect(self._on_user_selected)
+        layout.addWidget(self._user_list, stretch=1)
+
+        btns = QHBoxLayout()
+        add_btn = QPushButton("Add User")
+        add_btn.clicked.connect(self._add_user)
+        del_btn = QPushButton("Delete")
+        del_btn.setObjectName("danger")
+        del_btn.clicked.connect(self._delete_user)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+
+        btns.addWidget(add_btn)
+        btns.addWidget(del_btn)
+        btns.addStretch()
+        btns.addWidget(close_btn)
+        layout.addLayout(btns)
+
+        return panel
+
+    # ------------------------------------------------------------------
+    # Layout — detail panel
+    # ------------------------------------------------------------------
+
+    def _build_detail_panel(self) -> QWidget:
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        # Name header
+        self._lbl_name = QLabel("Select a user")
+        f = QFont()
+        f.setPointSize(15)
+        f.setWeight(QFont.Weight.Bold)
+        self._lbl_name.setFont(f)
+        layout.addWidget(self._lbl_name)
+
+        # Camera + photo list side by side
+        mid = QHBoxLayout()
+        mid.setSpacing(10)
+
+        # Camera column
+        cam_col = QVBoxLayout()
+        self._camera_label = QLabel()
+        self._camera_label.setFixedSize(280, 210)
+        self._camera_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._camera_label.setStyleSheet(f"background-color: {_CARD_BG}; border: 1px solid #2a2a4e; border-radius: 4px; color: {_MUTED};")
+        self._camera_label.setText("No camera")
+        cam_col.addWidget(self._camera_label)
+
+        self._capture_btn = QPushButton("📷  Capture Photo")
+        self._capture_btn.clicked.connect(self._capture_photo)
+        self._capture_btn.setEnabled(False)
+        cam_col.addWidget(self._capture_btn)
+        cam_col.addStretch()
+
+        mid.addLayout(cam_col)
+
+        # Photo list column
+        photo_col = QVBoxLayout()
+        photo_header = QLabel("Training Photos")
+        photo_header.setStyleSheet(f"color: {_MUTED}; font-size: 11px; letter-spacing: 1px;")
+        photo_col.addWidget(photo_header)
+
+        self._photo_list = QListWidget()
+        self._photo_list.setFixedWidth(200)
+        self._photo_list.setStyleSheet(f"font-size: 11px;")
+        photo_col.addWidget(self._photo_list, stretch=1)
+
+        del_photo_btn = QPushButton("Delete Photo")
+        del_photo_btn.setObjectName("danger")
+        del_photo_btn.clicked.connect(self._delete_photo)
+        photo_col.addWidget(del_photo_btn)
+
+        mid.addLayout(photo_col)
+        layout.addLayout(mid)
+
+        # Training row
+        train_row = QHBoxLayout()
+        self._train_btn = QPushButton("Train Recognition")
+        self._train_btn.setObjectName("train")
+        self._train_btn.clicked.connect(self._train_user)
+        self._train_btn.setEnabled(False)
+        train_row.addWidget(self._train_btn)
+
+        self._lbl_train_status = QLabel("")
+        self._lbl_train_status.setStyleSheet(f"color: {_MUTED}; font-size: 12px;")
+        train_row.addWidget(self._lbl_train_status)
+        train_row.addStretch()
+        layout.addLayout(train_row)
+
+        # Balance row
+        bal_row = QHBoxLayout()
+        self._lbl_balance = QLabel("")
+        self._lbl_balance.setStyleSheet(f"font-size: 13px;")
+        bal_row.addWidget(self._lbl_balance)
+        bal_row.addStretch()
+
+        self._payment_spin = QDoubleSpinBox()
+        self._payment_spin.setRange(0.01, 999.99)
+        self._payment_spin.setValue(5.00)
+        self._payment_spin.setPrefix("$")
+        self._payment_spin.setDecimals(2)
+        bal_row.addWidget(self._payment_spin)
+
+        self._payment_btn = QPushButton("Record Payment")
+        self._payment_btn.clicked.connect(self._record_payment)
+        self._payment_btn.setEnabled(False)
+        bal_row.addWidget(self._payment_btn)
+        layout.addLayout(bal_row)
+
+        layout.addStretch()
+        return panel
+
+    # ------------------------------------------------------------------
+    # Data loading
+    # ------------------------------------------------------------------
+
+    def _load_users(self) -> None:
+        self._user_list.clear()
+        for user in self._db.get_all_users():
+            item = QListWidgetItem(user.name)
+            item.setData(Qt.ItemDataRole.UserRole, user.id)
+            self._user_list.addItem(item)
+
+    def _on_user_selected(self, row: int) -> None:
+        if row < 0:
+            self._selected_user = None
+            self._lbl_name.setText("Select a user")
+            self._capture_btn.setEnabled(False)
+            self._train_btn.setEnabled(False)
+            self._payment_btn.setEnabled(False)
+            self._photo_list.clear()
+            self._lbl_balance.setText("")
+            return
+
+        item    = self._user_list.item(row)
+        user_id = item.data(Qt.ItemDataRole.UserRole)
+        user    = self._db.get_user(user_id)
+        if not user:
+            return
+
+        self._selected_user = user
+        self._lbl_name.setText(user.name)
+
+        is_real_user = user.id != UNKNOWN_USER_ID
+        self._capture_btn.setEnabled(is_real_user)
+        self._train_btn.setEnabled(is_real_user and bool(user.image_paths))
+        self._payment_btn.setEnabled(is_real_user)
+
+        self._refresh_photo_list(user)
+        self._refresh_balance(user)
+        self._lbl_train_status.setText(
+            f"{len(self._db.get_face_encodings_for_user(user.id))} encoding(s) stored"
+        )
+
+    def _refresh_photo_list(self, user: User) -> None:
+        self._photo_list.clear()
+        for path in user.image_paths:
+            name = Path(path).name
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, path)
+            self._photo_list.addItem(item)
+
+    def _refresh_balance(self, user: User) -> None:
+        balance = self._db.balance_for_user(user.id)
+        color   = _ORANGE if balance > 0 else _GREEN
+        self._lbl_balance.setText(f"Balance owed: ${balance:.2f}")
+        self._lbl_balance.setStyleSheet(f"color: {color}; font-size: 13px; font-weight: bold;")
+
+    # ------------------------------------------------------------------
+    # Camera feed
+    # ------------------------------------------------------------------
+
+    def _on_camera_frame(self, pixmap: QPixmap) -> None:
+        scaled = pixmap.scaled(
+            self._camera_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self._camera_label.setPixmap(scaled)
+
+    # ------------------------------------------------------------------
+    # User actions
+    # ------------------------------------------------------------------
+
+    def _add_user(self) -> None:
+        name, ok = QInputDialog.getText(self, "Add User", "Name:")
+        if not ok or not name.strip():
+            return
+
+        user = User(id=None, name=name.strip())
+        self._db.save_user(user)
+        log.info("Added user: %s (id=%d)", user.name, user.id)
+        self._load_users()
+
+        # Select the new user
+        for i in range(self._user_list.count()):
+            if self._user_list.item(i).data(Qt.ItemDataRole.UserRole) == user.id:
+                self._user_list.setCurrentRow(i)
+                break
+
+    def _delete_user(self) -> None:
+        if not self._selected_user:
+            return
+        if self._selected_user.id == UNKNOWN_USER_ID:
+            QMessageBox.warning(self, "Cannot Delete", "The Unknown user cannot be deleted.")
+            return
+
+        result = QMessageBox.question(
+            self, "Delete User",
+            f"Delete '{self._selected_user.name}'?\nAll their pours will remain but be attributed to Unknown.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if result != QMessageBox.StandardButton.Yes:
+            return
+
+        self._db.delete_face_encodings_for_user(self._selected_user.id)
+        self._db.delete_user(self._selected_user.id)
+        log.info("Deleted user %d (%s)", self._selected_user.id, self._selected_user.name)
+
+        if self._recognizer:
+            self._recognizer.reload_encodings()
+
+        self._selected_user = None
+        self._load_users()
+
+    # ------------------------------------------------------------------
+    # Photo management
+    # ------------------------------------------------------------------
+
+    def _capture_photo(self) -> None:
+        if not self._selected_user or not self._camera:
+            return
+
+        photos_dir = Path(self._config["data"]["user_photos_dir"])
+        user_dir   = photos_dir / str(self._selected_user.id)
+        user_dir.mkdir(parents=True, exist_ok=True)
+
+        next_id = len(list(user_dir.glob("*.jpg")))
+        path    = str(user_dir / f"pic{next_id}.jpg")
+
+        if not self._camera.capture_photo(path):
+            QMessageBox.warning(self, "Capture Failed", "Could not capture photo — is the camera running?")
+            return
+
+        self._db.add_user_image(self._selected_user.id, path)
+
+        # Reload user and refresh UI
+        self._selected_user = self._db.get_user(self._selected_user.id)
+        self._refresh_photo_list(self._selected_user)
+        self._train_btn.setEnabled(True)
+        log.info("Captured photo for user %d: %s", self._selected_user.id, path)
+
+    def _delete_photo(self) -> None:
+        item = self._photo_list.currentItem()
+        if not item or not self._selected_user:
+            return
+
+        path = item.data(Qt.ItemDataRole.UserRole)
+        result = QMessageBox.question(
+            self, "Delete Photo",
+            f"Delete {Path(path).name}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if result != QMessageBox.StandardButton.Yes:
+            return
+
+        # Remove from DB and optionally from disk
+        user = self._selected_user
+        new_paths = [p for p in user.image_paths if p != path]
+        user.image_paths = new_paths
+        self._db.save_user(user)
+
+        try:
+            Path(path).unlink(missing_ok=True)
+        except Exception as exc:
+            log.warning("Could not delete photo file %s: %s", path, exc)
+
+        self._refresh_photo_list(user)
+        self._train_btn.setEnabled(bool(new_paths))
+
+    # ------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------
+
+    def _train_user(self) -> None:
+        if not self._selected_user or not self._recognizer:
+            return
+
+        self._train_btn.setEnabled(False)
+        self._lbl_train_status.setText("Training…")
+        self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 12px;")
+        self._recognizer.train_user(self._selected_user.id)
+
+    def _on_training_complete(self, user_id: int, count: int) -> None:
+        if self._selected_user and self._selected_user.id == user_id:
+            self._lbl_train_status.setText(f"✓  {count} encoding(s) stored")
+            self._lbl_train_status.setStyleSheet(f"color: {_GREEN}; font-size: 12px;")
+            self._train_btn.setEnabled(True)
+
+    def _on_training_failed(self, user_id: int, reason: str) -> None:
+        if self._selected_user and self._selected_user.id == user_id:
+            self._lbl_train_status.setText(f"✗  {reason}")
+            self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 12px;")
+            self._train_btn.setEnabled(True)
+
+    # ------------------------------------------------------------------
+    # Payments
+    # ------------------------------------------------------------------
+
+    def _record_payment(self) -> None:
+        if not self._selected_user:
+            return
+        amount  = self._payment_spin.value()
+        payment = self._db.add_payment(self._selected_user.id, amount)
+        log.info("Recorded payment $%.2f for user %d", amount, self._selected_user.id)
+        self._refresh_balance(self._selected_user)

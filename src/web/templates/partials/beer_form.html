@@ -1,0 +1,33 @@
+<!-- Shared form fields for Add/Edit Beer modals -->
+<div class="mb-3">
+  <label class="form-label">Name <span class="text-danger">*</span></label>
+  <input type="text" class="form-control" name="name" value="{{ beer.name if beer is defined else '' }}" required>
+</div>
+<div class="row g-2">
+  <div class="col-md-6 mb-3">
+    <label class="form-label">Brewery / Company</label>
+    <input type="text" class="form-control" name="company" value="{{ beer.company if beer is defined else '' }}">
+  </div>
+  <div class="col-md-6 mb-3">
+    <label class="form-label">Style</label>
+    <input type="text" class="form-control" name="style" value="{{ beer.style if beer is defined else '' }}"
+           placeholder="IPA, Stout, Lager…">
+  </div>
+</div>
+<div class="mb-3">
+  <label class="form-label">Location</label>
+  <input type="text" class="form-control" name="location" value="{{ beer.location if beer is defined else '' }}"
+         placeholder="City, State">
+</div>
+<div class="row g-2">
+  <div class="col-md-6 mb-3">
+    <label class="form-label">ABV (%)</label>
+    <input type="number" class="form-control" name="abv" step="0.1" min="0" max="100"
+           value="{{ beer.abv if beer is defined else '0.0' }}">
+  </div>
+  <div class="col-md-6 mb-3">
+    <label class="form-label">IBU</label>
+    <input type="number" class="form-control" name="ibu" min="0"
+           value="{{ beer.ibu if beer is defined else '0' }}">
+  </div>
+</div>

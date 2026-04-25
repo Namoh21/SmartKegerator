@@ -1,0 +1,46 @@
+hardware:
+  # Camera
+  camera_index: 0
+  camera_width: 640
+  camera_height: 480
+  camera_use_color: true
+  camera_leds_pin: 18
+
+  # Flow meters (GPIO BCM pin numbers)
+  flow_meter_pin_left: 23
+  flow_meter_pin_center: 24
+  flow_meter_pin_right: 25
+  ticks_per_liter: 500
+  tick_threshold: 3          # ticks required before a pour is registered
+  end_pour_seconds: 5.0      # seconds of no ticks before pour ends
+
+  # Temperature sensors
+  temp_sensor_power_pin: 17
+  temp_sensor_dht_pin: 22
+  liquid_temp_sensor_id: "28-0000058cffde"   # DS18B20 1-Wire device ID
+
+recognition:
+  enabled: true
+  confidence_threshold: 0.55   # lower = stricter (face_recognition distance metric)
+  detection_model: "hog"       # "hog" (faster, CPU) or "cnn" (accurate, needs more CPU)
+
+data:
+  database_path: /home/pi/smartkegerator/smartkegerator.db
+  user_photos_dir: /home/pi/smartkegerator/photos
+  pour_videos_dir: /home/pi/smartkegerator/videos
+  beer_logos_dir: /home/pi/smartkegerator/logos
+
+ui:
+  fullscreen: false
+  window_x: 500
+  window_y: 200
+  css_file: /home/pi/smartkegerator/style.css
+  beer_logo_opacity: 0.5
+  pour_video_frame_rate: 20
+  log_pours: true
+
+web:
+  port: 8080    # web interface port — accessible at http://<pi-ip>:8080
+
+admin:
+  password: "1234"

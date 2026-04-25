@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Kegs — SmartKegerator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="text-accent mb-0"><i class="bi bi-archive me-2"></i>Kegs</h2>
+  <button class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#addKegModal">
+    <i class="bi bi-plus-lg me-1"></i>Add Keg
+  </button>
+</div>
+
+<!-- ── Tap Assignment Panel ─────────────────────────────────────────── -->
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-diagram-3 me-2"></i>Tap Assignments</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for tap_name, keg_id in [("left", taps.left_keg_id), ("center", taps.center_keg_id), ("right", taps.right_keg_id)] %}
+      <div class="col-md-4">
+        <form method="post" action="/kegs/assign-tap" class="d-flex gap-2 align-items-end">
+          <input type="hidden" name="tap" value="{{ tap_name }}">
+          <div class="flex-grow-1">
+            <label class="form-label tap-label">{{ tap_name | upper }} TAP</label>
+            <select class="form-select" name="keg_id">
+              <option value="none" {% if keg_id is none %}selected{% endif %}>— Empty —</option>
+              {% for keg in all_kegs %}
+              {% set b = namespace(name="Unknown") %}
+              {% for s in stats %}{% if s.keg.id == keg.id %}{% set b.name = s.beer.name if s.beer else "Unknown" %}{% endif %}{% endfor %}
+              <option value="{{ keg.id }}" {% if keg.id == keg_id %}selected{% endif %}>
+                #{{ keg.id }} · {{ b.name }} ({{ keg.percent_remaining | pct }} left)
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm btn-outline-secondary">Set</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- ── Keg list ─────────────────────────────────────────────────────── -->
+<div class="row g-3">
+  {% for s in stats %}
+  {% set pct = s.keg.percent_remaining | int %}
+  {% if pct > 25 %}{% set bar_cls = "level-ok" %}
+  {% elif pct > 10 %}{% set bar_cls = "level-low" %}
+  {% else %}{% set bar_cls = "level-empty" %}{% endif %}
+
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <div>
+          <strong>{{ s.beer.name if s.beer else "Unknown Beer" }}</strong>
+          {% if s.tap %}<span class="badge ms-2" style="background:var(--sk-accent)">{{ s.tap | upper }}</span>{% endif %}
+        </div>
+        <span class="text-muted small">Keg #{{ s.keg.id }}</span>
+      </div>
+      <div class="card-body">
+        <div class="progress mb-3" style="height:24px;" title="{{ pct }}% remaining">
+          <div class="progress-bar {{ bar_cls }}" style="width:{{ pct }}%;">{{ pct }}%</div>
+        </div>
+
+        <div class="row g-1 small">
+          <div class="col-7 text-muted">Remaining</div>
+          <div class="col-5 text-end">{{ "%.1f"|format(s.oz_remaining) }} oz / {{ "%.1f"|format(s.keg.liters_remaining) }} L</div>
+
+          <div class="col-7 text-muted">Total poured</div>
+          <div class="col-5 text-end">{{ "%.1f"|format(s.oz_poured_total) }} oz</div>
+
+          <div class="col-7 text-muted">Keg capacity</div>
+          <div class="col-5 text-end">{{ s.keg.liters_capacity }} L</div>
+
+          <div class="col-7 text-muted">Tapped</div>
+          <div class="col-5 text-end">{{ s.keg.date_bought.strftime("%b %d, %Y") }}</div>
+
+          <div class="col-7 text-muted">Total cost</div>
+          <div class="col-5 text-end">{{ s.keg.price | usd }}</div>
+
+          <div class="col-7 text-muted">Cost / oz</div>
+          <div class="col-5 text-end">${{ "%.3f"|format(s.cost_per_oz) }}</div>
+
+          <div class="col-7 text-muted">Cost / pint (16 oz)</div>
+          <div class="col-5 text-end fw-bold text-accent">${{ "%.2f"|format(s.cost_per_pint) }}</div>
+
+          {% if s.pour_rate_oz_day > 0 %}
+          <div class="col-7 text-muted">Pour rate (14-day avg)</div>
+          <div class="col-5 text-end">{{ "%.1f"|format(s.pour_rate_oz_day) }} oz/day</div>
+          {% endif %}
+
+          {% if s.est_empty_date %}
+          <div class="col-7 text-muted">Est. empty</div>
+          <div class="col-5 text-end">{{ s.est_empty_date.strftime("%b %d") }}
+            {% if s.days_remaining %}<span class="text-muted">({{ s.days_remaining | int }}d)</span>{% endif %}
+          </div>
+          {% endif %}
+
+          <div class="col-7 text-muted">Pours today / this week</div>
+          <div class="col-5 text-end">{{ s.pours_today }} / {{ s.pours_this_week }}</div>
+        </div>
+      </div>
+      <div class="card-footer border-secondary d-flex justify-content-end gap-2 py-2">
+        <button class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#editKeg{{ s.keg.id }}">
+          <i class="bi bi-pencil"></i> Edit
+        </button>
+        <form method="post" action="/kegs/{{ s.keg.id }}/delete" class="d-inline"
+              onsubmit="return confirm('Delete keg #{{ s.keg.id }}? This cannot be undone.')">
+          <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Keg Modal -->
+  <div class="modal fade" id="editKeg{{ s.keg.id }}" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content" style="background:var(--sk-card);">
+        <form method="post" action="/kegs/{{ s.keg.id }}/edit">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title">Edit Keg #{{ s.keg.id }}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            {% set keg = s.keg %}
+            {% include "partials/keg_form.html" %}
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-accent">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Add Keg Modal ────────────────────────────────────────────────── -->
+<div class="modal fade" id="addKegModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content" style="background:var(--sk-card);">
+      <form method="post" action="/kegs/add">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title">Add Keg</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% set keg = none %}
+          {% include "partials/keg_form.html" %}
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-accent">Add Keg</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

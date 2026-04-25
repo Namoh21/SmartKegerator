@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Database & runtime data
+*.db
+*.db-shm
+*.db-wal
+
+# User photos and media (large binary data — store separately)
+photos/
+videos/
+
+# Config overrides (keep the template, not local edits with real passwords/paths)
+# src/config.yaml is intentionally tracked as a template
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Old SVN metadata
+.svn/
+
+# Old C++ build artifacts (legacy — source files kept in git history)
+*.o
+*.so
+Makefile.Debug
+Makefile.Release

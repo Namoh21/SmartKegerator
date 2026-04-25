@@ -1,0 +1,47 @@
+{% for i in range(3) %}
+{% set s = tap_stats[i] %}
+{% set name = tap_names[i] %}
+<div class="col">
+  <div class="card tap-card h-100">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+      <span class="tap-label">{{ name }} TAP</span>
+      {% if s %}<span class="badge" style="background:var(--sk-accent)">{{ s.keg.percent_remaining | pct }}</span>{% endif %}
+    </div>
+    <div class="card-body">
+      {% if s and s.beer %}
+        <h5 class="card-title mb-0">{{ s.beer.name }}</h5>
+        <small class="text-muted">{{ s.beer.company }}{% if s.beer.style %} · {{ s.beer.style }}{% endif %}</small>
+
+        {% set pct = s.keg.percent_remaining | int %}
+        {% if pct > 25 %}{% set bar_cls = "level-ok" %}
+        {% elif pct > 10 %}{% set bar_cls = "level-low" %}
+        {% else %}{% set bar_cls = "level-empty" %}{% endif %}
+
+        <div class="progress my-3" style="height:22px;">
+          <div class="progress-bar {{ bar_cls }}" style="width:{{ pct }}%;">{{ pct }}%</div>
+        </div>
+
+        <div class="row g-1 small">
+          <div class="col-6 text-muted">Remaining</div>
+          <div class="col-6 text-end">{{ "%.1f"|format(s.oz_remaining) }} oz</div>
+          <div class="col-6 text-muted">Cost / oz</div>
+          <div class="col-6 text-end">${{ "%.3f"|format(s.cost_per_oz) }}</div>
+          <div class="col-6 text-muted">Cost / pint</div>
+          <div class="col-6 text-end">${{ "%.2f"|format(s.cost_per_pint) }}</div>
+          {% if s.beer.abv %}<div class="col-6 text-muted">ABV</div><div class="col-6 text-end">{{ s.beer.abv | abv }}</div>{% endif %}
+          {% if s.beer.ibu %}<div class="col-6 text-muted">IBU</div><div class="col-6 text-end">{{ s.beer.ibu }}</div>{% endif %}
+          <div class="col-6 text-muted">Pours today</div>
+          <div class="col-6 text-end">{{ s.pours_today }}</div>
+          {% if s.est_empty_date %}
+          <div class="col-6 text-muted">Est. empty</div>
+          <div class="col-6 text-end">{{ s.est_empty_date.strftime("%b %d") }}</div>
+          {% endif %}
+        </div>
+      {% else %}
+        <p class="text-muted mt-3"><i class="bi bi-archive me-1"></i>No keg assigned</p>
+        <a href="/kegs/" class="btn btn-sm btn-outline-secondary mt-2">Assign keg</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}

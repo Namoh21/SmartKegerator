@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Pour History — SmartKegerator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="text-accent mb-0"><i class="bi bi-clock-history me-2"></i>Pour History</h2>
+</div>
+
+<!-- ── Filters ───────────────────────────────────────────────────────── -->
+<form method="get" action="/pours/" class="card mb-4">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small text-muted">User</label>
+        <select class="form-select form-select-sm" name="user_id">
+          <option value="0" {% if selected_user == 0 %}selected{% endif %}>All users</option>
+          {% for u in all_users %}
+          {% if u.id != -1 %}
+          <option value="{{ u.id }}" {% if selected_user == u.id %}selected{% endif %}>{{ u.name }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small text-muted">Keg / Beer</label>
+        <select class="form-select form-select-sm" name="keg_id">
+          <option value="0" {% if selected_keg == 0 %}selected{% endif %}>All kegs</option>
+          {% for keg in all_kegs %}
+          <option value="{{ keg.id }}" {% if selected_keg == keg.id %}selected{% endif %}>
+            Keg #{{ keg.id }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small text-muted">Period</label>
+        <select class="form-select form-select-sm" name="period">
+          {% for val, label in [("7d","Last 7 days"), ("30d","Last 30 days"), ("90d","Last 90 days"), ("all","All time")] %}
+          <option value="{{ val }}" {% if selected_period == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2">
+        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Apply</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- ── Summary bar ───────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-4">
+    <div class="card text-center py-2">
+      <div class="fs-5 fw-bold text-accent">{{ pour_count }}</div>
+      <div class="text-muted small">Pours</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card text-center py-2">
+      <div class="fs-5 fw-bold">{{ "%.1f"|format(total_oz) }} oz</div>
+      <div class="text-muted small">Total volume</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card text-center py-2">
+      <div class="fs-5 fw-bold">{{ total_price | usd }}</div>
+      <div class="text-muted small">Total value</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Bar chart ─────────────────────────────────────────────────────── -->
+{% if chart_labels %}
+<div class="card mb-4">
+  <div class="card-header small text-muted">Oz poured per day</div>
+  <div class="card-body" style="height:200px;">
+    <canvas id="pourChart"></canvas>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Pour table ────────────────────────────────────────────────────── -->
+<div class="card">
+  <div class="card-body p-0">
+    {% if enriched_pours %}
+    <div class="table-responsive">
+      <table class="table table-striped table-hover mb-0 small">
+        <thead>
+          <tr>
+            <th>Date &amp; Time</th>
+            <th>User</th>
+            <th>Beer</th>
+            <th class="text-end">Amount</th>
+            <th class="text-end">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in enriched_pours %}
+          <tr>
+            <td class="text-muted">{{ row.pour.time | datetime }}</td>
+            <td>
+              <a href="/users/{{ row.pour.user_id }}" class="text-white text-decoration-none">
+                {{ row.user_name }}
+              </a>
+            </td>
+            <td>{{ row.beer_name }}</td>
+            <td class="text-end">{{ row.pour.ounces | oz }}</td>
+            <td class="text-end">{{ row.pour.price | usd }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted p-3 mb-0">No pours found for the selected filters.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if chart_labels %}
+<script>
+(function() {
+  const labels = {{ chart_labels | tojson }};
+  const data   = {{ chart_oz | tojson }};
+  const ctx    = document.getElementById("pourChart").getContext("2d");
+  new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "oz",
+        data,
+        backgroundColor: "rgba(233,69,96,0.6)",
+        borderColor:     "rgba(233,69,96,1)",
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#aaa", maxRotation: 45, autoSkip: true, maxTicksLimit: 15 },
+             grid: { color: "#333" } },
+        y: { ticks: { color: "#aaa" }, grid: { color: "#333" }, beginAtZero: true },
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}
