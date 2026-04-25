@@ -54,10 +54,8 @@ apt-get install -y \
     python3-venv \
     cmake \
     build-essential \
-    libatlas-base-dev \
     libopenblas-dev \
     libhdf5-dev \
-    libhdf5-serial-dev \
     liblapack-dev \
     gfortran
 
