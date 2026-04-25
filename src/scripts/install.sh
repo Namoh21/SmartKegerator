@@ -76,15 +76,8 @@ apt-get install -y \
     libgpiod-dev \
     python3-libgpiod
 
-# dlib (pre-built Debian package avoids the 20-30 min compile from source)
-apt-get install -y python3-dlib || {
-    warn "python3-dlib not in apt — will build from source via pip (takes ~25 min on Pi 4)"
-}
-
-# Adafruit DHT22 dependencies
-apt-get install -y \
-    python3-dev \
-    libgpiod2
+# Adafruit DHT22 dependencies (libgpiod3 is the Bookworm name; libgpiod-dev above pulls it in)
+apt-get install -y python3-dev
 
 # YAML
 apt-get install -y python3-yaml
@@ -99,7 +92,11 @@ section "Python pip packages"
 # On Bookworm, pip requires --break-system-packages to install globally
 PIP="python3 -m pip install --break-system-packages --quiet"
 
-# face-recognition — the heavy one; uses the dlib we just installed from apt
+# dlib — must build from source on Bookworm 64-bit (~20-30 min on Pi 4, please be patient)
+info "Building dlib from source — this takes 20-30 minutes on Pi 4, please wait..."
+$PIP dlib
+
+# face-recognition — depends on dlib above
 $PIP face-recognition
 
 # PyQtGraph for history charts
