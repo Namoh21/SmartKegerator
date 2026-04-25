@@ -225,10 +225,14 @@ chown "${REAL_USER}:${REAL_USER}" \
 # Enable lingering so user services start at boot without login
 loginctl enable-linger "${REAL_USER}" 2>/dev/null || true
 
-sudo -u "${REAL_USER}" systemctl --user daemon-reload 2>/dev/null || true
-sudo -u "${REAL_USER}" systemctl --user enable smartkegerator.service 2>/dev/null || \
+# systemctl --user requires XDG_RUNTIME_DIR to reach the user's D-Bus session
+REAL_UID=$(id -u "${REAL_USER}")
+SYSTEMCTL="sudo -u ${REAL_USER} XDG_RUNTIME_DIR=/run/user/${REAL_UID} systemctl --user"
+
+${SYSTEMCTL} daemon-reload 2>/dev/null || true
+${SYSTEMCTL} enable smartkegerator.service 2>/dev/null || \
     warn "Could not enable service — run manually: systemctl --user enable smartkegerator.service"
-sudo -u "${REAL_USER}" systemctl --user enable smartkegerator-web.service 2>/dev/null || \
+${SYSTEMCTL} enable smartkegerator-web.service 2>/dev/null || \
     warn "Could not enable web service — run manually: systemctl --user enable smartkegerator-web.service"
 
 info "systemd services installed."
