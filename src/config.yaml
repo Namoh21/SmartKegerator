@@ -30,8 +30,12 @@ data:
   pour_videos_dir: /home/pi/smartkegerator/videos
   beer_logos_dir: /home/pi/smartkegerator/logos
 
+display:
+  rotate: 0          # 0=normal, 2=upside-down, 1=90°CW, 3=90°CCW
+                     # Applied by scripts/setup_hardware.sh — reboot required
+
 ui:
-  fullscreen: false
+  fullscreen: false  # auto-set to true when Pi 7" screen (800x480) is detected
   window_x: 500
   window_y: 200
   css_file: /home/pi/smartkegerator/style.css

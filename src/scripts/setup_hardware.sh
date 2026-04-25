@@ -87,6 +87,7 @@ fi
 echo ""
 echo "── GPIO permissions ──"
 REAL_USER="${SUDO_USER:-pi}"
+REAL_HOME=$(eval echo "~${REAL_USER}")
 if groups "${REAL_USER}" | grep -q gpio; then
     ok "User ${REAL_USER} is already in the gpio group"
 else
@@ -130,6 +131,73 @@ if [[ -d "${W1_DIR}" ]]; then
     fi
 else
     info "1-Wire sysfs not yet loaded (reboot required before sensor appears)"
+fi
+
+# ---------------------------------------------------------------------------
+# Screen blanking — disable for always-on kegerator display
+# ---------------------------------------------------------------------------
+echo ""
+echo "── Screen blanking ──"
+
+# consoleblank=0 keeps the TTY console from going dark
+CMDLINE="/boot/firmware/cmdline.txt"
+[[ -f "${CMDLINE}" ]] || CMDLINE="/boot/cmdline.txt"
+if [[ -f "${CMDLINE}" ]]; then
+    if ! grep -q "consoleblank=0" "${CMDLINE}"; then
+        sed -i 's/$/ consoleblank=0/' "${CMDLINE}"
+        info "Added consoleblank=0 to ${CMDLINE}"
+        REBOOT_NEEDED=true
+    else
+        ok "consoleblank=0 already set"
+    fi
+fi
+
+# Wayfire (Pi OS Bookworm default compositor) — disable idle/DPMS
+WAYFIRE_CONF="${REAL_HOME}/.config/wayfire.ini"
+mkdir -p "$(dirname "${WAYFIRE_CONF}")"
+chown "${REAL_USER}:${REAL_USER}" "$(dirname "${WAYFIRE_CONF}")"
+if grep -q "^\[idle\]" "${WAYFIRE_CONF}" 2>/dev/null; then
+    # Section exists — ensure both timeouts are 0
+    sed -i '/^\[idle\]/,/^\[/{
+        s/^screensaver_timeout *=.*/screensaver_timeout = 0/
+        s/^dpms_timeout *=.*/dpms_timeout = 0/
+    }' "${WAYFIRE_CONF}"
+    ok "Wayfire idle timeouts already present — set to 0"
+else
+    printf '\n[idle]\nscreensaver_timeout = 0\ndpms_timeout = 0\n' >> "${WAYFIRE_CONF}"
+    chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_CONF}"
+    info "Disabled Wayfire screensaver/DPMS in ${WAYFIRE_CONF}"
+fi
+
+# ---------------------------------------------------------------------------
+# Display rotation — Pi 7" touchscreen
+#   Set DISPLAY_ROTATE before running to apply a non-default orientation:
+#     DISPLAY_ROTATE=2 sudo ./setup_hardware.sh   # 180° (upside-down mount)
+#   Values: 0=normal  1=90°CW  2=180°  3=90°CCW
+# ---------------------------------------------------------------------------
+echo ""
+echo "── Display rotation ──"
+DISPLAY_ROTATE="${DISPLAY_ROTATE:-0}"
+if [[ "${DISPLAY_ROTATE}" != "0" ]]; then
+    # Remove any existing display_rotate line first, then add the new one
+    sed -i '/^display_rotate=/d' "${CONFIG}"
+    echo "display_rotate=${DISPLAY_ROTATE}" >> "${CONFIG}"
+    info "Display rotation set to ${DISPLAY_ROTATE} in ${CONFIG}"
+
+    # Also set in Wayfire (applies to the Wayland session)
+    WAYFIRE_ROTATE_MAP=([1]="90" [2]="180" [3]="270")
+    WF_TRANSFORM="${WAYFIRE_ROTATE_MAP[${DISPLAY_ROTATE}]:-normal}"
+    if grep -q "^\[output:DSI-1\]" "${WAYFIRE_CONF}" 2>/dev/null; then
+        sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = '"${WF_TRANSFORM}"'/}' "${WAYFIRE_CONF}"
+    else
+        printf '\n[output:DSI-1]\ntransform = %s\n' "${WF_TRANSFORM}" >> "${WAYFIRE_CONF}"
+        chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_CONF}"
+    fi
+    info "Wayfire display transform set to ${WF_TRANSFORM}"
+    REBOOT_NEEDED=true
+else
+    ok "Display rotation: 0 / normal landscape (default for Pi 7\" screen)"
+    ok "To rotate 180°: DISPLAY_ROTATE=2 sudo ./setup_hardware.sh"
 fi
 
 # ---------------------------------------------------------------------------

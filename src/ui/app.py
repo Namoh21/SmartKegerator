@@ -61,6 +61,9 @@ class App(QObject):
         self._main_window    = MainWindow(config, self._db, self._recognizer)
         self._pouring_window = PouringWindow(config, self._db)
 
+        # Set before _start_hardware() in case a pour fires during startup
+        self._fullscreen: bool = False
+
         # -----------------------------------------------------------------
         # Wire signals
         # -----------------------------------------------------------------
@@ -119,9 +122,10 @@ class App(QObject):
         app = QApplication.instance()
         geo = app.primaryScreen().availableGeometry()
 
-        # Detect Pi 7" touchscreen (800×454 after taskbar) or explicit config
+        # Detect Pi 7" touchscreen (800×480) or explicit config flag
         is_touchscreen = geo.width() == 800 and geo.height() <= 480
-        if ui.get("fullscreen", False) or is_touchscreen:
+        self._fullscreen = ui.get("fullscreen", False) or is_touchscreen
+        if self._fullscreen:
             app.setOverrideCursor(Qt.CursorShape.BlankCursor)
             self._main_window.showFullScreen()
         else:
@@ -154,8 +158,7 @@ class App(QObject):
         hw = self._config["hardware"]
         self._gpio.write(hw.get("camera_leds_pin", 18), True)
 
-        ui = self._config.get("ui", {})
-        if ui.get("fullscreen", False):
+        if self._fullscreen:
             self._pouring_window.showFullScreen()
         else:
             self._pouring_window.resize(self._main_window.size())
@@ -206,16 +209,22 @@ class App(QObject):
     def _open_history(self) -> None:
         from ui.history_window import HistoryWindow
         w = HistoryWindow(self._config, self._db, self._main_window)
+        if self._fullscreen:
+            w.showFullScreen()
         w.exec()
 
     def _open_settings(self) -> None:
         from ui.settings_window import SettingsWindow
         w = SettingsWindow(self._config, self._db, self._main_window)
+        if self._fullscreen:
+            w.showFullScreen()
         w.exec()
 
     def _open_users(self) -> None:
         from ui.users_window import UsersWindow
         w = UsersWindow(self._config, self._db, self._recognizer, self._camera, self._main_window)
+        if self._fullscreen:
+            w.showFullScreen()
         w.exec()
 
     # ------------------------------------------------------------------
