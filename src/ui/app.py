@@ -122,8 +122,11 @@ class App(QObject):
         app = QApplication.instance()
         geo = app.primaryScreen().availableGeometry()
 
-        # Detect Pi 7" touchscreen (800×480) or explicit config flag
-        is_touchscreen = geo.width() == 800 and geo.height() <= 480
+        # Detect Pi 7" touchscreen in landscape (800×480) or portrait/90° (480×800)
+        is_touchscreen = (
+            (geo.width() == 800 and geo.height() <= 480) or
+            (geo.width() == 480 and geo.height() <= 800)
+        )
         self._fullscreen = ui.get("fullscreen", False) or is_touchscreen
         if self._fullscreen:
             app.setOverrideCursor(Qt.CursorShape.BlankCursor)

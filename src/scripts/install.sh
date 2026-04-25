@@ -260,6 +260,34 @@ if [[ -d "$(dirname "${LXDE_AUTOSTART}")" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 8. Display rotation — Pi 7" touchscreen at 90° (portrait)
+# ---------------------------------------------------------------------------
+section "Display rotation"
+
+CONFIG_TXT="/boot/firmware/config.txt"
+[[ -f "${CONFIG_TXT}" ]] || CONFIG_TXT="/boot/config.txt"
+
+if [[ -f "${CONFIG_TXT}" ]]; then
+    if grep -q "^display_rotate=" "${CONFIG_TXT}"; then
+        sed -i "s/^display_rotate=.*/display_rotate=1/" "${CONFIG_TXT}"
+    else
+        echo "display_rotate=1" >> "${CONFIG_TXT}"
+    fi
+    info "Display rotation set to 90° (portrait) in ${CONFIG_TXT}"
+fi
+
+# Tell the Wayfire compositor to rotate the DSI-1 output to match
+WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
+mkdir -p "$(dirname "${WAYFIRE_INI}")"
+if grep -q "^\[output:DSI-1\]" "${WAYFIRE_INI}" 2>/dev/null; then
+    sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = 90/}' "${WAYFIRE_INI}"
+else
+    printf '\n[output:DSI-1]\ntransform = 90\n' >> "${WAYFIRE_INI}"
+fi
+chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
+info "Wayfire DSI-1 transform set to 90°"
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 section "Installation complete"
