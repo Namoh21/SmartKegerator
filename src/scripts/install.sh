@@ -261,22 +261,14 @@ fi
 
 # ---------------------------------------------------------------------------
 # 8. Display rotation — Pi 7" touchscreen at 90° (portrait)
+#
+#    On Pi OS Bookworm the KMS driver (vc4-kms-v3d) is active, so
+#    display_rotate in config.txt is NOT used.  Rotation is set via the
+#    Wayfire compositor only.
 # ---------------------------------------------------------------------------
 section "Display rotation"
 
-CONFIG_TXT="/boot/firmware/config.txt"
-[[ -f "${CONFIG_TXT}" ]] || CONFIG_TXT="/boot/config.txt"
-
-if [[ -f "${CONFIG_TXT}" ]]; then
-    if grep -q "^display_rotate=" "${CONFIG_TXT}"; then
-        sed -i "s/^display_rotate=.*/display_rotate=1/" "${CONFIG_TXT}"
-    else
-        echo "display_rotate=1" >> "${CONFIG_TXT}"
-    fi
-    info "Display rotation set to 90° (portrait) in ${CONFIG_TXT}"
-fi
-
-# Tell the Wayfire compositor to rotate the DSI-1 output to match
+# Wayfire: rotate DSI-1 output 90° clockwise (portrait mode)
 WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
 mkdir -p "$(dirname "${WAYFIRE_INI}")"
 if grep -q "^\[output:DSI-1\]" "${WAYFIRE_INI}" 2>/dev/null; then
@@ -285,7 +277,15 @@ else
     printf '\n[output:DSI-1]\ntransform = 90\n' >> "${WAYFIRE_INI}"
 fi
 chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
-info "Wayfire DSI-1 transform set to 90°"
+info "Wayfire DSI-1 transform set to 90° (portrait)"
+
+# Remove any stale display_rotate from config.txt (legacy option — breaks KMS)
+CONFIG_TXT="/boot/firmware/config.txt"
+[[ -f "${CONFIG_TXT}" ]] || CONFIG_TXT="/boot/config.txt"
+if grep -q "^display_rotate=" "${CONFIG_TXT}" 2>/dev/null; then
+    sed -i '/^display_rotate=/d' "${CONFIG_TXT}"
+    info "Removed legacy display_rotate from ${CONFIG_TXT} (not compatible with KMS)"
+fi
 
 # ---------------------------------------------------------------------------
 # Done
