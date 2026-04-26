@@ -206,7 +206,7 @@ esac
 # ---------------------------------------------------------------------------
 echo ""
 echo "── Display rotation ──"
-DISPLAY_ROTATE="${DISPLAY_ROTATE:-180}"
+DISPLAY_ROTATE="${DISPLAY_ROTATE:-270}"
 
 # Map degree values to compositor transform names
 case "${DISPLAY_ROTATE}" in
