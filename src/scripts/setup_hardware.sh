@@ -139,7 +139,17 @@ fi
 echo ""
 echo "── Screen blanking ──"
 
-# consoleblank=0 keeps the TTY console from going dark
+# Detect compositor
+if command -v labwc &>/dev/null; then
+    COMPOSITOR="labwc"
+elif command -v wayfire &>/dev/null; then
+    COMPOSITOR="wayfire"
+else
+    COMPOSITOR="unknown"
+fi
+info "Compositor: ${COMPOSITOR}"
+
+# consoleblank=0 keeps the TTY console from going dark (all compositors)
 CMDLINE="/boot/firmware/cmdline.txt"
 [[ -f "${CMDLINE}" ]] || CMDLINE="/boot/cmdline.txt"
 if [[ -f "${CMDLINE}" ]]; then
@@ -152,53 +162,89 @@ if [[ -f "${CMDLINE}" ]]; then
     fi
 fi
 
-# Wayfire (Pi OS Bookworm default compositor) — disable idle/DPMS
-WAYFIRE_CONF="${REAL_HOME}/.config/wayfire.ini"
-mkdir -p "$(dirname "${WAYFIRE_CONF}")"
-chown "${REAL_USER}:${REAL_USER}" "$(dirname "${WAYFIRE_CONF}")"
-if grep -q "^\[idle\]" "${WAYFIRE_CONF}" 2>/dev/null; then
-    # Section exists — ensure both timeouts are 0
-    sed -i '/^\[idle\]/,/^\[/{
-        s/^screensaver_timeout *=.*/screensaver_timeout = 0/
-        s/^dpms_timeout *=.*/dpms_timeout = 0/
-    }' "${WAYFIRE_CONF}"
-    ok "Wayfire idle timeouts already present — set to 0"
-else
-    printf '\n[idle]\nscreensaver_timeout = 0\ndpms_timeout = 0\n' >> "${WAYFIRE_CONF}"
-    chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_CONF}"
-    info "Disabled Wayfire screensaver/DPMS in ${WAYFIRE_CONF}"
-fi
+case "${COMPOSITOR}" in
+    wayfire)
+        WAYFIRE_CONF="${REAL_HOME}/.config/wayfire.ini"
+        mkdir -p "$(dirname "${WAYFIRE_CONF}")"
+        chown "${REAL_USER}:${REAL_USER}" "$(dirname "${WAYFIRE_CONF}")"
+        if grep -q "^\[idle\]" "${WAYFIRE_CONF}" 2>/dev/null; then
+            sed -i '/^\[idle\]/,/^\[/{
+                s/^screensaver_timeout *=.*/screensaver_timeout = 0/
+                s/^dpms_timeout *=.*/dpms_timeout = 0/
+            }' "${WAYFIRE_CONF}"
+            ok "Wayfire idle timeouts set to 0"
+        else
+            printf '\n[idle]\nscreensaver_timeout = 0\ndpms_timeout = 0\n' >> "${WAYFIRE_CONF}"
+            chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_CONF}"
+            info "Disabled Wayfire screensaver/DPMS in ${WAYFIRE_CONF}"
+        fi
+        ;;
+    labwc)
+        # labwc delegates idle to swayidle; ensure it isn't blanking the screen.
+        # The cleanest approach: add wlopm --on to autostart so the display
+        # is forced on after the compositor starts.
+        LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
+        mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
+        if ! grep -q "wlopm" "${LABWC_AUTOSTART}" 2>/dev/null; then
+            # Kill any swayidle instance and keep display on
+            printf 'pkill swayidle 2>/dev/null || true\n' >> "${LABWC_AUTOSTART}"
+            chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
+            info "Disabled swayidle screen blanking in labwc autostart"
+        else
+            ok "labwc autostart already has blanking configuration"
+        fi
+        ;;
+    *)
+        warn "Unknown compositor — disable screen blanking manually."
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
-# Display rotation — Pi 7" touchscreen
-#   Set DISPLAY_ROTATE before running to apply a non-default orientation:
-#     DISPLAY_ROTATE=2 sudo ./setup_hardware.sh   # 180° (upside-down mount)
-#   Values: 0=normal  1=90°CW  2=180°  3=90°CCW
+# Display rotation — Pi 7" touchscreen (90° portrait, installed default)
+#   Override: DISPLAY_ROTATE=180 sudo ./setup_hardware.sh
+#   Values: 0=normal  90=portrait-CW  180=upside-down  270=portrait-CCW
 # ---------------------------------------------------------------------------
 echo ""
 echo "── Display rotation ──"
-DISPLAY_ROTATE="${DISPLAY_ROTATE:-0}"
-if [[ "${DISPLAY_ROTATE}" != "0" ]]; then
-    # Remove any existing display_rotate line first, then add the new one
-    sed -i '/^display_rotate=/d' "${CONFIG}"
-    echo "display_rotate=${DISPLAY_ROTATE}" >> "${CONFIG}"
-    info "Display rotation set to ${DISPLAY_ROTATE} in ${CONFIG}"
+DISPLAY_ROTATE="${DISPLAY_ROTATE:-90}"
 
-    # Also set in Wayfire (applies to the Wayland session)
-    WAYFIRE_ROTATE_MAP=([1]="90" [2]="180" [3]="270")
-    WF_TRANSFORM="${WAYFIRE_ROTATE_MAP[${DISPLAY_ROTATE}]:-normal}"
-    if grep -q "^\[output:DSI-1\]" "${WAYFIRE_CONF}" 2>/dev/null; then
-        sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = '"${WF_TRANSFORM}"'/}' "${WAYFIRE_CONF}"
-    else
-        printf '\n[output:DSI-1]\ntransform = %s\n' "${WF_TRANSFORM}" >> "${WAYFIRE_CONF}"
-        chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_CONF}"
-    fi
-    info "Wayfire display transform set to ${WF_TRANSFORM}"
-    REBOOT_NEEDED=true
-else
-    ok "Display rotation: 0 / normal landscape (default for Pi 7\" screen)"
-    ok "To rotate 180°: DISPLAY_ROTATE=2 sudo ./setup_hardware.sh"
-fi
+# Map degree values to compositor transform names
+case "${DISPLAY_ROTATE}" in
+    0)   WF_TRANSFORM="normal" ;;
+    90)  WF_TRANSFORM="90"     ;;
+    180) WF_TRANSFORM="180"    ;;
+    270) WF_TRANSFORM="270"    ;;
+    *)   WF_TRANSFORM="normal"; warn "Unknown DISPLAY_ROTATE value — defaulting to normal" ;;
+esac
+
+case "${COMPOSITOR}" in
+    wayfire)
+        WAYFIRE_CONF="${REAL_HOME}/.config/wayfire.ini"
+        if grep -q "^\[output:DSI-1\]" "${WAYFIRE_CONF}" 2>/dev/null; then
+            sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = '"${WF_TRANSFORM}"'/}' "${WAYFIRE_CONF}"
+        else
+            printf '\n[output:DSI-1]\ntransform = %s\n' "${WF_TRANSFORM}" >> "${WAYFIRE_CONF}"
+            chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_CONF}"
+        fi
+        info "Wayfire DSI-1 transform set to ${WF_TRANSFORM}"
+        REBOOT_NEEDED=true
+        ;;
+    labwc)
+        LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
+        mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
+        if grep -q "wlr-randr.*DSI-1" "${LABWC_AUTOSTART}" 2>/dev/null; then
+            sed -i "s|wlr-randr --output DSI-1 --transform [^ ]*|wlr-randr --output DSI-1 --transform ${WF_TRANSFORM}|" "${LABWC_AUTOSTART}"
+        else
+            echo "wlr-randr --output DSI-1 --transform ${WF_TRANSFORM} &" >> "${LABWC_AUTOSTART}"
+            chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
+        fi
+        info "labwc DSI-1 rotation set to ${WF_TRANSFORM} via wlr-randr"
+        REBOOT_NEEDED=true
+        ;;
+    *)
+        warn "Unknown compositor — set display rotation manually."
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Done

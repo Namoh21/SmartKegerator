@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# SmartKegerator installer — Raspberry Pi OS Bookworm (64-bit)
+# SmartKegerator installer — Raspberry Pi OS Bookworm / Trixie (64-bit)
 #
 # Run once on a fresh Pi:
 #   chmod +x install.sh && sudo ./install.sh
@@ -9,7 +9,10 @@
 #   1. Installs system packages via apt (OpenCV, PyQt6, gpiod, etc.)
 #   2. Creates a Python venv and installs pip packages into it
 #   3. Creates the data/photo/video directory tree
-#   4. Installs systemd user services and Pi autostart entry
+#   4. Installs systemd user services and compositor autostart entry
+#   5. Runs hardware setup (1-Wire, GPIO, screen blanking, rotation)
+#
+# Supports both Wayfire (Bookworm default) and labwc (Trixie default).
 # =============================================================================
 set -euo pipefail
 
@@ -67,12 +70,16 @@ apt-get install -y \
     python3-opencv \
     libopencv-dev
 
-# PyQt6 + Wayland platform plugin (required on Pi OS Bookworm / Wayfire)
+# PyQt6 + Wayland platform plugin
 apt-get install -y \
     python3-pyqt6 \
     python3-pyqt6.qtmultimedia \
     qt6-base-dev \
     qt6-wayland
+
+# wlr-randr — output rotation for labwc (Trixie) and other wlroots compositors
+apt-get install -y wlr-randr 2>/dev/null || \
+    warn "wlr-randr not available — display rotation will be configured via compositor config"
 
 # GPIO (modern chardev API — replaces unmaintained wiringPi)
 apt-get install -y \
@@ -267,22 +274,53 @@ ${SYSTEMCTL} enable smartkegerator-web.service 2>/dev/null || \
 info "systemd services installed."
 
 # ---------------------------------------------------------------------------
-# 7. LXDE / Wayfire autostart (fallback for desktop environments)
+# 7. Compositor autostart — supports Wayfire (Bookworm) and labwc (Trixie)
 # ---------------------------------------------------------------------------
 section "Desktop autostart"
 
-WAYFIRE_AUTOSTART="${REAL_HOME}/.config/wayfire/autostart"
-mkdir -p "$(dirname "${WAYFIRE_AUTOSTART}")"
-if ! grep -q "smartkegerator" "${WAYFIRE_AUTOSTART}" 2>/dev/null; then
-    echo "${PYTHON} ${SRC_DIR}/main.py ${CONFIG} &" >> "${WAYFIRE_AUTOSTART}"
-    chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_AUTOSTART}"
-    info "Added to Wayfire autostart."
+# Detect which compositor is installed
+if command -v labwc &>/dev/null; then
+    COMPOSITOR="labwc"
+elif command -v wayfire &>/dev/null; then
+    COMPOSITOR="wayfire"
+else
+    COMPOSITOR="unknown"
+    warn "Could not detect Wayland compositor — add autostart entry manually."
 fi
+info "Compositor detected: ${COMPOSITOR}"
 
+AUTOSTART_CMD="${PYTHON} ${SRC_DIR}/main.py ${CONFIG}"
+
+case "${COMPOSITOR}" in
+    labwc)
+        LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
+        mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
+        if ! grep -q "smartkegerator" "${LABWC_AUTOSTART}" 2>/dev/null; then
+            echo "${AUTOSTART_CMD} &" >> "${LABWC_AUTOSTART}"
+            chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
+            info "Added to labwc autostart: ${LABWC_AUTOSTART}"
+        else
+            info "labwc autostart already contains smartkegerator entry."
+        fi
+        ;;
+    wayfire)
+        WAYFIRE_AUTOSTART="${REAL_HOME}/.config/wayfire/autostart"
+        mkdir -p "$(dirname "${WAYFIRE_AUTOSTART}")"
+        if ! grep -q "smartkegerator" "${WAYFIRE_AUTOSTART}" 2>/dev/null; then
+            echo "${AUTOSTART_CMD} &" >> "${WAYFIRE_AUTOSTART}"
+            chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_AUTOSTART}"
+            info "Added to Wayfire autostart: ${WAYFIRE_AUTOSTART}"
+        else
+            info "Wayfire autostart already contains smartkegerator entry."
+        fi
+        ;;
+esac
+
+# LXDE fallback (older Pi OS images)
 LXDE_AUTOSTART="${REAL_HOME}/.config/lxsession/LXDE-pi/autostart"
 if [[ -d "$(dirname "${LXDE_AUTOSTART}")" ]]; then
     if ! grep -q "smartkegerator" "${LXDE_AUTOSTART}" 2>/dev/null; then
-        echo "@${PYTHON} ${SRC_DIR}/main.py ${CONFIG}" >> "${LXDE_AUTOSTART}"
+        echo "@${AUTOSTART_CMD}" >> "${LXDE_AUTOSTART}"
         chown "${REAL_USER}:${REAL_USER}" "${LXDE_AUTOSTART}"
         info "Added to LXDE autostart."
     fi
@@ -291,30 +329,49 @@ fi
 # ---------------------------------------------------------------------------
 # 8. Display rotation — Pi 7" touchscreen at 90° (portrait)
 #
-#    On Pi OS Bookworm the KMS driver (vc4-kms-v3d) is active, so
-#    display_rotate in config.txt is NOT used.  Rotation is set via the
-#    Wayfire compositor only.
+#    KMS driver (vc4-kms-v3d) is used on all modern Pi OS images, so
+#    display_rotate in config.txt is NOT used.  Rotation is handled by
+#    the compositor: Wayfire via wayfire.ini, labwc via wlr-randr at startup.
 # ---------------------------------------------------------------------------
 section "Display rotation"
 
-# Wayfire: rotate DSI-1 output 90° clockwise (portrait mode)
-WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
-mkdir -p "$(dirname "${WAYFIRE_INI}")"
-if grep -q "^\[output:DSI-1\]" "${WAYFIRE_INI}" 2>/dev/null; then
-    sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = 90/}' "${WAYFIRE_INI}"
-else
-    printf '\n[output:DSI-1]\ntransform = 90\n' >> "${WAYFIRE_INI}"
-fi
-chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
-info "Wayfire DSI-1 transform set to 90° (portrait)"
-
-# Remove any stale display_rotate from config.txt (legacy option — breaks KMS)
+# Remove any stale display_rotate from config.txt (legacy — breaks KMS)
 CONFIG_TXT="/boot/firmware/config.txt"
 [[ -f "${CONFIG_TXT}" ]] || CONFIG_TXT="/boot/config.txt"
 if grep -q "^display_rotate=" "${CONFIG_TXT}" 2>/dev/null; then
     sed -i '/^display_rotate=/d' "${CONFIG_TXT}"
-    info "Removed legacy display_rotate from ${CONFIG_TXT} (not compatible with KMS)"
+    info "Removed legacy display_rotate from ${CONFIG_TXT}"
 fi
+
+case "${COMPOSITOR}" in
+    labwc)
+        # labwc: run wlr-randr at startup to rotate the DSI-1 output
+        LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
+        mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
+        if ! grep -q "wlr-randr.*DSI-1" "${LABWC_AUTOSTART}" 2>/dev/null; then
+            echo "wlr-randr --output DSI-1 --transform 90 &" >> "${LABWC_AUTOSTART}"
+            chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
+            info "Added wlr-randr 90° rotation to labwc autostart."
+        else
+            info "labwc autostart already has rotation entry."
+        fi
+        ;;
+    wayfire)
+        # Wayfire: set transform in wayfire.ini
+        WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
+        mkdir -p "$(dirname "${WAYFIRE_INI}")"
+        if grep -q "^\[output:DSI-1\]" "${WAYFIRE_INI}" 2>/dev/null; then
+            sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = 90/}' "${WAYFIRE_INI}"
+        else
+            printf '\n[output:DSI-1]\ntransform = 90\n' >> "${WAYFIRE_INI}"
+        fi
+        chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
+        info "Wayfire DSI-1 transform set to 90° (portrait)."
+        ;;
+    *)
+        warn "Unknown compositor — set display rotation manually."
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
 # 9. Hardware setup (1-Wire, camera, GPIO, screen blanking)
