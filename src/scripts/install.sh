@@ -36,7 +36,7 @@ info "Installing for user: ${REAL_USER}  (home: ${REAL_HOME})"
 # ---------------------------------------------------------------------------
 # Configurable paths — edit these if you put things elsewhere
 # ---------------------------------------------------------------------------
-INSTALL_DIR="${REAL_HOME}/smartkegerator"
+INSTALL_DIR="/opt/smartkegerator"
 SRC_DIR="${INSTALL_DIR}/src"
 VENV_DIR="${INSTALL_DIR}/venv"
 DATA_DIR="${INSTALL_DIR}/data"
@@ -118,9 +118,9 @@ section "Python pip packages"
 
 # Wheel cache — persists compiled wheels across pip cache clears.
 # Back this directory up before reimaging to skip the dlib build next time:
-#   cp -r ~/smartkegerator/wheel-cache /media/usb/
+#   cp -r /opt/smartkegerator/wheel-cache /media/usb/
 # Restore after git clone:
-#   cp -r /media/usb/wheel-cache ~/smartkegerator/
+#   sudo cp -r /media/usb/wheel-cache /opt/smartkegerator/
 WHEEL_CACHE="${INSTALL_DIR}/wheel-cache"
 sudo -u "${REAL_USER}" mkdir -p "${WHEEL_CACHE}"
 

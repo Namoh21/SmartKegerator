@@ -25,10 +25,10 @@ recognition:
   detection_model: "hog"       # "hog" (faster, CPU) or "cnn" (accurate, needs more CPU)
 
 data:
-  database_path: /home/pi/smartkegerator/smartkegerator.db
-  user_photos_dir: /home/pi/smartkegerator/photos
-  pour_videos_dir: /home/pi/smartkegerator/videos
-  beer_logos_dir: /home/pi/smartkegerator/logos
+  database_path: /opt/smartkegerator/smartkegerator.db
+  user_photos_dir: /opt/smartkegerator/photos
+  pour_videos_dir: /opt/smartkegerator/videos
+  beer_logos_dir: /opt/smartkegerator/logos
 
 display:
   rotate: 1          # 1=90°CW (portrait), 0=normal landscape, 2=180°, 3=270°
@@ -38,7 +38,7 @@ ui:
   fullscreen: true   # set false only for desktop development/testing
   window_x: 500
   window_y: 200
-  css_file: /home/pi/smartkegerator/style.css
+  css_file: /opt/smartkegerator/style.css
   beer_logo_opacity: 0.5
   pour_video_frame_rate: 20
   log_pours: true
