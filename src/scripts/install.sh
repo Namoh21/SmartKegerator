@@ -289,6 +289,18 @@ if grep -q "^display_rotate=" "${CONFIG_TXT}" 2>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
+# 9. Hardware setup (1-Wire, camera, GPIO, screen blanking)
+# ---------------------------------------------------------------------------
+section "Hardware setup"
+
+SETUP_SCRIPT="${SRC_DIR}/scripts/setup_hardware.sh"
+if [[ -f "${SETUP_SCRIPT}" ]]; then
+    bash "${SETUP_SCRIPT}"
+else
+    warn "setup_hardware.sh not found at ${SETUP_SCRIPT} — run it manually after install."
+fi
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 section "Installation complete"
@@ -302,10 +314,7 @@ echo "  Photos:   ${PHOTOS_DIR}"
 echo ""
 echo "  Next steps:"
 echo ""
-echo "  1. Run hardware setup (enables 1-Wire, camera, GPIO):"
-echo "     sudo ${SRC_DIR}/scripts/setup_hardware.sh"
-echo ""
-echo "  2. Migrate existing data (if upgrading from the old C++ version):"
+echo "  1. Migrate existing data (if upgrading from the old C++ version):"
 echo "     cd ${SRC_DIR}"
 echo "     ${PYTHON} -m scripts.migrate_data --db ${DB_PATH} \\"
 echo "         --beers /path/to/old/logs/beers.txt \\"
@@ -313,17 +322,15 @@ echo "         --kegs  /path/to/old/logs/kegs.txt  \\"
 echo "         --users /path/to/old/logs/users.txt  \\"
 echo "         --pours /path/to/old/logs/pours.txt"
 echo ""
-echo "  3. Add beers and kegs via the CLI:"
+echo "  2. Add beers and kegs via the CLI:"
 echo "     cd ${SRC_DIR}"
 echo "     ${PYTHON} -m scripts.manage beer add --name 'IPA' --company 'Brewery' --abv 6.5"
 echo "     ${PYTHON} -m scripts.manage keg add --beer-id 1 --capacity 19.5 --price 120"
 echo "     ${PYTHON} -m scripts.manage tap set left --keg-id 1"
 echo ""
-echo "  4. Start the services:"
-echo "     systemctl --user start smartkegerator"
-echo "     systemctl --user start smartkegerator-web"
-echo "     # or reboot and both start automatically"
+echo "  3. Reboot — both services and the GUI start automatically:"
+echo "     sudo reboot"
 echo ""
-echo "  5. Open the web interface from any device on the same network:"
+echo "  4. Open the web interface from any device on the same network:"
 echo "     http://$(hostname -I | awk '{print $1}'):8080"
 echo ""
