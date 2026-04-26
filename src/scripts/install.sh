@@ -232,7 +232,7 @@ chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.config"
 cat > "${SERVICE_DIR}/smartkegerator.service" << EOF
 [Unit]
 Description=SmartKegerator
-After=graphical-session.target
+After=network.target
 
 [Service]
 Type=simple
@@ -243,7 +243,7 @@ RestartSec=5
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 
 [Install]
-WantedBy=graphical-session.target
+WantedBy=default.target
 EOF
 
 cat > "${SERVICE_DIR}/smartkegerator-web.service" << EOF
@@ -319,19 +319,25 @@ case "${COMPOSITOR}" in
         fi
         ;;
     wayfire)
-        WAYFIRE_AUTOSTART="${REAL_HOME}/.config/wayfire/autostart"
-        mkdir -p "$(dirname "${WAYFIRE_AUTOSTART}")"
-        if ! grep -q "launch_gui" "${WAYFIRE_AUTOSTART}" 2>/dev/null; then
-            echo "${LAUNCH_SCRIPT} &" >> "${WAYFIRE_AUTOSTART}"
-            chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_AUTOSTART}"
-            info "Added kiosk launch to Wayfire autostart."
+        # Wayfire reads autostart from the [autostart] section of wayfire.ini
+        WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
+        mkdir -p "$(dirname "${WAYFIRE_INI}")"
+        if ! grep -q "smartkegerator" "${WAYFIRE_INI}" 2>/dev/null; then
+            if grep -q "^\[autostart\]" "${WAYFIRE_INI}" 2>/dev/null; then
+                sed -i "/^\[autostart\]/a smartkegerator = ${LAUNCH_SCRIPT}" "${WAYFIRE_INI}"
+            else
+                printf '\n[autostart]\nsmartkegerator = %s\n' "${LAUNCH_SCRIPT}" >> "${WAYFIRE_INI}"
+            fi
+            chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
+            info "Added SmartKegerator to Wayfire [autostart] in wayfire.ini."
         else
-            info "Wayfire autostart already has SmartKegerator entry."
+            info "wayfire.ini already has SmartKegerator autostart entry."
         fi
-        # Hide the Wayfire panel for kiosk mode
+        # Autohide the desktop panel for kiosk mode
         WFSHELL="${REAL_HOME}/.config/wf-shell.ini"
         if [[ -f "${WFSHELL}" ]]; then
             sed -i 's/autohide\s*=\s*false/autohide = true/' "${WFSHELL}" 2>/dev/null || true
+            info "Set wf-panel to autohide."
         fi
         ;;
 esac
