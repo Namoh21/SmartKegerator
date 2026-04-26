@@ -75,7 +75,12 @@ def _setup_templates(templates: Jinja2Templates) -> None:
 async def lifespan(app: FastAPI):
     global _db, _config
 
-    config_path = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).parent.parent / "config.yaml")
+    _default_config = Path(__file__).parent.parent / "config.yaml"
+    config_path = (
+        sys.argv[1]
+        if len(sys.argv) > 1 and Path(sys.argv[1]).suffix in (".yaml", ".yml")
+        else str(_default_config)
+    )
     with open(config_path, "r") as f:
         _config = yaml.safe_load(f)
 
