@@ -121,6 +121,9 @@ section "System packages"
 
 apt-get update -qq
 
+# Prerequisites (may be missing on Lite images)
+apt-get install -y git curl ca-certificates
+
 # Core Python + build tools
 apt-get install -y \
     python3-pip \
