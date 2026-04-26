@@ -358,7 +358,7 @@ case "${COMPOSITOR}" in
         LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
         mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
         if ! grep -q "wlr-randr.*DSI-1" "${LABWC_AUTOSTART}" 2>/dev/null; then
-            echo "wlr-randr --output DSI-1 --transform 90 &" >> "${LABWC_AUTOSTART}"
+            echo "wlr-randr --output DSI-1 --transform 180 &" >> "${LABWC_AUTOSTART}"
             chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
             info "Added wlr-randr 90° rotation to labwc autostart."
         else
@@ -370,9 +370,9 @@ case "${COMPOSITOR}" in
         WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
         mkdir -p "$(dirname "${WAYFIRE_INI}")"
         if grep -q "^\[output:DSI-1\]" "${WAYFIRE_INI}" 2>/dev/null; then
-            sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = 90/}' "${WAYFIRE_INI}"
+            sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = 180/}' "${WAYFIRE_INI}"
         else
-            printf '\n[output:DSI-1]\ntransform = 90\n' >> "${WAYFIRE_INI}"
+            printf '\n[output:DSI-1]\ntransform = 180\n' >> "${WAYFIRE_INI}"
         fi
         chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
         info "Wayfire DSI-1 transform set to 90° (portrait)."
