@@ -67,11 +67,12 @@ apt-get install -y \
     python3-opencv \
     libopencv-dev
 
-# PyQt6
+# PyQt6 + Wayland platform plugin (required on Pi OS Bookworm / Wayfire)
 apt-get install -y \
     python3-pyqt6 \
     python3-pyqt6.qtmultimedia \
-    qt6-base-dev
+    qt6-base-dev \
+    qt6-wayland
 
 # GPIO (modern chardev API — replaces unmaintained wiringPi)
 apt-get install -y \
