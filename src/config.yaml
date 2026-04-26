@@ -35,7 +35,7 @@ display:
                      # Applied by scripts/install.sh — reboot required
 
 ui:
-  fullscreen: false  # auto-set to true when Pi 7" screen (800x480) is detected
+  fullscreen: true   # set false only for desktop development/testing
   window_x: 500
   window_y: 200
   css_file: /home/pi/smartkegerator/style.css

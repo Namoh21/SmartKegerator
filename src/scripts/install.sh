@@ -203,9 +203,10 @@ if [[ -f "${CONFIG}" ]]; then
         -e "s|user_photos_dir:.*|user_photos_dir: ${PHOTOS_DIR}|" \
         -e "s|pour_videos_dir:.*|pour_videos_dir: ${VIDEOS_DIR}|" \
         -e "s|beer_logos_dir:.*|beer_logos_dir: ${LOGOS_DIR}|" \
+        -e "s|^\(\s*fullscreen:\s*\).*|\1true|" \
         "${CONFIG}"
     chown "${REAL_USER}:${REAL_USER}" "${CONFIG}"
-    info "config.yaml paths updated."
+    info "config.yaml paths updated and fullscreen enabled."
 fi
 
 # ---------------------------------------------------------------------------
@@ -225,12 +226,9 @@ After=graphical-session.target
 [Service]
 Type=simple
 WorkingDirectory=${SRC_DIR}
-ExecStart=${PYTHON} ${SRC_DIR}/main.py ${CONFIG}
+ExecStart=${SRC_DIR}/scripts/launch_gui.sh
 Restart=on-failure
 RestartSec=5
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=${REAL_HOME}/.Xauthority
-Environment=WAYLAND_DISPLAY=wayland-1
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 
 [Install]
@@ -289,29 +287,40 @@ else
 fi
 info "Compositor detected: ${COMPOSITOR}"
 
-AUTOSTART_CMD="${PYTHON} ${SRC_DIR}/main.py ${CONFIG}"
+LAUNCH_SCRIPT="${SRC_DIR}/scripts/launch_gui.sh"
+chmod +x "${LAUNCH_SCRIPT}"
 
 case "${COMPOSITOR}" in
     labwc)
         LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
         mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
-        if ! grep -q "smartkegerator" "${LABWC_AUTOSTART}" 2>/dev/null; then
-            echo "${AUTOSTART_CMD} &" >> "${LABWC_AUTOSTART}"
+        # Kill the desktop panel so only the kiosk app is visible
+        if ! grep -q "wf-panel-pi" "${LABWC_AUTOSTART}" 2>/dev/null; then
+            printf '# Kiosk mode — hide desktop panel\npkill -x wf-panel-pi 2>/dev/null || true\n' \
+                >> "${LABWC_AUTOSTART}"
+        fi
+        if ! grep -q "launch_gui" "${LABWC_AUTOSTART}" 2>/dev/null; then
+            echo "${LAUNCH_SCRIPT} &" >> "${LABWC_AUTOSTART}"
             chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
-            info "Added to labwc autostart: ${LABWC_AUTOSTART}"
+            info "Added kiosk launch to labwc autostart."
         else
-            info "labwc autostart already contains smartkegerator entry."
+            info "labwc autostart already has SmartKegerator entry."
         fi
         ;;
     wayfire)
         WAYFIRE_AUTOSTART="${REAL_HOME}/.config/wayfire/autostart"
         mkdir -p "$(dirname "${WAYFIRE_AUTOSTART}")"
-        if ! grep -q "smartkegerator" "${WAYFIRE_AUTOSTART}" 2>/dev/null; then
-            echo "${AUTOSTART_CMD} &" >> "${WAYFIRE_AUTOSTART}"
+        if ! grep -q "launch_gui" "${WAYFIRE_AUTOSTART}" 2>/dev/null; then
+            echo "${LAUNCH_SCRIPT} &" >> "${WAYFIRE_AUTOSTART}"
             chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_AUTOSTART}"
-            info "Added to Wayfire autostart: ${WAYFIRE_AUTOSTART}"
+            info "Added kiosk launch to Wayfire autostart."
         else
-            info "Wayfire autostart already contains smartkegerator entry."
+            info "Wayfire autostart already has SmartKegerator entry."
+        fi
+        # Hide the Wayfire panel for kiosk mode
+        WFSHELL="${REAL_HOME}/.config/wf-shell.ini"
+        if [[ -f "${WFSHELL}" ]]; then
+            sed -i 's/autohide\s*=\s*false/autohide = true/' "${WFSHELL}" 2>/dev/null || true
         fi
         ;;
 esac
@@ -319,8 +328,8 @@ esac
 # LXDE fallback (older Pi OS images)
 LXDE_AUTOSTART="${REAL_HOME}/.config/lxsession/LXDE-pi/autostart"
 if [[ -d "$(dirname "${LXDE_AUTOSTART}")" ]]; then
-    if ! grep -q "smartkegerator" "${LXDE_AUTOSTART}" 2>/dev/null; then
-        echo "@${AUTOSTART_CMD}" >> "${LXDE_AUTOSTART}"
+    if ! grep -q "launch_gui" "${LXDE_AUTOSTART}" 2>/dev/null; then
+        echo "@${LAUNCH_SCRIPT}" >> "${LXDE_AUTOSTART}"
         chown "${REAL_USER}:${REAL_USER}" "${LXDE_AUTOSTART}"
         info "Added to LXDE autostart."
     fi
