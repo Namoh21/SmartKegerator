@@ -195,19 +195,30 @@ if [[ "${REPO_SRC}" != "${SRC_DIR}" ]]; then
     info "Source files copied (existing files not overwritten)."
 fi
 
-# Update config.yaml paths to match this installation
+# config.yaml is gitignored — create it from the template if missing,
+# then patch all paths to match this installation.
 CONFIG="${SRC_DIR}/config.yaml"
-if [[ -f "${CONFIG}" ]]; then
-    sed -i \
-        -e "s|database_path:.*|database_path: ${DB_PATH}|" \
-        -e "s|user_photos_dir:.*|user_photos_dir: ${PHOTOS_DIR}|" \
-        -e "s|pour_videos_dir:.*|pour_videos_dir: ${VIDEOS_DIR}|" \
-        -e "s|beer_logos_dir:.*|beer_logos_dir: ${LOGOS_DIR}|" \
-        -e "s|^\(\s*fullscreen:\s*\).*|\1true|" \
-        "${CONFIG}"
-    chown "${REAL_USER}:${REAL_USER}" "${CONFIG}"
-    info "config.yaml paths updated and fullscreen enabled."
+CONFIG_EXAMPLE="${SRC_DIR}/config.yaml.example"
+
+if [[ ! -f "${CONFIG}" ]]; then
+    if [[ -f "${CONFIG_EXAMPLE}" ]]; then
+        sudo -u "${REAL_USER}" cp "${CONFIG_EXAMPLE}" "${CONFIG}"
+        info "Created config.yaml from template."
+    else
+        error "config.yaml.example not found — cannot create configuration."
+    fi
 fi
+
+sed -i \
+    -e "s|database_path:.*|database_path: ${DB_PATH}|" \
+    -e "s|user_photos_dir:.*|user_photos_dir: ${PHOTOS_DIR}|" \
+    -e "s|pour_videos_dir:.*|pour_videos_dir: ${VIDEOS_DIR}|" \
+    -e "s|beer_logos_dir:.*|beer_logos_dir: ${LOGOS_DIR}|" \
+    -e "s|css_file:.*|css_file: ${INSTALL_DIR}/style.css|" \
+    -e "s|^\(\s*fullscreen:\s*\).*|\1true|" \
+    "${CONFIG}"
+chown "${REAL_USER}:${REAL_USER}" "${CONFIG}"
+info "config.yaml paths set for user ${REAL_USER}."
 
 # ---------------------------------------------------------------------------
 # 6. systemd user services
