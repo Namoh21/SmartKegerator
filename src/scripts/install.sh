@@ -109,28 +109,56 @@ sudo -u "${REAL_USER}" ${PIP} --upgrade pip
 # ---------------------------------------------------------------------------
 section "Python pip packages"
 
-# dlib — must build from source on Bookworm 64-bit (~20-30 min on Pi 4)
-info "Building dlib from source — this takes 20-30 minutes on Pi 4, please wait..."
-sudo -u "${REAL_USER}" ${PIP} dlib
+# Wheel cache — persists compiled wheels across pip cache clears.
+# Back this directory up before reimaging to skip the dlib build next time:
+#   cp -r ~/smartkegerator/wheel-cache /media/usb/
+# Restore after git clone:
+#   cp -r /media/usb/wheel-cache ~/smartkegerator/
+WHEEL_CACHE="${INSTALL_DIR}/wheel-cache"
+sudo -u "${REAL_USER}" mkdir -p "${WHEEL_CACHE}"
 
-# face-recognition — depends on dlib above
-sudo -u "${REAL_USER}" ${PIP} face-recognition
+# dlib + face-recognition — only needed when recognition.enabled: true
+# Check config (may not exist yet if this is a first install; default enabled)
+RECOGNITION_ENABLED="true"
+if [[ -f "${SRC_DIR}/config.yaml" ]]; then
+    if grep -qE "^\s*enabled:\s*false" "${SRC_DIR}/config.yaml"; then
+        RECOGNITION_ENABLED="false"
+    fi
+fi
 
-# PyQtGraph for history charts
-sudo -u "${REAL_USER}" ${PIP} pyqtgraph
+if [[ "${RECOGNITION_ENABLED}" == "false" ]]; then
+    warn "recognition.enabled is false — skipping dlib build."
+    warn "Set recognition.enabled: true in config.yaml and re-run to enable later."
+elif sudo -u "${REAL_USER}" ${PYTHON} -c "import dlib" 2>/dev/null; then
+    info "dlib already installed — skipping build."
+elif ls "${WHEEL_CACHE}"/dlib-*.whl &>/dev/null; then
+    info "Installing dlib from wheel cache (fast)..."
+    sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
+    info "dlib installed from cache."
+else
+    info "Building dlib from source (~10-15 min on Pi 5, ~25-30 min on Pi 4)..."
+    info "The wheel will be saved to ${WHEEL_CACHE} — back it up to skip this next time."
+    sudo -u "${REAL_USER}" ${PYTHON} -m pip wheel --no-deps --quiet \
+        -w "${WHEEL_CACHE}" dlib
+    chown -R "${REAL_USER}:${REAL_USER}" "${WHEEL_CACHE}"
+    sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
+    info "dlib built and cached."
+fi
 
-# Adafruit DHT22 library
-sudo -u "${REAL_USER}" ${PIP} adafruit-circuitpython-dht
+# face-recognition (pure Python wrapper — fast)
+if [[ "${RECOGNITION_ENABLED}" != "false" ]]; then
+    sudo -u "${REAL_USER}" ${PIP} face-recognition
+fi
 
-# Web interface dependencies
+# Remaining packages — all pure Python, install in seconds
 sudo -u "${REAL_USER}" ${PIP} \
+    pyqtgraph \
+    adafruit-circuitpython-dht \
     "fastapi>=0.110" \
     "uvicorn[standard]>=0.27" \
     "jinja2>=3.1" \
-    "python-multipart>=0.0.9"
-
-# PyYAML (likely already visible via system-site-packages, but ensure it's present)
-sudo -u "${REAL_USER}" ${PIP} PyYAML
+    "python-multipart>=0.0.9" \
+    PyYAML
 
 info "Pip packages installed."
 
