@@ -24,6 +24,7 @@ async def user_list(request: Request):
     stats.sort(key=lambda s: s.balance, reverse=True)
 
     return templates.TemplateResponse(
+        request,
         "users.html",
         ctx(request, stats=stats),
     )
@@ -52,6 +53,7 @@ async def user_detail(user_id: int, request: Request):
     enriched = [{"pour": p, "beer_name": beer_for_keg(p.keg_id)} for p in pours]
 
     return templates.TemplateResponse(
+        request,
         "user_detail.html",
         ctx(request, user=user, stats=stats, enriched_pours=enriched, payments=pays),
     )

@@ -21,6 +21,7 @@ async def beer_list(request: Request):
         keg_counts[keg.beer_id] = keg_counts.get(keg.beer_id, 0) + 1
 
     return templates.TemplateResponse(
+        request,
         "beers.html",
         ctx(request, beers=beers, keg_counts=keg_counts),
     )

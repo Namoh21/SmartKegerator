@@ -29,6 +29,7 @@ async def keg_list(request: Request):
     all_kegs = db.get_all_kegs()
 
     return templates.TemplateResponse(
+        request,
         "kegs.html",
         ctx(
             request,

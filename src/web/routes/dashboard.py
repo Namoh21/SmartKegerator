@@ -59,6 +59,7 @@ async def dashboard(request: Request):
     ]
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         ctx(
             request,
@@ -85,6 +86,7 @@ async def tap_levels_partial(request: Request):
         stats.append(keg_stats(db, keg, tap=tap_name) if keg else None)
 
     return templates.TemplateResponse(
+        request,
         "partials/tap_levels.html",
         ctx(request, tap_stats=stats, tap_names=["LEFT", "CENTER", "RIGHT"]),
     )

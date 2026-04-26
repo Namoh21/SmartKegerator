@@ -70,6 +70,7 @@ async def pour_history(
     day_oz = [round(day_buckets.get(i, 0.0), 1) for i in range(chart_days)]
 
     return templates.TemplateResponse(
+        request,
         "pours.html",
         ctx(
             request,
