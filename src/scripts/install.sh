@@ -47,7 +47,75 @@ DB_PATH="${DATA_DIR}/smartkegerator.db"
 PYTHON="${VENV_DIR}/bin/python3"
 
 # ---------------------------------------------------------------------------
-# 1. System packages
+# 1. Desktop environment (Pi OS Lite only)
+#    Full Pi OS already has Wayfire or labwc.  Lite has neither — install
+#    the matching minimal compositor and wire up TTY autologin so the
+#    kiosk display comes up on boot without a full desktop environment.
+# ---------------------------------------------------------------------------
+section "Desktop environment check"
+
+OS_CODENAME=$(. /etc/os-release 2>/dev/null && echo "${VERSION_CODENAME:-bookworm}")
+
+if command -v wayfire &>/dev/null || command -v labwc &>/dev/null; then
+    info "Wayland compositor already present — full Pi OS detected, skipping Lite setup."
+else
+    warn "No Wayland compositor found — Pi OS Lite detected."
+    info "OS: ${OS_CODENAME} — installing minimal kiosk compositor..."
+
+    # Choose compositor to match the OS generation
+    case "${OS_CODENAME}" in
+        trixie|forky) KIOSK_COMPOSITOR="labwc" ;;
+        *)            KIOSK_COMPOSITOR="wayfire" ;;
+    esac
+
+    apt-get install -y \
+        "${KIOSK_COMPOSITOR}" \
+        seatd \
+        fonts-dejavu-core \
+        libinput-tools \
+        xdg-user-dirs \
+        dbus-user-session
+
+    # Grant the user access to display hardware
+    usermod -aG video,input "${REAL_USER}"
+    getent group seat &>/dev/null && usermod -aG seat "${REAL_USER}" || true
+
+    # seatd provides unprivileged Wayland seat access (replaces suid wrappers)
+    systemctl enable seatd 2>/dev/null || true
+
+    # TTY1 autologin — no display manager needed
+    AUTOLOGIN_DIR="/etc/systemd/system/getty@tty1.service.d"
+    mkdir -p "${AUTOLOGIN_DIR}"
+    cat > "${AUTOLOGIN_DIR}/autologin.conf" << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${REAL_USER} --noclear %I \$TERM
+Type=idle
+EOF
+    systemctl daemon-reload
+    info "TTY1 autologin configured for ${REAL_USER}."
+
+    # Start compositor from .bash_profile when logging in on TTY1.
+    # The compositor will pick up its autostart entry (added in section 7).
+    PROFILE="${REAL_HOME}/.bash_profile"
+    if ! grep -q "WAYLAND_DISPLAY" "${PROFILE}" 2>/dev/null; then
+        cat >> "${PROFILE}" << PROFILE_EOF
+
+# SmartKegerator kiosk — start Wayland compositor on TTY1
+if [[ -z "\${WAYLAND_DISPLAY:-}" ]] && [[ "\$(tty)" == "/dev/tty1" ]]; then
+    export XDG_RUNTIME_DIR="\${XDG_RUNTIME_DIR:-/run/user/\$(id -u)}"
+    exec ${KIOSK_COMPOSITOR}
+fi
+PROFILE_EOF
+        chown "${REAL_USER}:${REAL_USER}" "${PROFILE}"
+        info "Added ${KIOSK_COMPOSITOR} launch to ${PROFILE}."
+    fi
+
+    info "Lite compositor setup complete. The GUI will appear on reboot."
+fi
+
+# ---------------------------------------------------------------------------
+# 2. System packages
 # ---------------------------------------------------------------------------
 section "System packages"
 
