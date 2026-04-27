@@ -147,7 +147,6 @@ app = FastAPI(
     docs_url=None,       # disable Swagger UI
     redoc_url=None,      # disable ReDoc
     openapi_url=None,    # disable /openapi.json
-    debug=True,          # TEMPORARY: exposes traceback in 500 responses
 )
 
 
@@ -170,7 +169,10 @@ class _SecurityHeaders(BaseHTTPMiddleware):
             "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
-        response.headers.pop("server", None)
+        try:
+            del response.headers["server"]
+        except (KeyError, AttributeError):
+            pass
         return response
 
 
