@@ -233,6 +233,10 @@ if [[ "${RECOGNITION_ENABLED}" != "false" ]]; then
     sudo -u "${REAL_USER}" ${PIP} face-recognition
 fi
 
+# Pin NumPy < 2 — system python3-opencv is compiled against NumPy 1.x
+# and NumPy 2.x breaks its C extension (_ARRAY_API not found).
+sudo -u "${REAL_USER}" ${PIP} "numpy<2"
+
 # Remaining packages — all pure Python, install in seconds
 sudo -u "${REAL_USER}" ${PIP} \
     pyqtgraph \
