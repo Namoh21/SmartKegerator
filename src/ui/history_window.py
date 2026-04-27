@@ -67,9 +67,9 @@ _STYLE = f"""
     QHeaderView::section {{
         background-color: #0f0f23;
         color: {_MUTED};
-        padding: 6px;
+        padding: 8px;
         border: none;
-        font-size: 11px;
+        font-size: 15px;
         letter-spacing: 1px;
     }}
     QComboBox {{
@@ -77,8 +77,9 @@ _STYLE = f"""
         color: {_TEXT};
         border: 1px solid #2a2a4e;
         border-radius: 4px;
-        padding: 4px 10px;
+        padding: 6px 12px;
         min-width: 140px;
+        font-size: 15px;
     }}
     QComboBox::drop-down {{ border: none; }}
     QPushButton {{
@@ -86,7 +87,8 @@ _STYLE = f"""
         color: {_TEXT};
         border: 1px solid {_ACCENT};
         border-radius: 4px;
-        padding: 6px 16px;
+        padding: 8px 20px;
+        font-size: 16px;
     }}
     QPushButton:pressed {{ background-color: {_ACCENT}; }}
 """
@@ -141,13 +143,13 @@ class HistoryWindow(QDialog):
 
     def _build_header(self, title_text: str = "Pour History") -> QWidget:
         bar = QWidget()
-        bar.setFixedHeight(44)
+        bar.setFixedHeight(56)
         row = QHBoxLayout(bar)
         row.setContentsMargins(0, 0, 0, 0)
 
         title = QLabel(title_text)
         f = QFont()
-        f.setPointSize(16)
+        f.setPointSize(20)
         f.setWeight(QFont.Weight.Bold)
         title.setFont(f)
         title.setStyleSheet(f"color: {_ACCENT};")
@@ -186,7 +188,7 @@ class HistoryWindow(QDialog):
 
     def _build_summary_bar(self) -> QWidget:
         bar = QWidget()
-        bar.setFixedHeight(36)
+        bar.setFixedHeight(46)
         row = QHBoxLayout(bar)
         row.setContentsMargins(4, 0, 4, 0)
         row.setSpacing(30)
@@ -356,5 +358,5 @@ class HistoryWindow(QDialog):
 
 def _stat_label(title: str, value: str) -> QLabel:
     lbl = QLabel(f"{title}: {value}")
-    lbl.setStyleSheet(f"color: {_TEXT}; font-size: 13px;")
+    lbl.setStyleSheet(f"color: {_TEXT}; font-size: 17px;")
     return lbl

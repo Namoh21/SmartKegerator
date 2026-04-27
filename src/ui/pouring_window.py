@@ -62,8 +62,8 @@ _STYLE = f"""
         color: white;
         border: none;
         border-radius: 4px;
-        padding: 8px 18px;
-        font-size: 14px;
+        padding: 10px 22px;
+        font-size: 18px;
         font-weight: bold;
     }}
     QPushButton:pressed {{
@@ -106,13 +106,13 @@ class PouringWindow(QWidget):
 
     def _build_header(self) -> QWidget:
         bar = QWidget()
-        bar.setFixedHeight(50)
+        bar.setFixedHeight(60)
         row = QHBoxLayout(bar)
         row.setContentsMargins(8, 0, 8, 0)
 
         self._lbl_title = QLabel("POURING")
         font = QFont()
-        font.setPointSize(16)
+        font.setPointSize(20)
         font.setWeight(QFont.Weight.Bold)
         self._lbl_title.setFont(font)
         self._lbl_title.setStyleSheet(f"color: {_ACCENT};")
@@ -148,7 +148,7 @@ class PouringWindow(QWidget):
 
         self._lbl_face_status = QLabel("")
         self._lbl_face_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_face_status.setFixedHeight(22)
+        self._lbl_face_status.setFixedHeight(28)
         cam_layout.addWidget(self._lbl_face_status)
 
         row.addWidget(cam_frame, stretch=5)
@@ -168,20 +168,20 @@ class PouringWindow(QWidget):
         # User identity
         self._lbl_user_icon = QLabel("👤")
         self._lbl_user_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_user_icon.setStyleSheet("font-size: 32px;")
+        self._lbl_user_icon.setStyleSheet("font-size: 40px;")
         layout.addWidget(self._lbl_user_icon)
 
         self._lbl_user = QLabel("Identifying…")
         self._lbl_user.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font = QFont()
-        font.setPointSize(15)
+        font.setPointSize(19)
         font.setWeight(QFont.Weight.Bold)
         self._lbl_user.setFont(font)
         layout.addWidget(self._lbl_user)
 
         self._lbl_confidence = QLabel("")
         self._lbl_confidence.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_confidence.setStyleSheet(f"color: {_MUTED}; font-size: 11px;")
+        self._lbl_confidence.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
         layout.addWidget(self._lbl_confidence)
 
         # Divider
@@ -193,20 +193,20 @@ class PouringWindow(QWidget):
         # Beer info
         self._lbl_beer_icon = QLabel("🍺")
         self._lbl_beer_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_beer_icon.setStyleSheet("font-size: 24px;")
+        self._lbl_beer_icon.setStyleSheet("font-size: 30px;")
         layout.addWidget(self._lbl_beer_icon)
 
         self._lbl_beer_name = QLabel("—")
         self._lbl_beer_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font2 = QFont()
-        font2.setPointSize(13)
+        font2.setPointSize(17)
         font2.setWeight(QFont.Weight.Bold)
         self._lbl_beer_name.setFont(font2)
         layout.addWidget(self._lbl_beer_name)
 
         self._lbl_beer_sub = QLabel("")
         self._lbl_beer_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_beer_sub.setStyleSheet(f"color: {_MUTED}; font-size: 11px;")
+        self._lbl_beer_sub.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
         self._lbl_beer_sub.setWordWrap(True)
         layout.addWidget(self._lbl_beer_sub)
 
@@ -224,7 +224,7 @@ class PouringWindow(QWidget):
         self._lbl_ounces = QLabel("0.0 oz")
         self._lbl_ounces.setAlignment(Qt.AlignmentFlag.AlignCenter)
         oz_font = QFont()
-        oz_font.setPointSize(22)
+        oz_font.setPointSize(27)
         oz_font.setWeight(QFont.Weight.Bold)
         self._lbl_ounces.setFont(oz_font)
         self._lbl_ounces.setStyleSheet(f"color: {_GREEN};")
@@ -232,7 +232,7 @@ class PouringWindow(QWidget):
 
         self._lbl_price = QLabel("$0.00")
         self._lbl_price.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_price.setStyleSheet(f"color: {_MUTED}; font-size: 14px;")
+        self._lbl_price.setStyleSheet(f"color: {_MUTED}; font-size: 18px;")
         pour_layout.addWidget(self._lbl_price)
 
         layout.addWidget(pour_frame)
@@ -308,18 +308,18 @@ class PouringWindow(QWidget):
         self._lbl_user.setText(self._user_name)
         self._lbl_confidence.setText(f"Confidence: {confidence * 100:.0f}%")
         self._lbl_confidence.setStyleSheet(
-            f"color: {_GREEN}; font-size: 11px;" if confidence >= 0.7
-            else f"color: {_ORANGE}; font-size: 11px;"
+            f"color: {_GREEN}; font-size: 15px;" if confidence >= 0.7
+            else f"color: {_ORANGE}; font-size: 15px;"
         )
 
     def on_face_detected(self, found: bool) -> None:
         self._face_found = found
         if found:
             self._lbl_face_status.setText("● Face detected")
-            self._lbl_face_status.setStyleSheet(f"color: {_GREEN}; font-size: 11px;")
+            self._lbl_face_status.setStyleSheet(f"color: {_GREEN}; font-size: 15px;")
         else:
             self._lbl_face_status.setText("○ No face detected")
-            self._lbl_face_status.setStyleSheet(f"color: {_MUTED}; font-size: 11px;")
+            self._lbl_face_status.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
 
     # ------------------------------------------------------------------
     # Internal helpers

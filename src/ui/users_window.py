@@ -57,7 +57,7 @@ _STYLE = f"""
         background-color: {_CARD_BG};
         border: 1px solid #2a2a4e;
         border-radius: 4px;
-        font-size: 13px;
+        font-size: 17px;
     }}
     QListWidget::item:selected {{
         background-color: {_ACCENT};
@@ -71,8 +71,8 @@ _STYLE = f"""
         color: {_TEXT};
         border: 1px solid {_ACCENT};
         border-radius: 4px;
-        padding: 6px 14px;
-        font-size: 12px;
+        padding: 8px 18px;
+        font-size: 16px;
     }}
     QPushButton:pressed {{ background-color: {_ACCENT}; }}
     QPushButton#danger {{
@@ -89,8 +89,9 @@ _STYLE = f"""
         color: {_TEXT};
         border: 1px solid #2a2a4e;
         border-radius: 4px;
-        padding: 4px 8px;
-        min-width: 90px;
+        padding: 6px 10px;
+        min-width: 110px;
+        font-size: 16px;
     }}
 """
 
@@ -157,7 +158,7 @@ class UsersWindow(QDialog):
 
         header = QLabel("Users")
         f = QFont()
-        f.setPointSize(14)
+        f.setPointSize(18)
         f.setWeight(QFont.Weight.Bold)
         header.setFont(f)
         header.setStyleSheet(f"color: {_ACCENT};")
@@ -202,7 +203,7 @@ class UsersWindow(QDialog):
         # Name header
         self._lbl_name = QLabel("Select a user")
         f = QFont()
-        f.setPointSize(15)
+        f.setPointSize(19)
         f.setWeight(QFont.Weight.Bold)
         self._lbl_name.setFont(f)
         layout.addWidget(self._lbl_name)
@@ -234,12 +235,12 @@ class UsersWindow(QDialog):
             # Photo list column (admin only)
             photo_col = QVBoxLayout()
             photo_header = QLabel("Training Photos")
-            photo_header.setStyleSheet(f"color: {_MUTED}; font-size: 11px; letter-spacing: 1px;")
+            photo_header.setStyleSheet(f"color: {_MUTED}; font-size: 15px; letter-spacing: 1px;")
             photo_col.addWidget(photo_header)
 
             self._photo_list = QListWidget()
             self._photo_list.setFixedWidth(200)
-            self._photo_list.setStyleSheet("font-size: 11px;")
+            self._photo_list.setStyleSheet("font-size: 15px;")
             photo_col.addWidget(self._photo_list, stretch=1)
 
             del_photo_btn = QPushButton("Delete Photo")
@@ -260,7 +261,7 @@ class UsersWindow(QDialog):
             train_row.addWidget(self._train_btn)
 
             self._lbl_train_status = QLabel("")
-            self._lbl_train_status.setStyleSheet(f"color: {_MUTED}; font-size: 12px;")
+            self._lbl_train_status.setStyleSheet(f"color: {_MUTED}; font-size: 16px;")
             train_row.addWidget(self._lbl_train_status)
             train_row.addStretch()
             layout.addLayout(train_row)
@@ -268,7 +269,7 @@ class UsersWindow(QDialog):
             # Balance + payment row (admin only)
             bal_row = QHBoxLayout()
             self._lbl_balance = QLabel("")
-            self._lbl_balance.setStyleSheet("font-size: 13px;")
+            self._lbl_balance.setStyleSheet("font-size: 17px;")
             bal_row.addWidget(self._lbl_balance)
             bal_row.addStretch()
 
@@ -343,7 +344,7 @@ class UsersWindow(QDialog):
         balance = self._db.balance_for_user(user.id)
         color   = _ORANGE if balance > 0 else _GREEN
         self._lbl_balance.setText(f"Balance owed: ${balance:.2f}")
-        self._lbl_balance.setStyleSheet(f"color: {color}; font-size: 13px; font-weight: bold;")
+        self._lbl_balance.setStyleSheet(f"color: {color}; font-size: 17px; font-weight: bold;")
 
     # ------------------------------------------------------------------
     # Camera feed
@@ -495,19 +496,19 @@ class UsersWindow(QDialog):
 
         self._train_btn.setEnabled(False)
         self._lbl_train_status.setText("Training…")
-        self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 12px;")
+        self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 16px;")
         self._recognizer.train_user(self._selected_user.id)
 
     def _on_training_complete(self, user_id: int, count: int) -> None:
         if self._selected_user and self._selected_user.id == user_id:
             self._lbl_train_status.setText(f"✓  {count} encoding(s) stored")
-            self._lbl_train_status.setStyleSheet(f"color: {_GREEN}; font-size: 12px;")
+            self._lbl_train_status.setStyleSheet(f"color: {_GREEN}; font-size: 16px;")
             self._train_btn.setEnabled(True)
 
     def _on_training_failed(self, user_id: int, reason: str) -> None:
         if self._selected_user and self._selected_user.id == user_id:
             self._lbl_train_status.setText(f"✗  {reason}")
-            self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 12px;")
+            self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 16px;")
             self._train_btn.setEnabled(True)
 
     # ------------------------------------------------------------------

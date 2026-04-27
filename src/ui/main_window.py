@@ -58,8 +58,8 @@ _GLOBAL_STYLE = f"""
         color: {_TEXT};
         border: 1px solid {_ACCENT};
         border-radius: 4px;
-        padding: 6px 14px;
-        font-size: 13px;
+        padding: 8px 18px;
+        font-size: 17px;
     }}
     QPushButton:pressed {{
         background-color: {_ACCENT};
@@ -106,13 +106,13 @@ class MainWindow(QWidget):
 
     def _build_header(self) -> QWidget:
         bar = QWidget()
-        bar.setFixedHeight(50)
+        bar.setFixedHeight(60)
         row = QHBoxLayout(bar)
         row.setContentsMargins(4, 0, 4, 0)
 
         title = QLabel("SmartKegerator")
         font  = QFont()
-        font.setPointSize(18)
+        font.setPointSize(22)
         font.setWeight(QFont.Weight.Bold)
         title.setFont(font)
         title.setStyleSheet(f"color: {_ACCENT};")
@@ -121,7 +121,7 @@ class MainWindow(QWidget):
         # Current user greeting — updated by App.set_current_user()
         self._lbl_current_user = QLabel("Tap to pour")
         self._lbl_current_user.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 13px;")
+        self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 17px;")
         row.addWidget(self._lbl_current_user, stretch=1)
 
         for label, signal in [
@@ -159,7 +159,7 @@ class MainWindow(QWidget):
         layout.setSpacing(10)
 
         header = QLabel("Environment")
-        header.setStyleSheet(f"color: {_MUTED}; font-size: 11px;")
+        header.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
 
@@ -189,11 +189,11 @@ class MainWindow(QWidget):
             self._lbl_current_user.setText(f"Welcome, {name}!{badge}")
             color = _ACCENT if not is_admin else "#f0c040"
             self._lbl_current_user.setStyleSheet(
-                f"color: {color}; font-size: 13px; font-weight: bold;"
+                f"color: {color}; font-size: 17px; font-weight: bold;"
             )
         else:
             self._lbl_current_user.setText("Tap to pour")
-            self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 13px;")
+            self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 17px;")
 
         # Reflect admin state on the Settings button
         if is_admin:
@@ -248,7 +248,7 @@ class _TapCard(QFrame):
         # Tap label
         tap_lbl = QLabel((display_name or tap_id).upper())
         tap_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tap_lbl.setStyleSheet(f"color: {_MUTED}; font-size: 11px; font-weight: bold; letter-spacing: 2px;")
+        tap_lbl.setStyleSheet(f"color: {_MUTED}; font-size: 15px; font-weight: bold; letter-spacing: 2px;")
         layout.addWidget(tap_lbl)
 
         # Beer name
@@ -256,7 +256,7 @@ class _TapCard(QFrame):
         self._lbl_beer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_beer.setWordWrap(True)
         font = QFont()
-        font.setPointSize(14)
+        font.setPointSize(18)
         font.setWeight(QFont.Weight.Bold)
         self._lbl_beer.setFont(font)
         layout.addWidget(self._lbl_beer)
@@ -264,7 +264,7 @@ class _TapCard(QFrame):
         # Company / style
         self._lbl_sub = QLabel("")
         self._lbl_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_sub.setStyleSheet(f"color: {_MUTED}; font-size: 11px;")
+        self._lbl_sub.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
         self._lbl_sub.setWordWrap(True)
         layout.addWidget(self._lbl_sub)
 
@@ -272,20 +272,20 @@ class _TapCard(QFrame):
         self._bar = QProgressBar()
         self._bar.setRange(0, 100)
         self._bar.setValue(0)
-        self._bar.setFixedHeight(22)
+        self._bar.setFixedHeight(28)
         self._bar.setTextVisible(True)
         layout.addWidget(self._bar)
 
         # Stats row (ABV · IBU)
         self._lbl_stats = QLabel("")
         self._lbl_stats.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_stats.setStyleSheet(f"color: {_MUTED}; font-size: 11px;")
+        self._lbl_stats.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
         layout.addWidget(self._lbl_stats)
 
         # Price
         self._lbl_price = QLabel("")
         self._lbl_price.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_price.setStyleSheet(f"color: {_ACCENT}; font-size: 13px; font-weight: bold;")
+        self._lbl_price.setStyleSheet(f"color: {_ACCENT}; font-size: 17px; font-weight: bold;")
         layout.addWidget(self._lbl_price)
 
         layout.addStretch()
@@ -335,5 +335,5 @@ class _TapCard(QFrame):
 
 def _reading_label(title: str, value: str) -> QLabel:
     lbl = QLabel(f"{title}:  {value}")
-    lbl.setStyleSheet(f"color: {_TEXT}; font-size: 13px; font-family: monospace;")
+    lbl.setStyleSheet(f"color: {_TEXT}; font-size: 17px; font-family: monospace;")
     return lbl
