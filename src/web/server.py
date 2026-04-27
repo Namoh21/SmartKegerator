@@ -232,11 +232,18 @@ _setup_templates(templates)
 
 def ctx(request: Request, **kwargs) -> dict:
     """Build a base template context dict (always includes is_admin)."""
+    try:
+        is_admin       = bool(request.session.get("admin_username"))
+        admin_username = request.session.get("admin_username")
+    except Exception:
+        # SessionMiddleware not yet available (startup edge-case)
+        is_admin       = False
+        admin_username = None
     return {
         "request":        request,
         "config":         _config,
-        "is_admin":       bool(request.session.get("admin_username")),
-        "admin_username": request.session.get("admin_username"),
+        "is_admin":       is_admin,
+        "admin_username": admin_username,
         **kwargs,
     }
 

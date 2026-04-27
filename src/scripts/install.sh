@@ -246,6 +246,7 @@ sudo -u "${REAL_USER}" ${PIP} \
     "jinja2>=3.1" \
     "python-multipart>=0.0.9" \
     "httpx>=0.27" \
+    "itsdangerous>=2.1" \
     PyYAML
 
 info "Pip packages installed."

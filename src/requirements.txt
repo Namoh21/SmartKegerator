@@ -33,3 +33,4 @@ jinja2>=3.1.0
 python-multipart>=0.0.9   # form data parsing
 aiofiles>=23.0.0           # static file serving
 httpx>=0.27.0              # async HTTP client for Untappd API proxy
+itsdangerous>=2.1.0        # required by SessionMiddleware (optional dep of starlette)

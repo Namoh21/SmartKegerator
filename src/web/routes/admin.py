@@ -32,8 +32,9 @@ async def setup_page(request: Request):
     if db.has_any_admin():
         return RedirectResponse("/", status_code=302)
     error = _SETUP_ERRORS.get(request.query_params.get("error", ""))
+    # Standalone page — doesn't extend base.html, skip ctx() to avoid session dependency
     return templates.TemplateResponse(
-        request, "admin/setup.html", ctx(request, error=error)
+        request, "admin/setup.html", {"request": request, "error": error}
     )
 
 
@@ -68,15 +69,19 @@ async def setup_submit(
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    if request.session.get("admin_username"):
-        return RedirectResponse("/", status_code=302)
+    try:
+        if request.session.get("admin_username"):
+            return RedirectResponse("/", status_code=302)
+    except Exception:
+        pass
     error   = _LOGIN_ERRORS.get(request.query_params.get("error", ""))
     created = request.query_params.get("created") == "1"
     next_   = request.query_params.get("next", "/")
+    # Standalone page — doesn't extend base.html, skip ctx() to avoid session dependency
     return templates.TemplateResponse(
         request,
         "admin/login.html",
-        ctx(request, error=error, created=created, next=next_),
+        {"request": request, "error": error, "created": created, "next": next_},
     )
 
 
