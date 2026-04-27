@@ -2,8 +2,10 @@
 {% block title %}Settings — SmartKegerator{% endblock %}
 
 {% block content %}
+{% set active_tab = request.query_params.get('tab', 'taps') %}
+
 <div class="row justify-content-center">
-  <div class="col-lg-7">
+  <div class="col-lg-8">
 
     {% if request.query_params.get('saved') %}
     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -12,72 +14,318 @@
     </div>
     {% endif %}
 
-    <!-- ── Untappd API ───────────────────────────────────────────── -->
-    <div class="card mb-4">
-      <div class="card-header d-flex align-items-center gap-2">
-        <img src="https://untappd.com/favicon.ico" width="18" height="18" alt="">
-        <strong>Untappd API</strong>
-        <span class="text-muted small ms-auto">
-          Register at
-          <a href="https://untappd.com/api/register" target="_blank" rel="noopener"
-             class="text-accent">untappd.com/api/register</a>
-        </span>
-      </div>
-      <div class="card-body">
-        <form method="post" action="/settings/">
+    <!-- ── Tab navigation ────────────────────────────────────────────── -->
+    <ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
+      {% for tab_id, tab_icon, tab_label in [
+          ('taps',    'bi-diagram-3',   'Taps'),
+          ('camera',  'bi-camera',      'Camera'),
+          ('sensors', 'bi-thermometer', 'Sensors'),
+          ('untappd', 'bi-cup-straw',   'Untappd'),
+      ] %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == tab_id %}active{% endif %}"
+                data-bs-toggle="tab" data-bs-target="#pane-{{ tab_id }}" type="button">
+          <i class="bi {{ tab_icon }} me-1"></i>{{ tab_label }}
+        </button>
+      </li>
+      {% endfor %}
+    </ul>
 
-          <div class="mb-3">
-            <label class="form-label">Client ID</label>
-            <input type="text" class="form-control font-monospace"
-                   name="untappd_client_id"
-                   value="{{ settings.get('untappd_client_id', '') }}"
-                   placeholder="Your Untappd Client ID"
-                   autocomplete="off">
-          </div>
+    <div class="tab-content" id="settingsTabContent">
 
-          <div class="mb-3">
-            <label class="form-label">Client Secret</label>
-            <div class="input-group">
-              <input type="password" class="form-control font-monospace"
-                     name="untappd_client_secret"
-                     value="{{ settings.get('untappd_client_secret', '') }}"
-                     placeholder="Your Untappd Client Secret"
-                     autocomplete="off"
-                     id="secretInput">
-              <button type="button" class="btn btn-outline-secondary"
-                      onclick="toggleSecret()">
-                <i class="bi bi-eye" id="eyeIcon"></i>
-              </button>
+      <!-- ══════════════════════════════════════════════════════════════
+           TAB: TAPS
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="tab-pane fade {% if active_tab == 'taps' %}show active{% endif %}" id="pane-taps">
+        <form method="post" action="/settings/taps">
+          <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-diagram-3 me-2"></i><strong>Tap Configuration</strong></div>
+            <div class="card-body">
+
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Number of active taps</label>
+                <select class="form-select w-auto" name="tap_count" id="tapCountSelect"
+                        onchange="updateTapRows()">
+                  {% for n in [1, 2, 3, 4] %}
+                  <option value="{{ n }}"
+                    {% if yaml_config.get('taps', {}).get('count', 3) == n %}selected{% endif %}>
+                    {{ n }} tap{% if n != 1 %}s{% endif %}
+                  </option>
+                  {% endfor %}
+                </select>
+                <div class="form-text text-muted">Only taps within this count will be active.</div>
+              </div>
+
+              {% for i in [1, 2, 3, 4] %}
+              {% set tap_key = 'tap' ~ i %}
+              {% set tap_cfg = yaml_config.get('taps', {}).get(tap_key, {}) %}
+              {% set default_names = {1: 'Left', 2: 'Center', 3: 'Right', 4: 'Tap 4'} %}
+              {% set default_pins  = {1: 23, 2: 24, 3: 25, 4: 26} %}
+              <div class="tap-config-row border rounded p-3 mb-2" id="tap-row-{{ i }}">
+                <div class="row g-2 align-items-end">
+                  <div class="col-auto">
+                    <span class="badge rounded-pill fs-6 px-3" style="background:var(--sk-accent);">{{ i }}</span>
+                  </div>
+                  <div class="col">
+                    <label class="form-label small mb-1">Display name</label>
+                    <input type="text" class="form-control form-control-sm"
+                           name="{{ tap_key }}_name"
+                           value="{{ tap_cfg.get('name', default_names[i]) }}"
+                           placeholder="{{ default_names[i] }}">
+                  </div>
+                  <div class="col-lg-7">
+                    <label class="form-label small mb-1">Flow meter GPIO pin (BCM)</label>
+                    <select class="form-select form-select-sm" name="{{ tap_key }}_pin">
+                      {% for pin_num, pin_label in gpio_pins %}
+                      <option value="{{ pin_num }}"
+                        {% if tap_cfg.get('pin', default_pins[i]) == pin_num %}selected{% endif %}>
+                        {{ pin_label }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+
             </div>
-            <div class="form-text text-muted">
-              Stored only in your local database — never sent to this server's code or anywhere except Untappd's API.
-            </div>
           </div>
-
-          <div class="d-flex gap-2 align-items-center">
-            <button type="submit" class="btn btn-accent">
-              <i class="bi bi-save me-1"></i>Save
-            </button>
-            <button type="button" class="btn btn-outline-secondary"
-                    hx-get="/untappd/test"
-                    hx-target="#test-result"
-                    hx-swap="innerHTML">
-              <i class="bi bi-wifi me-1"></i>Test Connection
-            </button>
-            <span id="test-result" class="small"></span>
-          </div>
-
+          <button type="submit" class="btn btn-accent">
+            <i class="bi bi-save me-1"></i>Save Taps
+          </button>
         </form>
       </div>
-    </div>
 
-    <!-- ── About ────────────────────────────────────────────────── -->
-    <div class="card">
-      <div class="card-header"><strong>About</strong></div>
-      <div class="card-body small text-muted">
-        <p class="mb-1">SmartKegerator — Python / PyQt6 / FastAPI rewrite of the original C++ kegerator controller.</p>
-        <p class="mb-0">API credentials are stored in the local SQLite database and read at runtime.
-           They are never written to config files, source code, or logs.</p>
+      <!-- ══════════════════════════════════════════════════════════════
+           TAB: CAMERA
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="tab-pane fade {% if active_tab == 'camera' %}show active{% endif %}" id="pane-camera">
+        <form method="post" action="/settings/camera">
+          {% set hw = yaml_config.get('hardware', {}) %}
+          <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-camera me-2"></i><strong>Camera Configuration</strong></div>
+            <div class="card-body">
+
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Camera device</label>
+                <div class="d-flex align-items-center gap-2">
+                  <select class="form-select" name="camera_index" id="cameraIndexSelect"
+                          style="max-width:300px;">
+                    <option value="{{ hw.get('camera_index', 0) }}" selected>
+                      Index {{ hw.get('camera_index', 0) }} (current)
+                    </option>
+                  </select>
+                  <button type="button" class="btn btn-outline-secondary btn-sm"
+                          hx-get="/settings/detect/cameras"
+                          hx-target="#cameraIndexSelect"
+                          hx-swap="innerHTML">
+                    <i class="bi bi-search me-1"></i>Detect
+                  </button>
+                </div>
+                <div class="form-text text-muted">
+                  Index 0 = first camera (USB or Pi Camera). Click Detect to scan /dev/video* devices.
+                  For the native Pi Camera Module, use index 0 (it appears as a V4L2 device).
+                </div>
+              </div>
+
+              <div class="row g-3 mb-4">
+                <div class="col-sm-6">
+                  <label class="form-label">Capture width (px)</label>
+                  <input type="number" class="form-control" name="camera_width"
+                         value="{{ hw.get('camera_width', 640) }}" min="160" max="1920" step="1">
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label">Capture height (px)</label>
+                  <input type="number" class="form-control" name="camera_height"
+                         value="{{ hw.get('camera_height', 480) }}" min="120" max="1080" step="1">
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="cameraColor"
+                         name="camera_use_color" value="true"
+                         {% if hw.get('camera_use_color', True) %}checked{% endif %}>
+                  <label class="form-check-label" for="cameraColor">
+                    Color mode <span class="text-muted">(uncheck for grayscale — slightly faster face detection)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label fw-semibold">LED ring GPIO pin (BCM)</label>
+                <select class="form-select w-auto" name="camera_leds_pin">
+                  {% for pin_num, pin_label in gpio_pins %}
+                  <option value="{{ pin_num }}"
+                    {% if hw.get('camera_leds_pin', 18) == pin_num %}selected{% endif %}>
+                    {{ pin_label }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <div class="form-text text-muted">GPIO pin that controls the IR/LED ring around the camera.</div>
+              </div>
+
+            </div>
+          </div>
+          <button type="submit" class="btn btn-accent">
+            <i class="bi bi-save me-1"></i>Save Camera
+          </button>
+        </form>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
+           TAB: SENSORS
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="tab-pane fade {% if active_tab == 'sensors' %}show active{% endif %}" id="pane-sensors">
+        <form method="post" action="/settings/sensors">
+          {% set hw = yaml_config.get('hardware', {}) %}
+          <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-thermometer me-2"></i><strong>Temperature Sensors</strong></div>
+            <div class="card-body">
+
+              <div class="mb-4">
+                <label class="form-label fw-semibold">DS18B20 liquid temperature sensor ID</label>
+                <div class="input-group" style="max-width:420px;">
+                  <input type="text" class="form-control font-monospace"
+                         name="liquid_temp_sensor_id" id="sensorIdInput"
+                         value="{{ hw.get('liquid_temp_sensor_id', '') }}"
+                         placeholder="28-xxxxxxxxxxxx">
+                  <button type="button" class="btn btn-outline-secondary"
+                          hx-get="/settings/detect/sensors"
+                          hx-target="#sensor-detect-result"
+                          hx-swap="innerHTML">
+                    <i class="bi bi-search me-1"></i>Detect
+                  </button>
+                </div>
+                <div id="sensor-detect-result" class="mt-2"></div>
+                <div class="form-text text-muted">
+                  Requires 1-Wire enabled: <code>raspi-config</code> → Interface Options → 1-Wire → reboot.
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Sensor power GPIO pin (BCM)</label>
+                <select class="form-select w-auto" name="temp_sensor_power_pin">
+                  {% for pin_num, pin_label in gpio_pins %}
+                  <option value="{{ pin_num }}"
+                    {% if hw.get('temp_sensor_power_pin', 17) == pin_num %}selected{% endif %}>
+                    {{ pin_label }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <div class="form-text text-muted">GPIO pin used to power the DS18B20 (3.3 V via transistor).</div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label fw-semibold">DHT22 humidity sensor GPIO pin (BCM)</label>
+                <select class="form-select w-auto" name="temp_sensor_dht_pin">
+                  {% for pin_num, pin_label in gpio_pins %}
+                  <option value="{{ pin_num }}"
+                    {% if hw.get('temp_sensor_dht_pin', 22) == pin_num %}selected{% endif %}>
+                    {{ pin_label }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <div class="form-text text-muted">Data pin of the DHT22 ambient temperature/humidity sensor.</div>
+              </div>
+
+            </div>
+          </div>
+          <button type="submit" class="btn btn-accent">
+            <i class="bi bi-save me-1"></i>Save Sensors
+          </button>
+        </form>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
+           TAB: UNTAPPD
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="tab-pane fade {% if active_tab == 'untappd' %}show active{% endif %}" id="pane-untappd">
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center gap-2">
+            <img src="https://untappd.com/favicon.ico" width="18" height="18" alt="">
+            <strong>Untappd API</strong>
+            <span class="text-muted small ms-auto">
+              Register at
+              <a href="https://untappd.com/api/register" target="_blank" rel="noopener"
+                 class="text-accent">untappd.com/api/register</a>
+            </span>
+          </div>
+          <div class="card-body">
+            <form method="post" action="/settings/untappd">
+
+              <div class="mb-3">
+                <label class="form-label">Client ID</label>
+                <input type="text" class="form-control font-monospace"
+                       name="untappd_client_id"
+                       value="{{ settings.get('untappd_client_id', '') }}"
+                       placeholder="Your Untappd Client ID"
+                       autocomplete="off">
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Client Secret</label>
+                <div class="input-group">
+                  <input type="password" class="form-control font-monospace"
+                         name="untappd_client_secret"
+                         value="{{ settings.get('untappd_client_secret', '') }}"
+                         placeholder="Your Untappd Client Secret"
+                         autocomplete="off"
+                         id="secretInput">
+                  <button type="button" class="btn btn-outline-secondary" onclick="toggleSecret()">
+                    <i class="bi bi-eye" id="eyeIcon"></i>
+                  </button>
+                </div>
+                <div class="form-text text-muted">
+                  Stored only in the local SQLite database — never written to config files or source code.
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 align-items-center">
+                <button type="submit" class="btn btn-accent">
+                  <i class="bi bi-save me-1"></i>Save
+                </button>
+                <button type="button" class="btn btn-outline-secondary"
+                        hx-get="/untappd/test"
+                        hx-target="#test-result"
+                        hx-swap="innerHTML">
+                  <i class="bi bi-wifi me-1"></i>Test Connection
+                </button>
+                <span id="test-result" class="small"></span>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><strong>About</strong></div>
+          <div class="card-body small text-muted">
+            <p class="mb-1">SmartKegerator — Python / PyQt6 / FastAPI rewrite of the original C++ kegerator controller.</p>
+            <p class="mb-0">API credentials are stored in the local SQLite database and read at runtime.
+               They are never written to config files, source code, or logs.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>{# end tab-content #}
+
+    <!-- ── Restart services ─────────────────────────────────────────── -->
+    <div class="card mt-4 border-secondary">
+      <div class="card-body d-flex flex-wrap align-items-center gap-3">
+        <div>
+          <strong><i class="bi bi-arrow-clockwise me-1"></i>Restart Services</strong>
+          <div class="text-muted small">Apply hardware config changes (tap pins, camera) — web UI stays available briefly.</div>
+        </div>
+        <div class="ms-auto d-flex align-items-center gap-3">
+          <span id="restart-result" class="small"></span>
+          <button type="button" class="btn btn-outline-warning"
+                  hx-post="/settings/restart"
+                  hx-target="#restart-result"
+                  hx-swap="innerHTML">
+            Restart
+          </button>
+        </div>
       </div>
     </div>
 
@@ -87,9 +335,37 @@
 
 {% block scripts %}
 <script>
+// Dim tap rows that are beyond the selected count
+function updateTapRows() {
+  const count = parseInt(document.getElementById('tapCountSelect').value, 10);
+  for (let i = 1; i <= 4; i++) {
+    const row = document.getElementById('tap-row-' + i);
+    if (!row) continue;
+    if (i <= count) {
+      row.style.opacity = '1';
+      row.style.pointerEvents = 'auto';
+    } else {
+      row.style.opacity = '0.35';
+      row.style.pointerEvents = 'none';
+    }
+  }
+}
+updateTapRows();
+
+// DS18B20 detect result — clicking a sensor-id button fills the input
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('.sensor-id-btn');
+  if (btn) {
+    const inp = document.getElementById('sensorIdInput');
+    if (inp) inp.value = btn.dataset.id;
+  }
+});
+
+// Untappd secret show/hide toggle
 function toggleSecret() {
   const inp  = document.getElementById('secretInput');
   const icon = document.getElementById('eyeIcon');
+  if (!inp) return;
   if (inp.type === 'password') {
     inp.type = 'text';
     icon.classList.replace('bi-eye', 'bi-eye-slash');

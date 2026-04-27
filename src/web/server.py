@@ -36,8 +36,9 @@ from data.database import Database
 # App-level shared state
 # ---------------------------------------------------------------------------
 
-_db:     Optional[Database] = None
-_config: dict               = {}
+_db:          Optional[Database] = None
+_config:      dict               = {}
+_config_path: str                = ""
 
 
 def get_db() -> Database:
@@ -47,6 +48,18 @@ def get_db() -> Database:
 
 def get_config() -> dict:
     return _config
+
+
+def get_config_path() -> str:
+    return _config_path
+
+
+def reload_config() -> None:
+    """Re-read config.yaml into the in-memory dict (used after web-UI edits)."""
+    global _config
+    if _config_path:
+        with open(_config_path, "r") as f:
+            _config = yaml.safe_load(f) or {}
 
 
 # ---------------------------------------------------------------------------
@@ -73,15 +86,15 @@ def _setup_templates(templates: Jinja2Templates) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _db, _config
+    global _db, _config, _config_path
 
     _default_config = Path(__file__).parent.parent / "config.yaml"
-    config_path = (
+    _config_path = (
         sys.argv[1]
         if len(sys.argv) > 1 and Path(sys.argv[1]).suffix in (".yaml", ".yml")
         else str(_default_config)
     )
-    with open(config_path, "r") as f:
+    with open(_config_path, "r") as f:
         _config = yaml.safe_load(f)
 
     _db = Database(_config["data"]["database_path"])
