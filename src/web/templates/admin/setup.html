@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>First-Run Setup — SmartKegerator</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root { --sk-accent: #e94560; --sk-bg: #1a1a2e; --sk-card: #16213e; }
+    body  { background-color: var(--sk-bg); min-height: 100vh;
+            display: flex; align-items: center; justify-content: center; }
+    .setup-card { background: var(--sk-card); border: 1px solid #2a2a4e;
+                  border-radius: .75rem; padding: 2.5rem; width: 100%; max-width: 420px; }
+    .brand { color: var(--sk-accent); font-weight: 700; font-size: 1.4rem; }
+    .btn-accent { background-color: var(--sk-accent); color: #fff; border: none; }
+    .btn-accent:hover { background-color: #c73652; color: #fff; }
+  </style>
+</head>
+<body>
+<div class="setup-card shadow-lg">
+  <div class="text-center mb-4">
+    <div class="brand mb-1"><i class="bi bi-cup-fill me-2"></i>SmartKegerator</div>
+    <h5 class="text-white mb-0">Create Administrator Account</h5>
+    <p class="text-muted small mt-1 mb-0">
+      This account can make changes to settings, beers, kegs, and users.
+      Everyone else gets read-only access.
+    </p>
+  </div>
+
+  {% if error %}
+  <div class="alert alert-danger py-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+  </div>
+  {% endif %}
+
+  <form method="post" action="/admin/setup" autocomplete="off">
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-control" name="username"
+             placeholder="admin" required autofocus autocomplete="username">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-control" name="password"
+             placeholder="At least 8 characters" required autocomplete="new-password">
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label">Confirm Password</label>
+      <input type="password" class="form-control" name="password2"
+             placeholder="Repeat password" required autocomplete="new-password">
+    </div>
+
+    <button type="submit" class="btn btn-accent w-100">
+      <i class="bi bi-person-check me-1"></i>Create Account &amp; Continue
+    </button>
+  </form>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

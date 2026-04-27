@@ -4,11 +4,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2 class="text-accent mb-0"><i class="bi bi-archive me-2"></i>Kegs</h2>
+  {% if is_admin %}
   <button class="btn btn-accent" data-bs-toggle="modal" data-bs-target="#addKegModal">
     <i class="bi bi-plus-lg me-1"></i>Add Keg
   </button>
+  {% endif %}
 </div>
 
+{% if is_admin %}
 <!-- ── Tap Assignment Panel ─────────────────────────────────────────── -->
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-diagram-3 me-2"></i>Tap Assignments</div>
@@ -39,6 +42,8 @@
     </div>
   </div>
 </div>
+
+{% endif %}{# is_admin — Tap Assignment Panel #}
 
 <!-- ── Keg list ─────────────────────────────────────────────────────── -->
 <div class="row g-3">
@@ -112,6 +117,7 @@
           <div class="col-5 text-end">{{ s.pours_today }} / {{ s.pours_this_week }}</div>
         </div>
       </div>
+      {% if is_admin %}
       <div class="card-footer border-secondary d-flex justify-content-end gap-2 py-2">
         <button class="btn btn-sm btn-outline-secondary"
                 data-bs-toggle="modal" data-bs-target="#editKeg{{ s.keg.id }}">
@@ -122,9 +128,11 @@
           <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
         </form>
       </div>
+      {% endif %}
     </div>
   </div>
 
+  {% if is_admin %}
   <!-- Edit Keg Modal -->
   <div class="modal fade" id="editKeg{{ s.keg.id }}" tabindex="-1">
     <div class="modal-dialog">
@@ -146,9 +154,11 @@
       </div>
     </div>
   </div>
+  {% endif %}{# is_admin — Edit Keg Modal #}
   {% endfor %}
 </div>
 
+{% if is_admin %}
 <!-- ── Add Keg Modal ────────────────────────────────────────────────── -->
 <div class="modal fade" id="addKegModal" tabindex="-1">
   <div class="modal-dialog">
@@ -170,6 +180,7 @@
     </div>
   </div>
 </div>
+{% endif %}{# is_admin — Add Keg Modal #}
 {% endblock %}
 
 {% block scripts %}

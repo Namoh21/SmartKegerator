@@ -4,12 +4,29 @@
 {% block content %}
 {% set active_tab = request.query_params.get('tab', 'taps') %}
 
+{% set _admin_errors = {
+    'empty':    'Username and password are required.',
+    'short':    'Password must be at least 8 characters.',
+    'taken':    'That username is already taken.',
+    'mismatch': 'Passwords do not match.',
+    'last':     'Cannot delete the last administrator account.',
+    'self':     'You cannot delete your own account.',
+} %}
+
 <div class="row justify-content-center">
   <div class="col-lg-8">
 
     {% if request.query_params.get('saved') %}
     <div class="alert alert-success alert-dismissible fade show" role="alert">
       <i class="bi bi-check-circle me-2"></i>Settings saved.
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    {% set _err = request.query_params.get('error','') %}
+    {% if _err and _err in _admin_errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <i class="bi bi-exclamation-triangle me-2"></i>{{ _admin_errors[_err] }}
       <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     {% endif %}
@@ -21,13 +38,16 @@
           ('camera',  'bi-camera',      'Camera'),
           ('sensors', 'bi-thermometer', 'Sensors'),
           ('untappd', 'bi-cup-straw',   'Untappd'),
+          ('admins',  'bi-shield-lock', 'Administrators'),
       ] %}
+      {% if tab_id != 'admins' or is_admin %}
       <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == tab_id %}active{% endif %}"
                 data-bs-toggle="tab" data-bs-target="#pane-{{ tab_id }}" type="button">
           <i class="bi {{ tab_icon }} me-1"></i>{{ tab_label }}
         </button>
       </li>
+      {% endif %}
       {% endfor %}
     </ul>
 
@@ -37,13 +57,16 @@
            TAB: TAPS
            ══════════════════════════════════════════════════════════════ -->
       <div class="tab-pane fade {% if active_tab == 'taps' %}show active{% endif %}" id="pane-taps">
-        <form method="post" action="/settings/taps">
-          <div class="card mb-3">
-            <div class="card-header"><i class="bi bi-diagram-3 me-2"></i><strong>Tap Configuration</strong></div>
-            <div class="card-body">
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-diagram-3 me-2"></i><strong>Tap Configuration</strong></div>
+          <div class="card-body">
+            {% if is_admin %}
+            <form method="post" action="/settings/taps">
+            {% endif %}
 
               <div class="mb-4">
                 <label class="form-label fw-semibold">Number of active taps</label>
+                {% if is_admin %}
                 <select class="form-select w-auto" name="tap_count" id="tapCountSelect"
                         onchange="updateTapRows()">
                   {% for n in [1, 2, 3, 4] %}
@@ -53,6 +76,9 @@
                   </option>
                   {% endfor %}
                 </select>
+                {% else %}
+                <p class="form-control-plaintext">{{ yaml_config.get('taps', {}).get('count', 3) }} taps</p>
+                {% endif %}
                 <div class="form-text text-muted">Only taps within this count will be active.</div>
               </div>
 
@@ -68,13 +94,18 @@
                   </div>
                   <div class="col">
                     <label class="form-label small mb-1">Display name</label>
+                    {% if is_admin %}
                     <input type="text" class="form-control form-control-sm"
                            name="{{ tap_key }}_name"
                            value="{{ tap_cfg.get('name', default_names[i]) }}"
                            placeholder="{{ default_names[i] }}">
+                    {% else %}
+                    <p class="form-control-plaintext form-control-sm mb-0">{{ tap_cfg.get('name', default_names[i]) }}</p>
+                    {% endif %}
                   </div>
                   <div class="col-lg-7">
                     <label class="form-label small mb-1">Flow meter GPIO pin (BCM)</label>
+                    {% if is_admin %}
                     <select class="form-select form-select-sm" name="{{ tap_key }}_pin">
                       {% for pin_num, pin_label in gpio_pins %}
                       <option value="{{ pin_num }}"
@@ -83,31 +114,41 @@
                       </option>
                       {% endfor %}
                     </select>
+                    {% else %}
+                    <p class="form-control-plaintext form-control-sm mb-0 font-monospace">
+                      GPIO {{ tap_cfg.get('pin', default_pins[i]) }}
+                    </p>
+                    {% endif %}
                   </div>
                 </div>
               </div>
               {% endfor %}
 
-            </div>
+              {% if is_admin %}
+              <button type="submit" class="btn btn-accent mt-2">
+                <i class="bi bi-save me-1"></i>Save Taps
+              </button>
+            </form>
+            {% endif %}
           </div>
-          <button type="submit" class="btn btn-accent">
-            <i class="bi bi-save me-1"></i>Save Taps
-          </button>
-        </form>
+        </div>
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
            TAB: CAMERA
            ══════════════════════════════════════════════════════════════ -->
       <div class="tab-pane fade {% if active_tab == 'camera' %}show active{% endif %}" id="pane-camera">
-        <form method="post" action="/settings/camera">
-          {% set hw = yaml_config.get('hardware', {}) %}
-          <div class="card mb-3">
-            <div class="card-header"><i class="bi bi-camera me-2"></i><strong>Camera Configuration</strong></div>
-            <div class="card-body">
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-camera me-2"></i><strong>Camera Configuration</strong></div>
+          <div class="card-body">
+            {% set hw = yaml_config.get('hardware', {}) %}
+            {% if is_admin %}
+            <form method="post" action="/settings/camera">
+            {% endif %}
 
               <div class="mb-4">
                 <label class="form-label fw-semibold">Camera device</label>
+                {% if is_admin %}
                 <div class="d-flex align-items-center gap-2">
                   <select class="form-select" name="camera_index" id="cameraIndexSelect"
                           style="max-width:300px;">
@@ -122,38 +163,53 @@
                     <i class="bi bi-search me-1"></i>Detect
                   </button>
                 </div>
+                {% else %}
+                <p class="form-control-plaintext">Index {{ hw.get('camera_index', 0) }}</p>
+                {% endif %}
                 <div class="form-text text-muted">
-                  Index 0 = first camera (USB or Pi Camera). Click Detect to scan /dev/video* devices.
-                  For the native Pi Camera Module, use index 0 (it appears as a V4L2 device).
+                  Index 0 = first camera (USB or Pi Camera Module).
                 </div>
               </div>
 
               <div class="row g-3 mb-4">
                 <div class="col-sm-6">
-                  <label class="form-label">Capture width (px)</label>
+                  <label class="form-label">Width (px)</label>
+                  {% if is_admin %}
                   <input type="number" class="form-control" name="camera_width"
-                         value="{{ hw.get('camera_width', 640) }}" min="160" max="1920" step="1">
+                         value="{{ hw.get('camera_width', 640) }}" min="160" max="1920">
+                  {% else %}
+                  <p class="form-control-plaintext">{{ hw.get('camera_width', 640) }}</p>
+                  {% endif %}
                 </div>
                 <div class="col-sm-6">
-                  <label class="form-label">Capture height (px)</label>
+                  <label class="form-label">Height (px)</label>
+                  {% if is_admin %}
                   <input type="number" class="form-control" name="camera_height"
-                         value="{{ hw.get('camera_height', 480) }}" min="120" max="1080" step="1">
+                         value="{{ hw.get('camera_height', 480) }}" min="120" max="1080">
+                  {% else %}
+                  <p class="form-control-plaintext">{{ hw.get('camera_height', 480) }}</p>
+                  {% endif %}
                 </div>
               </div>
 
               <div class="mb-4">
+                {% if is_admin %}
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="cameraColor"
                          name="camera_use_color" value="true"
                          {% if hw.get('camera_use_color', True) %}checked{% endif %}>
                   <label class="form-check-label" for="cameraColor">
-                    Color mode <span class="text-muted">(uncheck for grayscale — slightly faster face detection)</span>
+                    Color mode <span class="text-muted">(uncheck for grayscale)</span>
                   </label>
                 </div>
+                {% else %}
+                <span class="text-muted small">Mode: {{ 'Color' if hw.get('camera_use_color', True) else 'Grayscale' }}</span>
+                {% endif %}
               </div>
 
               <div class="mb-2">
                 <label class="form-label fw-semibold">LED ring GPIO pin (BCM)</label>
+                {% if is_admin %}
                 <select class="form-select w-auto" name="camera_leds_pin">
                   {% for pin_num, pin_label in gpio_pins %}
                   <option value="{{ pin_num }}"
@@ -162,29 +218,36 @@
                   </option>
                   {% endfor %}
                 </select>
-                <div class="form-text text-muted">GPIO pin that controls the IR/LED ring around the camera.</div>
+                {% else %}
+                <p class="form-control-plaintext font-monospace">GPIO {{ hw.get('camera_leds_pin', 18) }}</p>
+                {% endif %}
               </div>
 
-            </div>
+              {% if is_admin %}
+              <button type="submit" class="btn btn-accent mt-2">
+                <i class="bi bi-save me-1"></i>Save Camera
+              </button>
+            </form>
+            {% endif %}
           </div>
-          <button type="submit" class="btn btn-accent">
-            <i class="bi bi-save me-1"></i>Save Camera
-          </button>
-        </form>
+        </div>
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
            TAB: SENSORS
            ══════════════════════════════════════════════════════════════ -->
       <div class="tab-pane fade {% if active_tab == 'sensors' %}show active{% endif %}" id="pane-sensors">
-        <form method="post" action="/settings/sensors">
-          {% set hw = yaml_config.get('hardware', {}) %}
-          <div class="card mb-3">
-            <div class="card-header"><i class="bi bi-thermometer me-2"></i><strong>Temperature Sensors</strong></div>
-            <div class="card-body">
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-thermometer me-2"></i><strong>Temperature Sensors</strong></div>
+          <div class="card-body">
+            {% set hw = yaml_config.get('hardware', {}) %}
+            {% if is_admin %}
+            <form method="post" action="/settings/sensors">
+            {% endif %}
 
               <div class="mb-4">
                 <label class="form-label fw-semibold">DS18B20 liquid temperature sensor ID</label>
+                {% if is_admin %}
                 <div class="input-group" style="max-width:420px;">
                   <input type="text" class="form-control font-monospace"
                          name="liquid_temp_sensor_id" id="sensorIdInput"
@@ -198,13 +261,19 @@
                   </button>
                 </div>
                 <div id="sensor-detect-result" class="mt-2"></div>
+                {% else %}
+                <p class="form-control-plaintext font-monospace">
+                  {{ hw.get('liquid_temp_sensor_id', '—') or '—' }}
+                </p>
+                {% endif %}
                 <div class="form-text text-muted">
-                  Requires 1-Wire enabled: <code>raspi-config</code> → Interface Options → 1-Wire → reboot.
+                  Enable 1-Wire in <code>raspi-config</code> → Interface Options → 1-Wire, then reboot.
                 </div>
               </div>
 
               <div class="mb-4">
                 <label class="form-label fw-semibold">Sensor power GPIO pin (BCM)</label>
+                {% if is_admin %}
                 <select class="form-select w-auto" name="temp_sensor_power_pin">
                   {% for pin_num, pin_label in gpio_pins %}
                   <option value="{{ pin_num }}"
@@ -213,11 +282,14 @@
                   </option>
                   {% endfor %}
                 </select>
-                <div class="form-text text-muted">GPIO pin used to power the DS18B20 (3.3 V via transistor).</div>
+                {% else %}
+                <p class="form-control-plaintext font-monospace">GPIO {{ hw.get('temp_sensor_power_pin', 17) }}</p>
+                {% endif %}
               </div>
 
               <div class="mb-2">
                 <label class="form-label fw-semibold">DHT22 humidity sensor GPIO pin (BCM)</label>
+                {% if is_admin %}
                 <select class="form-select w-auto" name="temp_sensor_dht_pin">
                   {% for pin_num, pin_label in gpio_pins %}
                   <option value="{{ pin_num }}"
@@ -226,15 +298,19 @@
                   </option>
                   {% endfor %}
                 </select>
-                <div class="form-text text-muted">Data pin of the DHT22 ambient temperature/humidity sensor.</div>
+                {% else %}
+                <p class="form-control-plaintext font-monospace">GPIO {{ hw.get('temp_sensor_dht_pin', 22) }}</p>
+                {% endif %}
               </div>
 
-            </div>
+              {% if is_admin %}
+              <button type="submit" class="btn btn-accent mt-2">
+                <i class="bi bi-save me-1"></i>Save Sensors
+              </button>
+            </form>
+            {% endif %}
           </div>
-          <button type="submit" class="btn btn-accent">
-            <i class="bi bi-save me-1"></i>Save Sensors
-          </button>
-        </form>
+        </div>
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
@@ -252,8 +328,8 @@
             </span>
           </div>
           <div class="card-body">
+            {% if is_admin %}
             <form method="post" action="/settings/untappd">
-
               <div class="mb-3">
                 <label class="form-label">Client ID</label>
                 <input type="text" class="form-control font-monospace"
@@ -270,7 +346,7 @@
                   <input type="password" class="form-control font-monospace"
                          name="untappd_client_secret"
                          value=""
-                         placeholder="{{ '••••••••  (already saved — leave blank to keep)' if _secret_set else 'Your Untappd Client Secret' }}"
+                         placeholder="{{ '••••••••  (saved — leave blank to keep)' if _secret_set else 'Your Untappd Client Secret' }}"
                          autocomplete="off"
                          id="secretInput">
                   <button type="button" class="btn btn-outline-secondary" onclick="toggleSecret()">
@@ -278,7 +354,7 @@
                   </button>
                 </div>
                 <div class="form-text text-muted">
-                  Stored only in the local SQLite database — never written to config files or source code.
+                  Stored only in the local database — never in source code or config files.
                 </div>
               </div>
 
@@ -294,8 +370,17 @@
                 </button>
                 <span id="test-result" class="small"></span>
               </div>
-
             </form>
+            {% else %}
+            <p class="text-muted small mb-0">
+              <i class="bi bi-lock me-1"></i>Untappd credentials are managed by administrators.
+              {% if settings.get('untappd_client_id') %}
+              <br><span class="text-success"><i class="bi bi-check-circle me-1"></i>API credentials are configured.</span>
+              {% else %}
+              <br><span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>No API credentials set — beer search will not work.</span>
+              {% endif %}
+            </p>
+            {% endif %}
           </div>
         </div>
 
@@ -309,14 +394,126 @@
         </div>
       </div>
 
+      <!-- ══════════════════════════════════════════════════════════════
+           TAB: ADMINISTRATORS (admin-only)
+           ══════════════════════════════════════════════════════════════ -->
+      {% if is_admin %}
+      <div class="tab-pane fade {% if active_tab == 'admins' %}show active{% endif %}" id="pane-admins">
+
+        <!-- Current admins -->
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-shield-lock me-2"></i><strong>Administrator Accounts</strong></div>
+          <div class="card-body p-0">
+            <table class="table table-hover mb-0 small">
+              <thead>
+                <tr>
+                  <th class="ps-3">Username</th>
+                  <th>Created</th>
+                  <th class="text-end pe-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for a in admins %}
+                <tr>
+                  <td class="ps-3">
+                    <i class="bi bi-person-badge me-1 text-accent"></i>
+                    <strong>{{ a.username }}</strong>
+                    {% if a.username == admin_username %}
+                    <span class="badge bg-secondary ms-1">you</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted">{{ a.created_at | datetime }}</td>
+                  <td class="text-end pe-3">
+                    <button class="btn btn-sm btn-outline-secondary me-1"
+                            data-bs-toggle="modal"
+                            data-bs-target="#pwModal{{ a.id }}">
+                      <i class="bi bi-key"></i>
+                    </button>
+                    {% if a.username != admin_username %}
+                    <form method="post" action="/settings/admins/{{ a.id }}/delete"
+                          class="d-inline"
+                          onsubmit="return confirm('Remove {{ a.username }}?')">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                    {% endif %}
+                  </td>
+                </tr>
+
+                <!-- Change password modal -->
+                <div class="modal fade" id="pwModal{{ a.id }}" tabindex="-1">
+                  <div class="modal-dialog modal-sm">
+                    <div class="modal-content" style="background:var(--sk-card);">
+                      <form method="post" action="/settings/admins/{{ a.id }}/password">
+                        <div class="modal-header border-secondary">
+                          <h6 class="modal-title">Change password — {{ a.username }}</h6>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                          <div class="mb-2">
+                            <label class="form-label small">New password</label>
+                            <input type="password" class="form-control form-control-sm"
+                                   name="password" required autocomplete="new-password">
+                          </div>
+                          <div class="mb-0">
+                            <label class="form-label small">Confirm</label>
+                            <input type="password" class="form-control form-control-sm"
+                                   name="password2" required autocomplete="new-password">
+                          </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-accent btn-sm">Save</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Add new admin -->
+        <div class="card">
+          <div class="card-header"><i class="bi bi-person-plus me-2"></i><strong>Add Administrator</strong></div>
+          <div class="card-body">
+            <form method="post" action="/settings/admins/add" autocomplete="off">
+              <div class="row g-2 align-items-end">
+                <div class="col-sm-4">
+                  <label class="form-label small">Username</label>
+                  <input type="text" class="form-control form-control-sm" name="username"
+                         placeholder="username" required autocomplete="off">
+                </div>
+                <div class="col-sm-4">
+                  <label class="form-label small">Password</label>
+                  <input type="password" class="form-control form-control-sm" name="password"
+                         placeholder="≥ 8 characters" required autocomplete="new-password">
+                </div>
+                <div class="col-sm-auto">
+                  <button type="submit" class="btn btn-accent btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Add
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+      </div>
+      {% endif %}
+
     </div>{# end tab-content #}
 
-    <!-- ── Restart services ─────────────────────────────────────────── -->
+    <!-- ── Restart services (admin only) ────────────────────────────── -->
+    {% if is_admin %}
     <div class="card mt-4 border-secondary">
       <div class="card-body d-flex flex-wrap align-items-center gap-3">
         <div>
           <strong><i class="bi bi-arrow-clockwise me-1"></i>Restart Services</strong>
-          <div class="text-muted small">Apply hardware config changes (tap pins, camera) — web UI stays available briefly.</div>
+          <div class="text-muted small">Apply hardware config changes (tap pins, camera).</div>
         </div>
         <div class="ms-auto d-flex align-items-center gap-3">
           <span id="restart-result" class="small"></span>
@@ -329,6 +526,7 @@
         </div>
       </div>
     </div>
+    {% endif %}
 
   </div>
 </div>
@@ -336,24 +534,19 @@
 
 {% block scripts %}
 <script>
-// Dim tap rows that are beyond the selected count
 function updateTapRows() {
-  const count = parseInt(document.getElementById('tapCountSelect').value, 10);
+  const sel = document.getElementById('tapCountSelect');
+  if (!sel) return;
+  const count = parseInt(sel.value, 10);
   for (let i = 1; i <= 4; i++) {
     const row = document.getElementById('tap-row-' + i);
     if (!row) continue;
-    if (i <= count) {
-      row.style.opacity = '1';
-      row.style.pointerEvents = 'auto';
-    } else {
-      row.style.opacity = '0.35';
-      row.style.pointerEvents = 'none';
-    }
+    row.style.opacity       = i <= count ? '1' : '0.35';
+    row.style.pointerEvents = i <= count ? 'auto' : 'none';
   }
 }
 updateTapRows();
 
-// DS18B20 detect result — clicking a sensor-id button fills the input
 document.addEventListener('click', function (e) {
   const btn = e.target.closest('.sensor-id-btn');
   if (btn) {
@@ -362,7 +555,6 @@ document.addEventListener('click', function (e) {
   }
 });
 
-// Untappd secret show/hide toggle
 function toggleSecret() {
   const inp  = document.getElementById('secretInput');
   const icon = document.getElementById('eyeIcon');

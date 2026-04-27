@@ -52,6 +52,9 @@
     /* Table */
     .table        { --bs-table-bg: var(--sk-card); }
     .table-striped > tbody > tr:nth-of-type(odd) > * { --bs-table-accent-bg: rgba(255,255,255,.03); }
+
+    /* Read-only banner */
+    .readonly-badge { font-size: .7rem; letter-spacing: .06em; }
   </style>
 </head>
 <body>
@@ -71,6 +74,32 @@
         <li class="nav-item"><a class="nav-link {% if '/users' in request.url.path %}active{% endif %}" href="/users/"><i class="bi bi-people me-1"></i>Users</a></li>
         <li class="nav-item"><a class="nav-link {% if '/pours' in request.url.path %}active{% endif %}" href="/pours/"><i class="bi bi-clock-history me-1"></i>History</a></li>
         <li class="nav-item"><a class="nav-link {% if '/settings' in request.url.path %}active{% endif %}" href="/settings/"><i class="bi bi-gear me-1"></i>Settings</a></li>
+      </ul>
+
+      <!-- ── Auth indicator ──────────────────────────────────────── -->
+      <ul class="navbar-nav ms-2 align-items-center">
+        {% if is_admin %}
+        <li class="nav-item d-flex align-items-center gap-2">
+          <span class="text-muted small">
+            <i class="bi bi-shield-check text-success me-1"></i>{{ admin_username }}
+          </span>
+          <form method="post" action="/admin/logout" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-box-arrow-right me-1"></i>Log out
+            </button>
+          </form>
+        </li>
+        {% else %}
+        <li class="nav-item d-flex align-items-center gap-2">
+          <span class="badge bg-secondary readonly-badge">
+            <i class="bi bi-eye me-1"></i>Read-only
+          </span>
+          <a href="/admin/login?next={{ request.url.path | urlencode }}"
+             class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Admin login
+          </a>
+        </li>
+        {% endif %}
       </ul>
     </div>
   </div>

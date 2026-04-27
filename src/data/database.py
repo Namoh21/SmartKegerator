@@ -96,6 +96,13 @@ CREATE TABLE IF NOT EXISTS face_encodings (
     encoding   BLOB    NOT NULL   -- numpy float64 array (128 values) as raw bytes
 );
 
+CREATE TABLE IF NOT EXISTS admins (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT    NOT NULL,
+    created_at    REAL    NOT NULL DEFAULT 0.0
+);
+
 CREATE INDEX IF NOT EXISTS idx_pours_time    ON pours(time);
 CREATE INDEX IF NOT EXISTS idx_pours_keg     ON pours(keg_id);
 CREATE INDEX IF NOT EXISTS idx_pours_user    ON pours(user_id);
@@ -471,6 +478,53 @@ class Database:
             )
             paid = cur.fetchone()[0]
         return charged - paid
+
+    # ------------------------------------------------------------------
+    # Admin accounts
+    # ------------------------------------------------------------------
+
+    def has_any_admin(self) -> bool:
+        with self._cursor() as cur:
+            cur.execute("SELECT 1 FROM admins LIMIT 1")
+            return cur.fetchone() is not None
+
+    def admin_count(self) -> int:
+        with self._cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM admins")
+            return cur.fetchone()[0]
+
+    def get_all_admins(self) -> list[dict]:
+        with self._cursor() as cur:
+            cur.execute("SELECT id, username, created_at FROM admins ORDER BY created_at")
+            return [{"id": r["id"], "username": r["username"], "created_at": r["created_at"]}
+                    for r in cur.fetchall()]
+
+    def get_admin_by_username(self, username: str) -> Optional[dict]:
+        with self._cursor() as cur:
+            cur.execute(
+                "SELECT id, username, password_hash FROM admins WHERE username = ?",
+                (username,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+    def add_admin(self, username: str, password_hash: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                "INSERT INTO admins (username, password_hash, created_at) VALUES (?, ?, ?)",
+                (username, password_hash, time.time()),
+            )
+
+    def delete_admin(self, admin_id: int) -> None:
+        with self._cursor() as cur:
+            cur.execute("DELETE FROM admins WHERE id = ?", (admin_id,))
+
+    def change_admin_password(self, admin_id: int, password_hash: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                "UPDATE admins SET password_hash = ? WHERE id = ?",
+                (password_hash, admin_id),
+            )
 
     # ------------------------------------------------------------------
     # Face encodings

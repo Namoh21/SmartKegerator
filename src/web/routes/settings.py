@@ -10,6 +10,7 @@ import yaml
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from web.auth import hash_password
 from web.server import get_db, get_config_path, reload_config, templates, ctx
 
 router = APIRouter(prefix="/settings")
@@ -71,10 +72,11 @@ async def settings_page(request: Request):
     db       = get_db()
     settings = db.get_all_settings()
     cfg      = _read_yaml()
+    admins   = db.get_all_admins() if request.session.get("admin_username") else []
     return templates.TemplateResponse(
         request,
         "settings.html",
-        ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS),
+        ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS, admins=admins),
     )
 
 
@@ -200,6 +202,56 @@ async def detect_sensors():
         f'<div class="mb-1">{buttons}</div>'
         '<p class="text-muted small mb-0">Click a sensor ID to copy it to the field above.</p>'
     )
+
+
+# ---------------------------------------------------------------------------
+# Service restart
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Admin account management (admin-only; middleware enforces POST auth)
+# ---------------------------------------------------------------------------
+
+@router.post("/admins/add", response_class=RedirectResponse)
+async def admin_add(
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    db       = get_db()
+    username = username.strip()
+    if not username or not password:
+        return RedirectResponse("/settings/?error=empty&tab=admins", status_code=303)
+    if len(password) < 8:
+        return RedirectResponse("/settings/?error=short&tab=admins", status_code=303)
+    if db.get_admin_by_username(username):
+        return RedirectResponse("/settings/?error=taken&tab=admins", status_code=303)
+    db.add_admin(username, hash_password(password))
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+@router.post("/admins/{admin_id}/delete", response_class=RedirectResponse)
+async def admin_delete(admin_id: int, request: Request):
+    db = get_db()
+    if db.admin_count() <= 1:
+        return RedirectResponse("/settings/?error=last&tab=admins", status_code=303)
+    if request.session.get("admin_id") == admin_id:
+        return RedirectResponse("/settings/?error=self&tab=admins", status_code=303)
+    db.delete_admin(admin_id)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+@router.post("/admins/{admin_id}/password", response_class=RedirectResponse)
+async def admin_change_password(
+    admin_id:  int,
+    password:  str = Form(...),
+    password2: str = Form(...),
+):
+    if password != password2:
+        return RedirectResponse("/settings/?error=mismatch&tab=admins", status_code=303)
+    if len(password) < 8:
+        return RedirectResponse("/settings/?error=short&tab=admins", status_code=303)
+    get_db().change_admin_password(admin_id, hash_password(password))
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
 # ---------------------------------------------------------------------------

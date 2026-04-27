@@ -27,6 +27,9 @@ videos/
 # Never track it — git pull would reset user-specific paths
 src/config.yaml
 
+# Session secret — auto-generated on first run, must not be in version control
+src/web/.session_secret
+
 # IDE
 .vscode/
 .idea/

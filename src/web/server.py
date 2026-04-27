@@ -16,22 +16,49 @@ Accessible at:  http://<pi-ip>:8080
 
 from __future__ import annotations
 
+import secrets
 import sys
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote, urlparse
 
 import uvicorn
 import yaml
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from data.database import Database
+
+# ---------------------------------------------------------------------------
+# Session secret — persisted in a file so sessions survive service restarts.
+# Regenerated automatically if the file is deleted.
+# ---------------------------------------------------------------------------
+
+_SECRET_FILE = Path(__file__).parent / ".session_secret"
+
+
+def _load_session_secret() -> str:
+    if _SECRET_FILE.exists():
+        s = _SECRET_FILE.read_text().strip()
+        if len(s) >= 32:
+            return s
+    s = secrets.token_hex(32)
+    _SECRET_FILE.write_text(s)
+    try:
+        _SECRET_FILE.chmod(0o600)
+    except OSError:
+        pass
+    return s
+
+
+_SESSION_SECRET = _load_session_secret()
 
 # ---------------------------------------------------------------------------
 # App-level shared state
@@ -77,7 +104,7 @@ def _setup_templates(templates: Jinja2Templates) -> None:
     env.filters["pct"]         = lambda v: f"{v:.0f}%"
     env.filters["abv"]         = lambda v: f"{v:.1f}%"
 
-    env.globals["now"]         = datetime.now
+    env.globals["now"]          = datetime.now
     env.globals["current_year"] = datetime.now().year
 
 
@@ -119,12 +146,14 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url=None,       # disable Swagger UI
     redoc_url=None,      # disable ReDoc
-    openapi_url=None,    # disable /openapi.json entirely
+    openapi_url=None,    # disable /openapi.json
 )
 
 
+# ── Middleware (last added = outermost = first to process requests) ─────────
+
 class _SecurityHeaders(BaseHTTPMiddleware):
-    """Attach security headers to every response."""
+    """Attach security response headers to every reply."""
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
         response.headers["X-Frame-Options"]        = "SAMEORIGIN"
@@ -140,24 +169,81 @@ class _SecurityHeaders(BaseHTTPMiddleware):
             "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
-        # Remove server banner
         response.headers.pop("server", None)
         return response
 
 
+class _AdminAuthMiddleware(BaseHTTPMiddleware):
+    """
+    First-run redirect + mutation protection.
+
+    - If no admins exist: redirect everything to /admin/setup.
+    - POST/PUT/DELETE/PATCH: require an active admin session.
+    - GET requests and static files: always public.
+    """
+    _SKIP_PREFIXES = ("/photos/",)
+    _PUBLIC_POSTS  = {"/admin/login", "/admin/setup", "/admin/logout"}
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        path = request.url.path
+
+        # Pass static files straight through
+        if any(path.startswith(p) for p in self._SKIP_PREFIXES):
+            return await call_next(request)
+
+        # First-run check: redirect to setup when no admins exist
+        try:
+            db = get_db()
+            if not db.has_any_admin() and path != "/admin/setup":
+                return RedirectResponse("/admin/setup", status_code=303)
+        except Exception:
+            pass  # DB not ready yet during startup
+
+        # Protect all mutation requests
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            if path not in self._PUBLIC_POSTS:
+                if not request.session.get("admin_username"):
+                    # Redirect to login, then come back to the page the form was on
+                    referer = request.headers.get("referer", "/")
+                    try:
+                        next_path = urlparse(referer).path or "/"
+                    except Exception:
+                        next_path = "/"
+                    return RedirectResponse(
+                        f"/admin/login?next={quote(next_path, safe='/')}",
+                        status_code=303,
+                    )
+
+        return await call_next(request)
+
+
+# Order matters: last add_middleware = outermost = runs first on requests
 app.add_middleware(_SecurityHeaders)
+app.add_middleware(_AdminAuthMiddleware)
+app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=False)
+
+# ---------------------------------------------------------------------------
+# Templates + context helper
+# ---------------------------------------------------------------------------
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 _setup_templates(templates)
 
 
 def ctx(request: Request, **kwargs) -> dict:
-    """Build a base template context dict."""
-    return {"request": request, "config": _config, **kwargs}
+    """Build a base template context dict (always includes is_admin)."""
+    return {
+        "request":        request,
+        "config":         _config,
+        "is_admin":       bool(request.session.get("admin_username")),
+        "admin_username": request.session.get("admin_username"),
+        **kwargs,
+    }
 
 
 # Register routers — imported after ctx/templates are defined to avoid circular import
 from web.routes import dashboard, beers, kegs, users, pours, settings, untappd  # noqa: E402
+from web.routes import admin                                                      # noqa: E402
 
 app.include_router(dashboard.router)
 app.include_router(beers.router)
@@ -166,6 +252,7 @@ app.include_router(users.router)
 app.include_router(pours.router)
 app.include_router(settings.router)
 app.include_router(untappd.router)
+app.include_router(admin.router)
 
 
 # ---------------------------------------------------------------------------
@@ -180,5 +267,5 @@ if __name__ == "__main__":
         port=port,
         reload=False,
         log_level="info",
-        server_header=False,   # suppress 'server: uvicorn' banner
+        server_header=False,
     )
