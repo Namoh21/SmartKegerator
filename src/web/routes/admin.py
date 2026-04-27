@@ -93,20 +93,27 @@ async def login_submit(
     password: str = Form(...),
     next:     str = Form("/"),
 ):
-    db    = get_db()
-    admin = db.get_admin_by_username(username.strip())
+    db       = get_db()
+    username = username.strip()
+    dest     = next if (next.startswith("/") and not next.startswith("//")) else "/"
 
+    # Check admin credentials first
+    admin = db.get_admin_by_username(username)
     if admin and verify_password(password, admin["password_hash"]):
         request.session["admin_username"] = admin["username"]
         request.session["admin_id"]       = admin["id"]
-        # Also populate standard-user session keys from the linked user
         if admin.get("user_id"):
             linked = db.get_user(admin["user_id"])
             if linked:
                 request.session["user_id"]   = linked.id
                 request.session["user_name"] = linked.name
-        # Validate redirect target — must be a relative path on this server
-        dest = next if (next.startswith("/") and not next.startswith("//")) else "/"
+        return RedirectResponse(dest, status_code=303)
+
+    # Fall back to standard-user credentials (login by display name)
+    std_user = db.get_user_for_login(username)
+    if std_user and verify_password(password, std_user["password_hash"]):
+        request.session["user_id"]   = std_user["id"]
+        request.session["user_name"] = std_user["name"]
         return RedirectResponse(dest, status_code=303)
 
     return RedirectResponse("/admin/login?error=1", status_code=303)
