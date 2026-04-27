@@ -147,6 +147,7 @@ app = FastAPI(
     docs_url=None,       # disable Swagger UI
     redoc_url=None,      # disable ReDoc
     openapi_url=None,    # disable /openapi.json
+    debug=True,          # TEMPORARY: exposes traceback in 500 responses
 )
 
 
