@@ -415,8 +415,8 @@ class Database:
         with self._cursor() as cur:
             cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
-    def register_user(self, name: str, password_hash: str) -> Optional["User"]:
-        """Create a standard user with login credentials.
+    def register_user(self, name: str) -> Optional["User"]:
+        """Create a user profile (no password — identity via face recognition).
 
         Returns the new User, or None if the display name is already taken.
         """
@@ -427,23 +427,9 @@ class Database:
             )
             if cur.fetchone():
                 return None  # name already taken
-            cur.execute(
-                "INSERT INTO users (name, password_hash) VALUES (?, ?)",
-                (name, password_hash),
-            )
+            cur.execute("INSERT INTO users (name) VALUES (?)", (name,))
             user_id = cur.lastrowid
         return self.get_user(user_id)
-
-    def get_user_for_login(self, name: str) -> Optional[dict]:
-        """Return {id, name, password_hash} for a user who has a password set."""
-        with self._cursor() as cur:
-            cur.execute(
-                "SELECT id, name, password_hash FROM users "
-                "WHERE name = ? AND id != ? AND password_hash IS NOT NULL",
-                (name, UNKNOWN_USER_ID),
-            )
-            row = cur.fetchone()
-            return dict(row) if row else None
 
     def _get_image_paths(self, user_id: int) -> list[str]:
         with self._cursor() as cur:

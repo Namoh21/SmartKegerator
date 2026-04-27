@@ -235,27 +235,18 @@ _setup_templates(templates)
 
 
 def ctx(request: Request, **kwargs) -> dict:
-    """Build a base template context dict (always includes auth state)."""
+    """Build a base template context dict (always includes is_admin)."""
     try:
-        admin_username    = request.session.get("admin_username")
-        current_user_id   = request.session.get("user_id")
-        current_user_name = request.session.get("user_name")
-        is_admin          = bool(admin_username)
-        is_logged_in      = bool(current_user_id)
+        admin_username = request.session.get("admin_username")
+        is_admin       = bool(admin_username)
     except Exception:
-        admin_username    = None
-        current_user_id   = None
-        current_user_name = None
-        is_admin          = False
-        is_logged_in      = False
+        admin_username = None
+        is_admin       = False
     return {
-        "request":            request,
-        "config":             _config,
-        "is_admin":           is_admin,
-        "is_logged_in":       is_logged_in,
-        "admin_username":     admin_username,
-        "current_user_id":    current_user_id,
-        "current_user_name":  current_user_name,
+        "request":        request,
+        "config":         _config,
+        "is_admin":       is_admin,
+        "admin_username": admin_username,
         **kwargs,
     }
 

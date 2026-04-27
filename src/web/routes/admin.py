@@ -97,7 +97,6 @@ async def login_submit(
     username = username.strip()
     dest     = next if (next.startswith("/") and not next.startswith("//")) else "/"
 
-    # Check admin credentials first
     admin = db.get_admin_by_username(username)
     if admin and verify_password(password, admin["password_hash"]):
         request.session["admin_username"] = admin["username"]
@@ -107,13 +106,6 @@ async def login_submit(
             if linked:
                 request.session["user_id"]   = linked.id
                 request.session["user_name"] = linked.name
-        return RedirectResponse(dest, status_code=303)
-
-    # Fall back to standard-user credentials (login by display name)
-    std_user = db.get_user_for_login(username)
-    if std_user and verify_password(password, std_user["password_hash"]):
-        request.session["user_id"]   = std_user["id"]
-        request.session["user_name"] = std_user["name"]
         return RedirectResponse(dest, status_code=303)
 
     return RedirectResponse("/admin/login?error=1", status_code=303)

@@ -4,6 +4,18 @@ Application coordinator.
 Creates every subsystem in the right order, wires all Qt signals together,
 and manages the pour lifecycle (pour started → pouring window → save to DB
 → back to main window).
+
+Session model
+-------------
+The "current user" is whoever facial recognition last identified.
+It is tracked only on the touchscreen — the web interface has no
+standard-user login.
+
+Timeout rules:
+  • 20 s after a pour ends with no further interaction  → logout
+  • 30 s after the last touchscreen touch                → logout
+  • A new pour always resets (logs out) the session so face recognition
+    identifies the person at the tap fresh every time.
 """
 
 from __future__ import annotations
@@ -12,7 +24,7 @@ import logging
 import time
 from typing import Optional
 
-from PyQt6.QtCore import QObject, Qt
+from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
 from PyQt6.QtWidgets import QApplication
 
 from data.database import Database
@@ -56,6 +68,25 @@ class App(QObject):
         self._recognizer = FaceRecognizer(config, self._db)
 
         # -----------------------------------------------------------------
+        # Touchscreen session state
+        # -----------------------------------------------------------------
+        self._current_user_id:   Optional[int] = None
+        self._current_user_name: str            = ""
+
+        # 20 s after pour ends, log out (unless the user interacts first)
+        self._post_pour_timer = QTimer()
+        self._post_pour_timer.setSingleShot(True)
+        self._post_pour_timer.timeout.connect(self._logout_user)
+
+        # 30 s after the last touchscreen interaction, log out
+        self._idle_timer = QTimer()
+        self._idle_timer.setSingleShot(True)
+        self._idle_timer.timeout.connect(self._logout_user)
+
+        # Catch all mouse / touch events across the whole application
+        QApplication.instance().installEventFilter(self)
+
+        # -----------------------------------------------------------------
         # Windows
         # -----------------------------------------------------------------
         self._main_window    = MainWindow(config, self._db, self._recognizer)
@@ -93,11 +124,14 @@ class App(QObject):
         # Temperature sensors → main window
         self._temp_sensor.readings_updated.connect(self._main_window.on_readings_updated)
 
-        # Face recognizer → pouring window
+        # Face recognizer → pouring window (shows who's pouring)
         self._recognizer.user_identified.connect(self._pouring_window.on_user_identified)
         self._recognizer.face_detected.connect(self._pouring_window.on_face_detected)
 
-        # Main window navigation (windows opened in Phase 5)
+        # Face recognizer → App session (updates main window + timers)
+        self._recognizer.user_identified.connect(self._on_user_identified)
+
+        # Main window navigation
         self._main_window.history_requested.connect(self._open_history)
         self._main_window.settings_requested.connect(self._open_settings)
         self._main_window.users_requested.connect(self._open_users)
@@ -122,7 +156,6 @@ class App(QObject):
         app = QApplication.instance()
         geo = app.primaryScreen().availableGeometry()
 
-        # Detect Pi 7" touchscreen: 800×480 (0°/180°) or 480×800 (90°/270°)
         is_touchscreen = (
             (geo.width() == 800 and geo.height() <= 480) or
             (geo.width() <= 480 and geo.height() == 800)
@@ -134,6 +167,64 @@ class App(QObject):
         else:
             self._main_window.move(ui.get("window_x", 100), ui.get("window_y", 100))
             self._main_window.resize(900, 520)
+
+    # ------------------------------------------------------------------
+    # Session management
+    # ------------------------------------------------------------------
+
+    def _on_user_identified(self, user_id: int, confidence: float) -> None:
+        """Called whenever facial recognition matches someone.
+
+        Updates the main-window greeting and resets/starts the idle timer.
+        Only fires if the recognised user is different from the current one
+        (avoids redundant DB hits and label flicker when recognition is steady).
+        """
+        # Always reset idle timer — recognition counts as "activity"
+        self._idle_timer.start(30_000)
+
+        if user_id == self._current_user_id:
+            return  # same person still recognised — timers already reset above
+
+        user = self._db.get_user(user_id)
+        if not user:
+            return
+
+        self._current_user_id   = user.id
+        self._current_user_name = user.name
+        self._post_pour_timer.stop()          # new person takes over immediately
+        self._main_window.set_current_user(user.id, user.name)
+        log.info(
+            "Session started: %s (id=%d, confidence=%.0f%%)",
+            user.name, user.id, confidence * 100,
+        )
+
+    def _on_interaction(self) -> None:
+        """Touchscreen tap detected — keep session alive."""
+        self._post_pour_timer.stop()
+        self._idle_timer.start(30_000)
+
+    def _logout_user(self) -> None:
+        """Clear the current session (called by either timer)."""
+        if self._current_user_id is not None:
+            log.info(
+                "Session timed out — logging out %s (id=%d)",
+                self._current_user_name, self._current_user_id,
+            )
+        self._current_user_id   = None
+        self._current_user_name = ""
+        self._post_pour_timer.stop()
+        self._idle_timer.stop()
+        self._main_window.set_current_user(None, "")
+
+    # ------------------------------------------------------------------
+    # Qt event filter — catches all touch / mouse events
+    # ------------------------------------------------------------------
+
+    def eventFilter(self, obj, event) -> bool:
+        if self._current_user_id is not None:
+            if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.TouchBegin):
+                self._on_interaction()
+        return False  # never consume events
 
     # ------------------------------------------------------------------
     # Pour lifecycle
@@ -151,6 +242,9 @@ class App(QObject):
         beer = self._db.get_beer(keg.beer_id) if keg else None
 
         log.info("Pour started: tap=%s keg=%s beer=%s", tap, keg_id, beer.name if beer else "?")
+
+        # Log out and clear session — face recognition will re-identify the pourer
+        self._logout_user()
 
         self._pouring_window.start_pour(tap, keg, beer)
 
@@ -196,13 +290,16 @@ class App(QObject):
         else:
             log.info("Pour finished with no ticks or no keg — nothing saved")
 
+        # Start 20 s post-pour logout countdown
+        self._post_pour_timer.start(20_000)
+
         self._pouring_window.end_pour()
         self._pouring_window.hide()
         self._main_window.show()
         self._main_window.refresh()
 
     # ------------------------------------------------------------------
-    # Navigation (Phase 5 windows — stubs until then)
+    # Navigation
     # ------------------------------------------------------------------
 
     def _open_history(self) -> None:

@@ -118,7 +118,11 @@ class MainWindow(QWidget):
         title.setStyleSheet(f"color: {_ACCENT};")
         row.addWidget(title)
 
-        row.addStretch()
+        # Current user greeting — updated by App.set_current_user()
+        self._lbl_current_user = QLabel("Tap to pour")
+        self._lbl_current_user.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 13px;")
+        row.addWidget(self._lbl_current_user, stretch=1)
 
         for label, signal in [
             ("History",  self.history_requested),
@@ -169,6 +173,17 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------
     # Data refresh
     # ------------------------------------------------------------------
+
+    def set_current_user(self, user_id: Optional[int], name: str) -> None:
+        """Called by App whenever the touchscreen session user changes."""
+        if user_id is not None:
+            self._lbl_current_user.setText(f"Welcome, {name}!")
+            self._lbl_current_user.setStyleSheet(
+                f"color: {_ACCENT}; font-size: 13px; font-weight: bold;"
+            )
+        else:
+            self._lbl_current_user.setText("Tap to pour")
+            self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 13px;")
 
     def refresh(self) -> None:
         taps = self._db.get_tap_assignments()

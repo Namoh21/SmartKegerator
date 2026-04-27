@@ -21,10 +21,10 @@
 <div class="reg-card shadow-lg">
   <div class="text-center mb-4">
     <div class="brand mb-1"><i class="bi bi-cup-fill me-2"></i>SmartKegerator</div>
-    <h5 class="text-white mb-0">Join the Kegerator</h5>
+    <h5 class="text-white mb-0">Add Yourself</h5>
     <p class="text-muted small mt-1 mb-0">
-      Create an account to track your pours and see your history.
-      <br>Already have an account? <a href="/admin/login" class="text-accent">Log in</a>
+      Enter your name to create a profile. The kegerator will
+      recognise you by face — no password needed.
     </p>
   </div>
 
@@ -35,26 +35,14 @@
   {% endif %}
 
   <form method="post" action="/register" autocomplete="off">
-    <div class="mb-3">
+    <div class="mb-4">
       <label class="form-label">Your name <span class="text-muted small">(shown on the leaderboard)</span></label>
       <input type="text" class="form-control" name="name"
              placeholder="First name or nickname" required autofocus autocomplete="name">
     </div>
 
-    <div class="mb-3">
-      <label class="form-label">Password</label>
-      <input type="password" class="form-control" name="password"
-             placeholder="At least 8 characters" required autocomplete="new-password">
-    </div>
-
-    <div class="mb-4">
-      <label class="form-label">Confirm Password</label>
-      <input type="password" class="form-control" name="password2"
-             placeholder="Repeat password" required autocomplete="new-password">
-    </div>
-
     <button type="submit" class="btn btn-accent w-100">
-      <i class="bi bi-person-check me-1"></i>Create Account
+      <i class="bi bi-person-check me-1"></i>Create Profile
     </button>
   </form>
 
