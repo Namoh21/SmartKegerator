@@ -154,7 +154,9 @@ CMDLINE="/boot/firmware/cmdline.txt"
 [[ -f "${CMDLINE}" ]] || CMDLINE="/boot/cmdline.txt"
 if [[ -f "${CMDLINE}" ]]; then
     if ! grep -q "consoleblank=0" "${CMDLINE}"; then
-        sed -i 's/$/ consoleblank=0/' "${CMDLINE}"
+        # Modify only line 1 — 's/$/' matches every line including trailing
+        # empty lines, which corrupts the single-line kernel command line.
+        sed -i '1s/$/ consoleblank=0/' "${CMDLINE}"
         info "Added consoleblank=0 to ${CMDLINE}"
         REBOOT_NEEDED=true
     else
@@ -252,13 +254,7 @@ esac
 echo ""
 if [[ "${REBOOT_NEEDED}" == "true" ]]; then
     echo -e "${YELLOW}A reboot is required for hardware changes to take effect.${NC}"
-    echo ""
-    read -rp "Reboot now? [y/N] " ans
-    if [[ "${ans,,}" == "y" ]]; then
-        reboot
-    else
-        info "Reboot when ready:  sudo reboot"
-    fi
+    info "Reboot when ready:  sudo reboot"
 else
     ok "All hardware already configured — no reboot needed."
 fi
