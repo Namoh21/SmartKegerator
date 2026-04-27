@@ -39,16 +39,7 @@ fi
 info "Source files updated."
 
 # ---------------------------------------------------------------------------
-# 3. Install any new pip packages
-# ---------------------------------------------------------------------------
-PYTHON="${VENV_DIR}/bin/python3"
-if [[ -f "${SRC_DIR}/requirements.txt" ]]; then
-    info "Checking for new pip packages…"
-    sudo -u "${REAL_USER}" "${PYTHON}" -m pip install --quiet -r "${SRC_DIR}/requirements.txt"
-fi
-
-# ---------------------------------------------------------------------------
-# 4. Restart services
+# 3. Restart services
 # ---------------------------------------------------------------------------
 info "Restarting services…"
 REAL_UID=$(id -u "${REAL_USER}")
