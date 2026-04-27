@@ -524,6 +524,14 @@ class Database:
     # Admin accounts
     # ------------------------------------------------------------------
 
+    def is_user_admin(self, user_id: int) -> bool:
+        """Return True if user_id has a linked admin account."""
+        with self._cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM admins WHERE user_id = ? LIMIT 1", (user_id,)
+            )
+            return cur.fetchone() is not None
+
     def has_any_admin(self) -> bool:
         with self._cursor() as cur:
             cur.execute("SELECT 1 FROM admins LIMIT 1")

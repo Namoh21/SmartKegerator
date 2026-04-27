@@ -85,6 +85,7 @@ class App(QObject):
         # -----------------------------------------------------------------
         self._current_user_id:   Optional[int] = None
         self._current_user_name: str            = ""
+        self._is_admin:          bool           = False
 
         # 20 s after pour ends, log out (unless the user interacts first)
         self._post_pour_timer = QTimer()
@@ -245,11 +246,12 @@ class App(QObject):
 
         self._current_user_id   = user.id
         self._current_user_name = user.name
+        self._is_admin          = self._db.is_user_admin(user.id)
         self._post_pour_timer.stop()
-        self._main_window.set_current_user(user.id, user.name)
+        self._main_window.set_current_user(user.id, user.name, self._is_admin)
         log.info(
-            "Session started: %s (id=%d, confidence=%.0f%%)",
-            user.name, user.id, confidence * 100,
+            "Session started: %s (id=%d, admin=%s, confidence=%.0f%%)",
+            user.name, user.id, self._is_admin, confidence * 100,
         )
 
     def _on_interaction(self) -> None:
@@ -266,9 +268,10 @@ class App(QObject):
             )
         self._current_user_id   = None
         self._current_user_name = ""
+        self._is_admin          = False
         self._post_pour_timer.stop()
         self._idle_timer.stop()
-        self._main_window.set_current_user(None, "")
+        self._main_window.set_current_user(None, "", is_admin=False)
 
     # ------------------------------------------------------------------
     # Qt event filter — catches all touch / mouse events
@@ -369,13 +372,33 @@ class App(QObject):
     # ------------------------------------------------------------------
 
     def _open_history(self) -> None:
+        if self._current_user_id is None:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self._main_window, "Identify Yourself",
+                "Please stand in front of the camera to be identified,\n"
+                "then tap History to view your pour history.",
+            )
+            return
         from ui.history_window import HistoryWindow
-        w = HistoryWindow(self._config, self._db, self._main_window)
+        w = HistoryWindow(
+            self._config, self._db, self._main_window,
+            current_user_id=self._current_user_id,
+            is_admin=self._is_admin,
+        )
         if self._fullscreen:
             w.showFullScreen()
         w.exec()
 
     def _open_settings(self) -> None:
+        if not self._is_admin:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self._main_window, "Admin Access Required",
+                "Settings can only be changed by an administrator.\n\n"
+                "An admin must be identified by the camera to unlock this screen.",
+            )
+            return
         from ui.settings_window import SettingsWindow
         w = SettingsWindow(self._config, self._db, self._main_window)
         if self._fullscreen:
@@ -384,7 +407,11 @@ class App(QObject):
 
     def _open_users(self) -> None:
         from ui.users_window import UsersWindow
-        w = UsersWindow(self._config, self._db, self._recognizer, self._camera, self._main_window)
+        w = UsersWindow(
+            self._config, self._db, self._recognizer, self._camera,
+            self._main_window,
+            is_admin=self._is_admin,
+        )
         if self._fullscreen:
             w.showFullScreen()
         w.exec()

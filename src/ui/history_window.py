@@ -100,13 +100,24 @@ _PERIODS = {
 
 
 class HistoryWindow(QDialog):
-    def __init__(self, config: dict, db: Database, parent=None) -> None:
+    def __init__(
+        self,
+        config: dict,
+        db: Database,
+        parent=None,
+        *,
+        current_user_id: Optional[int] = None,
+        is_admin: bool = False,
+    ) -> None:
         super().__init__(parent)
-        self._config = config
-        self._db     = db
-        self._users: dict[int, str] = {}   # id → name cache
+        self._config          = config
+        self._db              = db
+        self._current_user_id = current_user_id
+        self._is_admin        = is_admin
+        self._users: dict[int, str] = {}
 
-        self.setWindowTitle("Pour History")
+        title = "Pour History" if is_admin else "My Pour History"
+        self.setWindowTitle(title)
         self.setStyleSheet(_STYLE)
         self.setMinimumSize(860, 560)
         self.resize(960, 620)
@@ -115,8 +126,9 @@ class HistoryWindow(QDialog):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(8)
 
-        root.addWidget(self._build_header())
-        root.addWidget(self._build_filter_bar())
+        root.addWidget(self._build_header(title))
+        if is_admin:
+            root.addWidget(self._build_filter_bar())
         root.addWidget(self._build_summary_bar())
         root.addLayout(self._build_body(), stretch=1)
 
@@ -127,13 +139,13 @@ class HistoryWindow(QDialog):
     # Layout builders
     # ------------------------------------------------------------------
 
-    def _build_header(self) -> QWidget:
+    def _build_header(self, title_text: str = "Pour History") -> QWidget:
         bar = QWidget()
         bar.setFixedHeight(44)
         row = QHBoxLayout(bar)
         row.setContentsMargins(0, 0, 0, 0)
 
-        title = QLabel("Pour History")
+        title = QLabel(title_text)
         f = QFont()
         f.setPointSize(16)
         f.setWeight(QFont.Weight.Bold)
@@ -230,16 +242,23 @@ class HistoryWindow(QDialog):
     def _load_users(self) -> None:
         users = self._db.get_all_users()
         self._users = {u.id: u.name for u in users}
-        for u in users:
-            if u.id == -1:
-                continue
-            self._combo_user.addItem(u.name, userData=u.id)
+        if self._is_admin:
+            for u in users:
+                if u.id == -1:
+                    continue
+                self._combo_user.addItem(u.name, userData=u.id)
 
     def _refresh(self) -> None:
         # -- Filters --
-        user_id   = self._combo_user.currentData()
-        period    = _PERIODS[self._combo_period.currentText()]
-        since     = (time.time() - period * 86400) if period else 0.0
+        # Admins use the combo box; standard users are locked to their own pours
+        if self._is_admin:
+            user_id = self._combo_user.currentData()
+            period  = _PERIODS[self._combo_period.currentText()]
+        else:
+            user_id = self._current_user_id
+            period  = _PERIODS[self._combo_period.currentText()]
+
+        since = (time.time() - period * 86400) if period else 0.0
 
         pours = self._db.get_pours_since(since)
         if user_id is not None:

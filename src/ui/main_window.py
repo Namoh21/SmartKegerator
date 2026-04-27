@@ -127,11 +127,14 @@ class MainWindow(QWidget):
         for label, signal in [
             ("History",  self.history_requested),
             ("Users",    self.users_requested),
-            ("Settings", self.settings_requested),
         ]:
             btn = QPushButton(label)
             btn.clicked.connect(signal.emit)
             row.addWidget(btn)
+
+        self._settings_btn = QPushButton("\U0001f512 Settings")
+        self._settings_btn.clicked.connect(self.settings_requested.emit)
+        row.addWidget(self._settings_btn)
 
         return bar
 
@@ -174,16 +177,31 @@ class MainWindow(QWidget):
     # Data refresh
     # ------------------------------------------------------------------
 
-    def set_current_user(self, user_id: Optional[int], name: str) -> None:
+    def set_current_user(
+        self,
+        user_id: Optional[int],
+        name: str,
+        is_admin: bool = False,
+    ) -> None:
         """Called by App whenever the touchscreen session user changes."""
         if user_id is not None:
-            self._lbl_current_user.setText(f"Welcome, {name}!")
+            badge = " ⚡ Admin" if is_admin else ""
+            self._lbl_current_user.setText(f"Welcome, {name}!{badge}")
+            color = _ACCENT if not is_admin else "#f0c040"
             self._lbl_current_user.setStyleSheet(
-                f"color: {_ACCENT}; font-size: 13px; font-weight: bold;"
+                f"color: {color}; font-size: 13px; font-weight: bold;"
             )
         else:
             self._lbl_current_user.setText("Tap to pour")
             self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 13px;")
+
+        # Reflect admin state on the Settings button
+        if is_admin:
+            self._settings_btn.setText("Settings")
+            self._settings_btn.setStyleSheet("")
+        else:
+            self._settings_btn.setText("\U0001f512 Settings")
+            self._settings_btn.setStyleSheet(f"color: {_MUTED};")
 
     def refresh(self) -> None:
         taps = self._db.get_tap_assignments()

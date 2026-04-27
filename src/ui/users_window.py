@@ -96,15 +96,25 @@ _STYLE = f"""
 
 
 class UsersWindow(QDialog):
-    def __init__(self, config: dict, db: Database, recognizer, camera, parent=None) -> None:
+    def __init__(
+        self,
+        config: dict,
+        db: Database,
+        recognizer,
+        camera,
+        parent=None,
+        *,
+        is_admin: bool = False,
+    ) -> None:
         super().__init__(parent)
         self._config     = config
         self._db         = db
         self._recognizer = recognizer
         self._camera     = camera
+        self._is_admin   = is_admin
         self._selected_user: Optional[User] = None
 
-        self.setWindowTitle("User Management")
+        self.setWindowTitle("Users")
         self.setStyleSheet(_STYLE)
         self.setMinimumSize(820, 540)
         self.resize(900, 580)
@@ -158,18 +168,22 @@ class UsersWindow(QDialog):
         layout.addWidget(self._user_list, stretch=1)
 
         btns = QHBoxLayout()
-        add_btn = QPushButton("Add User")
-        add_btn.clicked.connect(self._add_user)
-        del_btn = QPushButton("Delete")
-        del_btn.setObjectName("danger")
-        del_btn.clicked.connect(self._delete_user)
+
+        # Register button — visible to everyone (self-registration, no password needed)
+        reg_btn = QPushButton("Register / Add Me")
+        reg_btn.clicked.connect(self._register_user)
+        btns.addWidget(reg_btn)
+
+        if self._is_admin:
+            del_btn = QPushButton("Delete")
+            del_btn.setObjectName("danger")
+            del_btn.clicked.connect(self._delete_user)
+            btns.addWidget(del_btn)
+
+        btns.addStretch()
 
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
-
-        btns.addWidget(add_btn)
-        btns.addWidget(del_btn)
-        btns.addStretch()
         btns.addWidget(close_btn)
         layout.addLayout(btns)
 
@@ -197,75 +211,79 @@ class UsersWindow(QDialog):
         mid = QHBoxLayout()
         mid.setSpacing(10)
 
-        # Camera column
-        cam_col = QVBoxLayout()
-        self._camera_label = QLabel()
-        self._camera_label.setFixedSize(280, 210)
-        self._camera_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._camera_label.setStyleSheet(f"background-color: {_CARD_BG}; border: 1px solid #2a2a4e; border-radius: 4px; color: {_MUTED};")
-        self._camera_label.setText("No camera")
-        cam_col.addWidget(self._camera_label)
+        if self._is_admin:
+            # Camera column (admin only — for photo capture)
+            cam_col = QVBoxLayout()
+            self._camera_label = QLabel()
+            self._camera_label.setFixedSize(280, 210)
+            self._camera_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._camera_label.setStyleSheet(
+                f"background-color: {_CARD_BG}; border: 1px solid #2a2a4e; "
+                f"border-radius: 4px; color: {_MUTED};"
+            )
+            self._camera_label.setText("No camera")
+            cam_col.addWidget(self._camera_label)
 
-        self._capture_btn = QPushButton("📷  Capture Photo")
-        self._capture_btn.clicked.connect(self._capture_photo)
-        self._capture_btn.setEnabled(False)
-        cam_col.addWidget(self._capture_btn)
-        cam_col.addStretch()
+            self._capture_btn = QPushButton("📷  Capture Photo")
+            self._capture_btn.clicked.connect(self._capture_photo)
+            self._capture_btn.setEnabled(False)
+            cam_col.addWidget(self._capture_btn)
+            cam_col.addStretch()
+            mid.addLayout(cam_col)
 
-        mid.addLayout(cam_col)
+            # Photo list column (admin only)
+            photo_col = QVBoxLayout()
+            photo_header = QLabel("Training Photos")
+            photo_header.setStyleSheet(f"color: {_MUTED}; font-size: 11px; letter-spacing: 1px;")
+            photo_col.addWidget(photo_header)
 
-        # Photo list column
-        photo_col = QVBoxLayout()
-        photo_header = QLabel("Training Photos")
-        photo_header.setStyleSheet(f"color: {_MUTED}; font-size: 11px; letter-spacing: 1px;")
-        photo_col.addWidget(photo_header)
+            self._photo_list = QListWidget()
+            self._photo_list.setFixedWidth(200)
+            self._photo_list.setStyleSheet("font-size: 11px;")
+            photo_col.addWidget(self._photo_list, stretch=1)
 
-        self._photo_list = QListWidget()
-        self._photo_list.setFixedWidth(200)
-        self._photo_list.setStyleSheet(f"font-size: 11px;")
-        photo_col.addWidget(self._photo_list, stretch=1)
+            del_photo_btn = QPushButton("Delete Photo")
+            del_photo_btn.setObjectName("danger")
+            del_photo_btn.clicked.connect(self._delete_photo)
+            photo_col.addWidget(del_photo_btn)
+            mid.addLayout(photo_col)
 
-        del_photo_btn = QPushButton("Delete Photo")
-        del_photo_btn.setObjectName("danger")
-        del_photo_btn.clicked.connect(self._delete_photo)
-        photo_col.addWidget(del_photo_btn)
-
-        mid.addLayout(photo_col)
         layout.addLayout(mid)
 
-        # Training row
-        train_row = QHBoxLayout()
-        self._train_btn = QPushButton("Train Recognition")
-        self._train_btn.setObjectName("train")
-        self._train_btn.clicked.connect(self._train_user)
-        self._train_btn.setEnabled(False)
-        train_row.addWidget(self._train_btn)
+        if self._is_admin:
+            # Training row (admin only)
+            train_row = QHBoxLayout()
+            self._train_btn = QPushButton("Train Recognition")
+            self._train_btn.setObjectName("train")
+            self._train_btn.clicked.connect(self._train_user)
+            self._train_btn.setEnabled(False)
+            train_row.addWidget(self._train_btn)
 
-        self._lbl_train_status = QLabel("")
-        self._lbl_train_status.setStyleSheet(f"color: {_MUTED}; font-size: 12px;")
-        train_row.addWidget(self._lbl_train_status)
-        train_row.addStretch()
-        layout.addLayout(train_row)
+            self._lbl_train_status = QLabel("")
+            self._lbl_train_status.setStyleSheet(f"color: {_MUTED}; font-size: 12px;")
+            train_row.addWidget(self._lbl_train_status)
+            train_row.addStretch()
+            layout.addLayout(train_row)
 
-        # Balance row
-        bal_row = QHBoxLayout()
-        self._lbl_balance = QLabel("")
-        self._lbl_balance.setStyleSheet(f"font-size: 13px;")
-        bal_row.addWidget(self._lbl_balance)
-        bal_row.addStretch()
+            # Balance + payment row (admin only)
+            bal_row = QHBoxLayout()
+            self._lbl_balance = QLabel("")
+            self._lbl_balance.setStyleSheet("font-size: 13px;")
+            bal_row.addWidget(self._lbl_balance)
+            bal_row.addStretch()
 
-        self._payment_spin = QDoubleSpinBox()
-        self._payment_spin.setRange(0.01, 999.99)
-        self._payment_spin.setValue(5.00)
-        self._payment_spin.setPrefix("$")
-        self._payment_spin.setDecimals(2)
-        bal_row.addWidget(self._payment_spin)
+            self._payment_spin = QDoubleSpinBox()
+            self._payment_spin.setRange(0.01, 999.99)
+            self._payment_spin.setValue(5.00)
+            self._payment_spin.setPrefix("$")
+            self._payment_spin.setDecimals(2)
+            bal_row.addWidget(self._payment_spin)
 
-        self._payment_btn = QPushButton("Record Payment")
-        self._payment_btn.clicked.connect(self._record_payment)
-        self._payment_btn.setEnabled(False)
-        bal_row.addWidget(self._payment_btn)
-        layout.addLayout(bal_row)
+            self._payment_btn = QPushButton("Record Payment")
+            self._payment_btn.clicked.connect(self._record_payment)
+            self._payment_btn.setEnabled(False)
+            bal_row.addWidget(self._payment_btn)
+            layout.addLayout(bal_row)
 
         layout.addStretch()
         return panel
@@ -285,11 +303,12 @@ class UsersWindow(QDialog):
         if row < 0:
             self._selected_user = None
             self._lbl_name.setText("Select a user")
-            self._capture_btn.setEnabled(False)
-            self._train_btn.setEnabled(False)
-            self._payment_btn.setEnabled(False)
-            self._photo_list.clear()
-            self._lbl_balance.setText("")
+            if self._is_admin:
+                self._capture_btn.setEnabled(False)
+                self._train_btn.setEnabled(False)
+                self._payment_btn.setEnabled(False)
+                self._photo_list.clear()
+                self._lbl_balance.setText("")
             return
 
         item    = self._user_list.item(row)
@@ -301,16 +320,16 @@ class UsersWindow(QDialog):
         self._selected_user = user
         self._lbl_name.setText(user.name)
 
-        is_real_user = user.id != UNKNOWN_USER_ID
-        self._capture_btn.setEnabled(is_real_user)
-        self._train_btn.setEnabled(is_real_user and bool(user.image_paths))
-        self._payment_btn.setEnabled(is_real_user)
-
-        self._refresh_photo_list(user)
-        self._refresh_balance(user)
-        self._lbl_train_status.setText(
-            f"{len(self._db.get_face_encodings_for_user(user.id))} encoding(s) stored"
-        )
+        if self._is_admin:
+            is_real_user = user.id != UNKNOWN_USER_ID
+            self._capture_btn.setEnabled(is_real_user)
+            self._train_btn.setEnabled(is_real_user and bool(user.image_paths))
+            self._payment_btn.setEnabled(is_real_user)
+            self._refresh_photo_list(user)
+            self._refresh_balance(user)
+            self._lbl_train_status.setText(
+                f"{len(self._db.get_face_encodings_for_user(user.id))} encoding(s) stored"
+            )
 
     def _refresh_photo_list(self, user: User) -> None:
         self._photo_list.clear()
@@ -331,6 +350,8 @@ class UsersWindow(QDialog):
     # ------------------------------------------------------------------
 
     def _on_camera_frame(self, pixmap: QPixmap) -> None:
+        if not self._is_admin:
+            return
         scaled = pixmap.scaled(
             self._camera_label.size(),
             Qt.AspectRatioMode.KeepAspectRatio,
@@ -342,14 +363,32 @@ class UsersWindow(QDialog):
     # User actions
     # ------------------------------------------------------------------
 
-    def _add_user(self) -> None:
-        name, ok = QInputDialog.getText(self, "Add User", "Name:")
+    def _register_user(self) -> None:
+        """Self-registration — anyone can add themselves (no password needed)."""
+        name, ok = QInputDialog.getText(
+            self, "Register / Add Me",
+            "Enter your name (used for pour tracking and face recognition):"
+        )
         if not ok or not name.strip():
             return
 
-        user = User(id=None, name=name.strip())
+        name = name.strip()
+        # Check for duplicate name
+        existing = [
+            u for u in self._db.get_all_users()
+            if u.name.lower() == name.lower() and u.id != UNKNOWN_USER_ID
+        ]
+        if existing:
+            QMessageBox.warning(
+                self, "Name Taken",
+                f"'{name}' is already registered.\n"
+                "Choose a different name or ask an admin to update your profile.",
+            )
+            return
+
+        user = User(id=None, name=name)
         self._db.save_user(user)
-        log.info("Added user: %s (id=%d)", user.name, user.id)
+        log.info("Registered user: %s (id=%d)", user.name, user.id)
         self._load_users()
 
         # Select the new user
@@ -357,6 +396,14 @@ class UsersWindow(QDialog):
             if self._user_list.item(i).data(Qt.ItemDataRole.UserRole) == user.id:
                 self._user_list.setCurrentRow(i)
                 break
+
+        QMessageBox.information(
+            self, "Registered!",
+            f"Welcome, {user.name}!\n\n"
+            "Ask an admin to add your photo so the kegerator can identify you."
+            if not self._is_admin else
+            f"Welcome, {user.name}! Use the camera panel to capture training photos.",
+        )
 
     def _delete_user(self) -> None:
         if not self._selected_user:
