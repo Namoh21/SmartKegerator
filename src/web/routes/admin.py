@@ -99,6 +99,12 @@ async def login_submit(
     if admin and verify_password(password, admin["password_hash"]):
         request.session["admin_username"] = admin["username"]
         request.session["admin_id"]       = admin["id"]
+        # Also populate standard-user session keys from the linked user
+        if admin.get("user_id"):
+            linked = db.get_user(admin["user_id"])
+            if linked:
+                request.session["user_id"]   = linked.id
+                request.session["user_name"] = linked.name
         # Validate redirect target — must be a relative path on this server
         dest = next if (next.startswith("/") and not next.startswith("//")) else "/"
         return RedirectResponse(dest, status_code=303)

@@ -24,6 +24,17 @@ async def pour_history(
     days  = _PERIODS.get(period, 30)
     since = (time.time() - days * 86400) if days else 0.0
 
+    # Standard users (logged in but not admin) see only their own history
+    try:
+        is_admin     = bool(request.session.get("admin_username"))
+        session_uid  = request.session.get("user_id")
+    except Exception:
+        is_admin    = False
+        session_uid = None
+
+    if not is_admin and session_uid:
+        user_id = int(session_uid)   # override query param
+
     pours = db.get_pours_since(since)
 
     if user_id:
@@ -85,5 +96,6 @@ async def pour_history(
             pour_count=len(pours),
             chart_labels=day_labels,
             chart_oz=day_oz,
+            show_user_filter=is_admin,   # only admins see the user dropdown
         ),
     )

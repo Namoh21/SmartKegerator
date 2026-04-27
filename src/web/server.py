@@ -185,7 +185,8 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
     - GET requests and static files: always public.
     """
     _SKIP_PREFIXES = ("/photos/",)
-    _PUBLIC_POSTS  = {"/admin/login", "/admin/setup", "/admin/logout"}
+    _PUBLIC_POSTS  = {"/admin/login", "/admin/setup", "/admin/logout",
+                      "/register", "/logout"}
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
@@ -234,26 +235,34 @@ _setup_templates(templates)
 
 
 def ctx(request: Request, **kwargs) -> dict:
-    """Build a base template context dict (always includes is_admin)."""
+    """Build a base template context dict (always includes auth state)."""
     try:
-        is_admin       = bool(request.session.get("admin_username"))
-        admin_username = request.session.get("admin_username")
+        admin_username    = request.session.get("admin_username")
+        current_user_id   = request.session.get("user_id")
+        current_user_name = request.session.get("user_name")
+        is_admin          = bool(admin_username)
+        is_logged_in      = bool(current_user_id)
     except Exception:
-        # SessionMiddleware not yet available (startup edge-case)
-        is_admin       = False
-        admin_username = None
+        admin_username    = None
+        current_user_id   = None
+        current_user_name = None
+        is_admin          = False
+        is_logged_in      = False
     return {
-        "request":        request,
-        "config":         _config,
-        "is_admin":       is_admin,
-        "admin_username": admin_username,
+        "request":            request,
+        "config":             _config,
+        "is_admin":           is_admin,
+        "is_logged_in":       is_logged_in,
+        "admin_username":     admin_username,
+        "current_user_id":    current_user_id,
+        "current_user_name":  current_user_name,
         **kwargs,
     }
 
 
 # Register routers — imported after ctx/templates are defined to avoid circular import
 from web.routes import dashboard, beers, kegs, users, pours, settings, untappd  # noqa: E402
-from web.routes import admin                                                      # noqa: E402
+from web.routes import admin, auth                                                # noqa: E402
 
 app.include_router(dashboard.router)
 app.include_router(beers.router)
@@ -263,6 +272,7 @@ app.include_router(pours.router)
 app.include_router(settings.router)
 app.include_router(untappd.router)
 app.include_router(admin.router)
+app.include_router(auth.router)
 
 
 # ---------------------------------------------------------------------------
