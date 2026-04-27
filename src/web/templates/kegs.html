@@ -50,9 +50,21 @@
   <div class="col-md-6 col-xl-4">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center py-2">
-        <div>
-          <strong>{{ s.beer.name if s.beer else "Unknown Beer" }}</strong>
-          {% if s.tap %}<span class="badge ms-2" style="background:var(--sk-accent)">{{ s.tap | upper }}</span>{% endif %}
+        <div class="d-flex align-items-center gap-2">
+          {% if s.beer and s.beer.label_url %}
+          <img src="{{ s.beer.label_url }}" width="32" height="32"
+               style="object-fit:cover;border-radius:4px;" loading="lazy"
+               onerror="this.style.display='none'">
+          {% endif %}
+          <div>
+            <strong>{{ s.beer.name if s.beer else "Unknown Beer" }}</strong>
+            {% if s.tap %}<span class="badge ms-2" style="background:var(--sk-accent)">{{ s.tap | upper }}</span>{% endif %}
+            {% if s.beer and s.beer.style %}
+            <div class="text-muted" style="font-size:.7rem;">{{ s.beer.style }}
+              {% if s.beer.untappd_rating %}· &#9733; {{ s.beer.rating_display }}{% endif %}
+            </div>
+            {% endif %}
+          </div>
         </div>
         <span class="text-muted small">Keg #{{ s.keg.id }}</span>
       </div>
@@ -157,4 +169,25 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateKegBeerPreview(sel) {
+  const opt     = sel.options[sel.selectedIndex];
+  const preview = document.getElementById('keg-beer-preview');
+  const img     = document.getElementById('keg-beer-label');
+  if (!opt || !opt.value) { preview.classList.add('d-none'); return; }
+  const label  = opt.dataset.label;
+  const style  = opt.dataset.style;
+  const abv    = opt.dataset.abv;
+  const rating = opt.dataset.rating;
+  if (label) { img.src = label; img.style.display = ''; }
+  else         { img.style.display = 'none'; }
+  document.getElementById('keg-beer-style').textContent  = style  || '';
+  document.getElementById('keg-beer-abv').textContent    = abv    ? abv + '% ABV' : '';
+  document.getElementById('keg-beer-rating').textContent = rating ? '★ ' + rating : '';
+  preview.classList.remove('d-none');
+}
+</script>
 {% endblock %}

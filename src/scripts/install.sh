@@ -245,6 +245,7 @@ sudo -u "${REAL_USER}" ${PIP} \
     "uvicorn[standard]>=0.27" \
     "jinja2>=3.1" \
     "python-multipart>=0.0.9" \
+    "httpx>=0.27" \
     PyYAML
 
 info "Pip packages installed."

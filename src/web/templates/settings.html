@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Settings — SmartKegerator{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    {% if request.query_params.get('saved') %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+      <i class="bi bi-check-circle me-2"></i>Settings saved.
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <!-- ── Untappd API ───────────────────────────────────────────── -->
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center gap-2">
+        <img src="https://untappd.com/favicon.ico" width="18" height="18" alt="">
+        <strong>Untappd API</strong>
+        <span class="text-muted small ms-auto">
+          Register at
+          <a href="https://untappd.com/api/register" target="_blank" rel="noopener"
+             class="text-accent">untappd.com/api/register</a>
+        </span>
+      </div>
+      <div class="card-body">
+        <form method="post" action="/settings/">
+
+          <div class="mb-3">
+            <label class="form-label">Client ID</label>
+            <input type="text" class="form-control font-monospace"
+                   name="untappd_client_id"
+                   value="{{ settings.get('untappd_client_id', '') }}"
+                   placeholder="Your Untappd Client ID"
+                   autocomplete="off">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Client Secret</label>
+            <div class="input-group">
+              <input type="password" class="form-control font-monospace"
+                     name="untappd_client_secret"
+                     value="{{ settings.get('untappd_client_secret', '') }}"
+                     placeholder="Your Untappd Client Secret"
+                     autocomplete="off"
+                     id="secretInput">
+              <button type="button" class="btn btn-outline-secondary"
+                      onclick="toggleSecret()">
+                <i class="bi bi-eye" id="eyeIcon"></i>
+              </button>
+            </div>
+            <div class="form-text text-muted">
+              Stored only in your local database — never sent to this server's code or anywhere except Untappd's API.
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 align-items-center">
+            <button type="submit" class="btn btn-accent">
+              <i class="bi bi-save me-1"></i>Save
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    hx-get="/untappd/test"
+                    hx-target="#test-result"
+                    hx-swap="innerHTML">
+              <i class="bi bi-wifi me-1"></i>Test Connection
+            </button>
+            <span id="test-result" class="small"></span>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- ── About ────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header"><strong>About</strong></div>
+      <div class="card-body small text-muted">
+        <p class="mb-1">SmartKegerator — Python / PyQt6 / FastAPI rewrite of the original C++ kegerator controller.</p>
+        <p class="mb-0">API credentials are stored in the local SQLite database and read at runtime.
+           They are never written to config files, source code, or logs.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleSecret() {
+  const inp  = document.getElementById('secretInput');
+  const icon = document.getElementById('eyeIcon');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    icon.classList.replace('bi-eye', 'bi-eye-slash');
+  } else {
+    inp.type = 'password';
+    icon.classList.replace('bi-eye-slash', 'bi-eye');
+  }
+}
+</script>
+{% endblock %}

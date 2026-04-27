@@ -112,13 +112,15 @@ def ctx(request: Request, **kwargs) -> dict:
 
 
 # Register routers — imported after ctx/templates are defined to avoid circular import
-from web.routes import dashboard, beers, kegs, users, pours  # noqa: E402
+from web.routes import dashboard, beers, kegs, users, pours, settings, untappd  # noqa: E402
 
 app.include_router(dashboard.router)
 app.include_router(beers.router)
 app.include_router(kegs.router)
 app.include_router(users.router)
 app.include_router(pours.router)
+app.include_router(settings.router)
+app.include_router(untappd.router)
 
 
 # ---------------------------------------------------------------------------

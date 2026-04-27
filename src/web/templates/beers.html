@@ -13,23 +13,47 @@
   <div class="card-body p-0">
     {% if beers %}
     <div class="table-responsive">
-      <table class="table table-striped table-hover mb-0">
+      <table class="table table-striped table-hover mb-0 align-middle">
         <thead>
           <tr>
-            <th>Name</th><th>Company</th><th>Style</th><th>Location</th>
-            <th class="text-center">ABV</th><th class="text-center">IBU</th>
-            <th class="text-center">Kegs</th><th></th>
+            <th style="width:48px"></th>
+            <th>Name</th><th>Brewery</th><th>Style</th>
+            <th class="text-center">ABV</th>
+            <th class="text-center">IBU</th>
+            <th class="text-center" title="Untappd community rating">&#9733;</th>
+            <th class="text-center">Kegs</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for beer in beers %}
           <tr>
-            <td><strong>{{ beer.name }}</strong></td>
+            <td>
+              {% if beer.label_url %}
+              <img src="{{ beer.label_url }}" width="36" height="36"
+                   style="object-fit:cover;border-radius:4px;" loading="lazy"
+                   onerror="this.style.display='none'">
+              {% else %}
+              <span class="text-muted"><i class="bi bi-cup-fill" style="font-size:1.4rem;"></i></span>
+              {% endif %}
+            </td>
+            <td>
+              <strong>{{ beer.name }}</strong>
+              {% if beer.description %}
+              <div class="text-muted small" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                {{ beer.description }}
+              </div>
+              {% endif %}
+            </td>
             <td>{{ beer.company }}</td>
-            <td><span class="badge bg-secondary">{{ beer.style }}</span></td>
-            <td class="text-muted small">{{ beer.location }}</td>
+            <td><span class="badge bg-secondary">{{ beer.style or "—" }}</span></td>
             <td class="text-center">{{ beer.abv | abv }}</td>
             <td class="text-center">{{ beer.ibu if beer.ibu else "—" }}</td>
+            <td class="text-center">
+              {% if beer.untappd_rating %}
+              <span class="text-accent fw-semibold">{{ beer.rating_display }}</span>
+              {% else %}—{% endif %}
+            </td>
             <td class="text-center">{{ keg_counts.get(beer.id, 0) }}</td>
             <td class="text-end">
               <button class="btn btn-sm btn-outline-secondary me-1"
@@ -39,7 +63,9 @@
               {% if keg_counts.get(beer.id, 0) == 0 %}
               <form method="post" action="/beers/{{ beer.id }}/delete" class="d-inline"
                     onsubmit="return confirm('Delete {{ beer.name }}?')">
-                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
               </form>
               {% endif %}
             </td>
@@ -49,14 +75,14 @@
       </table>
     </div>
     {% else %}
-    <p class="text-muted p-3">No beers yet. Add one to get started.</p>
+    <p class="text-muted p-3">No beers yet — use the Untappd search to add one.</p>
     {% endif %}
   </div>
 </div>
 
 <!-- ── Add Beer Modal ───────────────────────────────────────────────── -->
 <div class="modal fade" id="addBeerModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content" style="background:var(--sk-card);">
       <form method="post" action="/beers/add">
         <div class="modal-header border-secondary">
@@ -64,6 +90,7 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          {% set beer = none %}
           {% include "partials/beer_form.html" %}
         </div>
         <div class="modal-footer border-secondary">
@@ -78,7 +105,7 @@
 <!-- ── Edit Beer Modals ─────────────────────────────────────────────── -->
 {% for beer in beers %}
 <div class="modal fade" id="editBeer{{ beer.id }}" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content" style="background:var(--sk-card);">
       <form method="post" action="/beers/{{ beer.id }}/edit">
         <div class="modal-header border-secondary">
@@ -97,4 +124,23 @@
   </div>
 </div>
 {% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fillBeerForm(btn) {
+  const prefix = btn.closest('.modal') ? '' : '';
+  document.getElementById('bf-name').value         = btn.dataset.name        || '';
+  document.getElementById('bf-company').value      = btn.dataset.company     || '';
+  document.getElementById('bf-location').value     = btn.dataset.location    || '';
+  document.getElementById('bf-style').value        = btn.dataset.style       || '';
+  document.getElementById('bf-abv').value          = btn.dataset.abv         || '0.0';
+  document.getElementById('bf-ibu').value          = btn.dataset.ibu         || '0';
+  document.getElementById('bf-description').value  = btn.dataset.description || '';
+  document.getElementById('bf-rating').value       = btn.dataset.untappdRating || '';
+  document.getElementById('bf-untappd-id').value   = btn.dataset.untappdId   || '';
+  document.getElementById('bf-label-url').value    = btn.dataset.labelUrl    || '';
+  document.getElementById('untappd-results').innerHTML = '';
+}
+</script>
 {% endblock %}

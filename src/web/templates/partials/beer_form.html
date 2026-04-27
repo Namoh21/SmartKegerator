@@ -1,33 +1,75 @@
 <!-- Shared form fields for Add/Edit Beer modals -->
+
+<!-- ── Untappd search ──────────────────────────────────────────────── -->
+<div class="mb-3">
+  <label class="form-label small text-muted">
+    <img src="https://untappd.com/favicon.ico" width="14" height="14" class="me-1" alt="">
+    Search Untappd to auto-fill fields
+  </label>
+  <input type="text" class="form-control"
+         placeholder="Type a beer name to search Untappd…"
+         hx-get="/untappd/search"
+         hx-trigger="keyup changed delay:400ms"
+         hx-target="#untappd-results"
+         hx-include="[name='untappd_q']"
+         name="untappd_q"
+         autocomplete="off">
+  <div id="untappd-results"></div>
+</div>
+<hr style="border-color: #2a2a4e;">
+
+<!-- ── Core fields ────────────────────────────────────────────────── -->
 <div class="mb-3">
   <label class="form-label">Name <span class="text-danger">*</span></label>
-  <input type="text" class="form-control" name="name" value="{{ beer.name if beer is defined else '' }}" required>
+  <input type="text" class="form-control" name="name" id="bf-name"
+         value="{{ beer.name if beer is defined else '' }}" required>
 </div>
 <div class="row g-2">
   <div class="col-md-6 mb-3">
     <label class="form-label">Brewery / Company</label>
-    <input type="text" class="form-control" name="company" value="{{ beer.company if beer is defined else '' }}">
+    <input type="text" class="form-control" name="company" id="bf-company"
+           value="{{ beer.company if beer is defined else '' }}">
   </div>
   <div class="col-md-6 mb-3">
     <label class="form-label">Style</label>
-    <input type="text" class="form-control" name="style" value="{{ beer.style if beer is defined else '' }}"
+    <input type="text" class="form-control" name="style" id="bf-style"
+           value="{{ beer.style if beer is defined else '' }}"
            placeholder="IPA, Stout, Lager…">
   </div>
 </div>
 <div class="mb-3">
   <label class="form-label">Location</label>
-  <input type="text" class="form-control" name="location" value="{{ beer.location if beer is defined else '' }}"
+  <input type="text" class="form-control" name="location" id="bf-location"
+         value="{{ beer.location if beer is defined else '' }}"
          placeholder="City, State">
 </div>
 <div class="row g-2">
-  <div class="col-md-6 mb-3">
+  <div class="col-md-4 mb-3">
     <label class="form-label">ABV (%)</label>
-    <input type="number" class="form-control" name="abv" step="0.1" min="0" max="100"
+    <input type="number" class="form-control" name="abv" id="bf-abv"
+           step="0.1" min="0" max="100"
            value="{{ beer.abv if beer is defined else '0.0' }}">
   </div>
-  <div class="col-md-6 mb-3">
+  <div class="col-md-4 mb-3">
     <label class="form-label">IBU</label>
-    <input type="number" class="form-control" name="ibu" min="0"
+    <input type="number" class="form-control" name="ibu" id="bf-ibu" min="0"
            value="{{ beer.ibu if beer is defined else '0' }}">
   </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Untappd Rating</label>
+    <input type="text" class="form-control" name="untappd_rating" id="bf-rating"
+           value="{{ beer.rating_display if beer is defined else '' }}"
+           placeholder="0.00–5.00" readonly>
+  </div>
 </div>
+<div class="mb-3">
+  <label class="form-label">Description</label>
+  <textarea class="form-control" name="description" id="bf-description"
+            rows="3">{{ beer.description if beer is defined else '' }}</textarea>
+</div>
+
+<!-- Hidden fields populated by Untappd selection -->
+<input type="hidden" name="untappd_id"  id="bf-untappd-id"
+       value="{{ beer.untappd_id if beer is defined else '' }}">
+<input type="hidden" name="label_url"   id="bf-label-url"
+       value="{{ beer.label_url if beer is defined else '' }}">

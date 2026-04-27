@@ -28,13 +28,22 @@ from data.models import (
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS beers (
-    id       INTEGER PRIMARY KEY,
-    name     TEXT    NOT NULL,
-    company  TEXT    NOT NULL DEFAULT '',
-    location TEXT    NOT NULL DEFAULT '',
-    style    TEXT    NOT NULL DEFAULT '',
-    abv      REAL    NOT NULL DEFAULT 0.0,
-    ibu      INTEGER NOT NULL DEFAULT 0
+    id              INTEGER PRIMARY KEY,
+    name            TEXT    NOT NULL,
+    company         TEXT    NOT NULL DEFAULT '',
+    location        TEXT    NOT NULL DEFAULT '',
+    style           TEXT    NOT NULL DEFAULT '',
+    abv             REAL    NOT NULL DEFAULT 0.0,
+    ibu             INTEGER NOT NULL DEFAULT 0,
+    description     TEXT    NOT NULL DEFAULT '',
+    untappd_id      INTEGER,
+    untappd_rating  REAL,
+    label_url       TEXT    NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS kegs (
@@ -143,6 +152,22 @@ class Database:
         with self._cursor() as cur:
             cur.executescript(_SCHEMA)
             cur.executescript(_SEED)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after the initial schema — safe to re-run."""
+        new_columns = [
+            "ALTER TABLE beers ADD COLUMN description    TEXT    NOT NULL DEFAULT ''",
+            "ALTER TABLE beers ADD COLUMN untappd_id     INTEGER",
+            "ALTER TABLE beers ADD COLUMN untappd_rating REAL",
+            "ALTER TABLE beers ADD COLUMN label_url      TEXT    NOT NULL DEFAULT ''",
+        ]
+        with self._cursor() as cur:
+            for sql in new_columns:
+                try:
+                    cur.execute(sql)
+                except sqlite3.OperationalError:
+                    pass  # column already exists
 
     # ------------------------------------------------------------------
     # Beer
@@ -163,22 +188,49 @@ class Database:
         with self._cursor() as cur:
             if beer.id is None:
                 cur.execute(
-                    "INSERT INTO beers (name, company, location, style, abv, ibu) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (beer.name, beer.company, beer.location, beer.style, beer.abv, beer.ibu),
+                    "INSERT INTO beers "
+                    "(name, company, location, style, abv, ibu, description, untappd_id, untappd_rating, label_url) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (beer.name, beer.company, beer.location, beer.style, beer.abv, beer.ibu,
+                     beer.description, beer.untappd_id, beer.untappd_rating, beer.label_url),
                 )
                 beer.id = cur.lastrowid
             else:
                 cur.execute(
-                    "INSERT OR REPLACE INTO beers (id, name, company, location, style, abv, ibu) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (beer.id, beer.name, beer.company, beer.location, beer.style, beer.abv, beer.ibu),
+                    "INSERT OR REPLACE INTO beers "
+                    "(id, name, company, location, style, abv, ibu, description, untappd_id, untappd_rating, label_url) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (beer.id, beer.name, beer.company, beer.location, beer.style, beer.abv, beer.ibu,
+                     beer.description, beer.untappd_id, beer.untappd_rating, beer.label_url),
                 )
         return beer
 
     def delete_beer(self, beer_id: int) -> None:
         with self._cursor() as cur:
             cur.execute("DELETE FROM beers WHERE id = ?", (beer_id,))
+
+    # ------------------------------------------------------------------
+    # Settings (key/value store for runtime config — never in source code)
+    # ------------------------------------------------------------------
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        with self._cursor() as cur:
+            cur.execute("SELECT value FROM settings WHERE key = ?", (key,))
+            row = cur.fetchone()
+            return row["value"] if row else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
+            )
+
+    def get_all_settings(self) -> dict[str, str]:
+        with self._cursor() as cur:
+            cur.execute("SELECT key, value FROM settings")
+            return {row["key"]: row["value"] for row in cur.fetchall()}
 
     # ------------------------------------------------------------------
     # Keg
@@ -439,6 +491,7 @@ class Database:
 # ---------------------------------------------------------------------------
 
 def _row_to_beer(row: sqlite3.Row) -> Beer:
+    keys = row.keys()
     return Beer(
         id=row["id"],
         name=row["name"],
@@ -447,6 +500,10 @@ def _row_to_beer(row: sqlite3.Row) -> Beer:
         style=row["style"],
         abv=row["abv"],
         ibu=row["ibu"],
+        description=row["description"] if "description" in keys else "",
+        untappd_id=row["untappd_id"] if "untappd_id" in keys else None,
+        untappd_rating=row["untappd_rating"] if "untappd_rating" in keys else None,
+        label_url=row["label_url"] if "label_url" in keys else "",
     )
 
 

@@ -1,15 +1,44 @@
 <!-- Shared form fields for Add/Edit Keg modals -->
 <div class="mb-3">
   <label class="form-label">Beer <span class="text-danger">*</span></label>
-  <select class="form-select" name="beer_id" required>
-    <option value="">— Select Beer —</option>
-    {% for beer in beers %}
-    <option value="{{ beer.id }}" {% if keg and keg.beer_id == beer.id %}selected{% endif %}>
-      {{ beer.name }}{% if beer.company %} · {{ beer.company }}{% endif %}
-    </option>
-    {% endfor %}
-  </select>
+  <div class="d-flex gap-2 align-items-center">
+    <select class="form-select" name="beer_id" required
+            onchange="updateKegBeerPreview(this)">
+      <option value="">— Select Beer —</option>
+      {% for beer in beers %}
+      <option value="{{ beer.id }}"
+              data-label="{{ beer.label_url }}"
+              data-style="{{ beer.style }}"
+              data-abv="{{ beer.abv }}"
+              data-rating="{{ beer.rating_display }}"
+              {% if keg and keg.beer_id == beer.id %}selected{% endif %}>
+        {{ beer.name }}{% if beer.company %} · {{ beer.company }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <a href="/beers/" class="btn btn-outline-secondary btn-sm text-nowrap"
+       title="Add a new beer first">
+      <i class="bi bi-plus-lg"></i> New
+    </a>
+  </div>
+
+  <!-- Beer preview card shown when a beer is selected -->
+  <div id="keg-beer-preview" class="mt-2 p-2 rounded d-none"
+       style="background:rgba(255,255,255,.04); border:1px solid #2a2a4e;">
+    <div class="d-flex align-items-center gap-3">
+      <img id="keg-beer-label" src="" width="48" height="48"
+           style="object-fit:cover;border-radius:4px;display:none;">
+      <div>
+        <div class="small text-muted" id="keg-beer-style"></div>
+        <div class="small">
+          <span id="keg-beer-abv" class="me-2"></span>
+          <span class="text-accent" id="keg-beer-rating"></span>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
 <div class="row g-2">
   <div class="col-md-6 mb-3">
     <label class="form-label">Capacity (L) <span class="text-danger">*</span></label>
@@ -26,8 +55,8 @@
 </div>
 <div class="row g-2">
   <div class="col-md-6 mb-3">
-    <label class="form-label">Date tapped <span class="text-danger">*</span></label>
-    <input type="date" class="form-control" name="date_bought" required
+    <label class="form-label">Date tapped</label>
+    <input type="date" class="form-control" name="date_bought"
            value="{{ keg.date_bought.strftime('%Y-%m-%d') if keg else '' }}">
   </div>
   <div class="col-md-6 mb-3">
