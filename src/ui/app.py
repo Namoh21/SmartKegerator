@@ -16,6 +16,9 @@ Timeout rules:
   • 30 s after the last touchscreen touch                → logout
   • A new pour always resets (logs out) the session so face recognition
     identifies the person at the tap fresh every time.
+  • 2 min of no touch and no pour                       → screen sleep
+    The first touch after sleep wakes the screen (consumed, not passed on).
+    Screen wakes automatically when a pour starts.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ import time
 from typing import Optional
 
 from PyQt6.QtCore import QEvent, QObject, Qt, QTimer
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 
 from data.database import Database
 from data.models import Pour, UNKNOWN_USER_ID
@@ -39,6 +42,31 @@ from ui.pouring_window import PouringWindow
 
 log = logging.getLogger(__name__)
 
+_SCREEN_SLEEP_MS  = 2 * 60 * 1000   # 2 minutes → screen sleep
+_POST_POUR_MS     =      20 * 1000   # 20 seconds after pour → user logout
+_IDLE_MS          =      30 * 1000   # 30 seconds of no touch → user logout
+
+
+# ---------------------------------------------------------------------------
+# Screen-sleep overlay
+# ---------------------------------------------------------------------------
+
+class _BlankScreen(QWidget):
+    """Solid-black frameless widget that covers the UI during screen sleep.
+
+    Shown fullscreen by App._sleep_screen(); hidden by App._wake_screen().
+    Input events that wake the screen are consumed by the App event filter
+    so they don't accidentally trigger buttons beneath this widget.
+    """
+    def __init__(self) -> None:
+        super().__init__(flags=Qt.WindowType.FramelessWindowHint)
+        self.setStyleSheet("background: black;")
+        self.setCursor(Qt.CursorShape.BlankCursor)
+
+
+# ---------------------------------------------------------------------------
+# Application coordinator
+# ---------------------------------------------------------------------------
 
 class App(QObject):
     def __init__(self, config: dict) -> None:
@@ -82,6 +110,17 @@ class App(QObject):
         self._idle_timer = QTimer()
         self._idle_timer.setSingleShot(True)
         self._idle_timer.timeout.connect(self._logout_user)
+
+        # -----------------------------------------------------------------
+        # Screen sleep
+        # -----------------------------------------------------------------
+        self._screen_off   = False
+        self._blank_screen = _BlankScreen()
+
+        self._screen_timer = QTimer()
+        self._screen_timer.setSingleShot(True)
+        self._screen_timer.timeout.connect(self._sleep_screen)
+        self._screen_timer.start(_SCREEN_SLEEP_MS)   # begin countdown at startup
 
         # Catch all mouse / touch events across the whole application
         QApplication.instance().installEventFilter(self)
@@ -169,21 +208,46 @@ class App(QObject):
             self._main_window.resize(900, 520)
 
     # ------------------------------------------------------------------
+    # Screen sleep / wake
+    # ------------------------------------------------------------------
+
+    def _sleep_screen(self) -> None:
+        """Blank the screen after 2 minutes of inactivity."""
+        if self._screen_off:
+            return
+        self._screen_off = True
+        if self._fullscreen:
+            self._blank_screen.showFullScreen()
+        else:
+            self._blank_screen.resize(self._main_window.size())
+            self._blank_screen.move(self._main_window.pos())
+            self._blank_screen.show()
+        log.info("Screen sleeping after %d s idle", _SCREEN_SLEEP_MS // 1000)
+
+    def _wake_screen(self) -> None:
+        """Restore the display after it was sleeping."""
+        if not self._screen_off:
+            return
+        self._screen_off = False
+        self._blank_screen.hide()
+        self._reset_screen_timer()
+        log.info("Screen woke")
+
+    def _reset_screen_timer(self) -> None:
+        """Restart the 2-minute sleep countdown."""
+        self._screen_timer.start(_SCREEN_SLEEP_MS)
+
+    # ------------------------------------------------------------------
     # Session management
     # ------------------------------------------------------------------
 
     def _on_user_identified(self, user_id: int, confidence: float) -> None:
-        """Called whenever facial recognition matches someone.
-
-        Updates the main-window greeting and resets/starts the idle timer.
-        Only fires if the recognised user is different from the current one
-        (avoids redundant DB hits and label flicker when recognition is steady).
-        """
-        # Always reset idle timer — recognition counts as "activity"
-        self._idle_timer.start(30_000)
+        """Called whenever facial recognition matches someone."""
+        self._reset_screen_timer()
+        self._idle_timer.start(_IDLE_MS)
 
         if user_id == self._current_user_id:
-            return  # same person still recognised — timers already reset above
+            return  # same person — timers already reset above
 
         user = self._db.get_user(user_id)
         if not user:
@@ -191,7 +255,7 @@ class App(QObject):
 
         self._current_user_id   = user.id
         self._current_user_name = user.name
-        self._post_pour_timer.stop()          # new person takes over immediately
+        self._post_pour_timer.stop()
         self._main_window.set_current_user(user.id, user.name)
         log.info(
             "Session started: %s (id=%d, confidence=%.0f%%)",
@@ -201,10 +265,10 @@ class App(QObject):
     def _on_interaction(self) -> None:
         """Touchscreen tap detected — keep session alive."""
         self._post_pour_timer.stop()
-        self._idle_timer.start(30_000)
+        self._idle_timer.start(_IDLE_MS)
 
     def _logout_user(self) -> None:
-        """Clear the current session (called by either timer)."""
+        """Clear the current session (called by either user-session timer)."""
         if self._current_user_id is not None:
             log.info(
                 "Session timed out — logging out %s (id=%d)",
@@ -221,10 +285,16 @@ class App(QObject):
     # ------------------------------------------------------------------
 
     def eventFilter(self, obj, event) -> bool:
-        if self._current_user_id is not None:
-            if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.TouchBegin):
-                self._on_interaction()
-        return False  # never consume events
+        if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.TouchBegin):
+            if self._screen_off:
+                # First touch wakes the screen; don't pass the event to widgets
+                self._wake_screen()
+                return True
+            else:
+                self._reset_screen_timer()
+                if self._current_user_id is not None:
+                    self._on_interaction()
+        return False
 
     # ------------------------------------------------------------------
     # Pour lifecycle
@@ -243,7 +313,12 @@ class App(QObject):
 
         log.info("Pour started: tap=%s keg=%s beer=%s", tap, keg_id, beer.name if beer else "?")
 
-        # Log out and clear session — face recognition will re-identify the pourer
+        # Wake screen (in case it was sleeping) and pause the sleep timer
+        # during the pour so the display stays on throughout
+        self._wake_screen()
+        self._screen_timer.stop()
+
+        # Log out and clear session — face recognition re-identifies the pourer
         self._logout_user()
 
         self._pouring_window.start_pour(tap, keg, beer)
@@ -290,8 +365,9 @@ class App(QObject):
         else:
             log.info("Pour finished with no ticks or no keg — nothing saved")
 
-        # Start 20 s post-pour logout countdown
-        self._post_pour_timer.start(20_000)
+        # Resume sleep countdown; also start the 20 s user-logout timer
+        self._reset_screen_timer()
+        self._post_pour_timer.start(_POST_POUR_MS)
 
         self._pouring_window.end_pour()
         self._pouring_window.hide()
