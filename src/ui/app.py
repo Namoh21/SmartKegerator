@@ -47,21 +47,6 @@ _POST_POUR_MS     =      20 * 1000   # 20 seconds after pour → user logout
 _IDLE_MS          =      30 * 1000   # 30 seconds of no touch → user logout
 
 
-# ---------------------------------------------------------------------------
-# Screen-sleep overlay
-# ---------------------------------------------------------------------------
-
-class _BlankScreen(QWidget):
-    """Solid-black frameless widget that covers the UI during screen sleep.
-
-    Shown fullscreen by App._sleep_screen(); hidden by App._wake_screen().
-    Input events that wake the screen are consumed by the App event filter
-    so they don't accidentally trigger buttons beneath this widget.
-    """
-    def __init__(self) -> None:
-        super().__init__(flags=Qt.WindowType.FramelessWindowHint)
-        self.setStyleSheet("background: black;")
-        self.setCursor(Qt.CursorShape.BlankCursor)
 
 
 # ---------------------------------------------------------------------------
@@ -112,15 +97,13 @@ class App(QObject):
         self._idle_timer.timeout.connect(self._logout_user)
 
         # -----------------------------------------------------------------
-        # Screen sleep
+        # Screen sleep timer (overlay created after main_window below)
         # -----------------------------------------------------------------
-        self._screen_off   = False
-        self._blank_screen = _BlankScreen()
+        self._screen_off = False
 
         self._screen_timer = QTimer()
         self._screen_timer.setSingleShot(True)
         self._screen_timer.timeout.connect(self._sleep_screen)
-        self._screen_timer.start(_SCREEN_SLEEP_MS)   # begin countdown at startup
 
         # Catch all mouse / touch events across the whole application
         QApplication.instance().installEventFilter(self)
@@ -130,6 +113,12 @@ class App(QObject):
         # -----------------------------------------------------------------
         self._main_window    = MainWindow(config, self._db, self._recognizer)
         self._pouring_window = PouringWindow(config, self._db)
+
+        # Black overlay is a CHILD of main_window so it has no independent
+        # Wayland surface and cannot steal input focus from other widgets.
+        self._blank_overlay = QWidget(self._main_window)
+        self._blank_overlay.setStyleSheet("background: black;")
+        self._blank_overlay.hide()
 
         # Set before _start_hardware() in case a pour fires during startup
         self._fullscreen: bool = False
@@ -145,6 +134,9 @@ class App(QObject):
         self._start_hardware()
         self._apply_display_settings()
         self._main_window.show()
+
+        # Start sleep countdown after the window is visible
+        self._screen_timer.start(_SCREEN_SLEEP_MS)
 
     # ------------------------------------------------------------------
     # Signal wiring
@@ -212,24 +204,22 @@ class App(QObject):
     # ------------------------------------------------------------------
 
     def _sleep_screen(self) -> None:
-        """Blank the screen after 2 minutes of inactivity."""
+        """Cover the main window with a black overlay after inactivity."""
         if self._screen_off:
             return
         self._screen_off = True
-        if self._fullscreen:
-            self._blank_screen.showFullScreen()
-        else:
-            self._blank_screen.resize(self._main_window.size())
-            self._blank_screen.move(self._main_window.pos())
-            self._blank_screen.show()
+        # Resize overlay to fill the entire main window, then bring to front
+        self._blank_overlay.resize(self._main_window.size())
+        self._blank_overlay.raise_()
+        self._blank_overlay.show()
         log.info("Screen sleeping after %d s idle", _SCREEN_SLEEP_MS // 1000)
 
     def _wake_screen(self) -> None:
-        """Restore the display after it was sleeping."""
+        """Remove the black overlay."""
         if not self._screen_off:
             return
         self._screen_off = False
-        self._blank_screen.hide()
+        self._blank_overlay.hide()
         self._reset_screen_timer()
         log.info("Screen woke")
 
