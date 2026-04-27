@@ -157,8 +157,11 @@ async def settings_save_untappd(
     untappd_client_secret: str = Form(""),
 ):
     db = get_db()
-    db.set_setting("untappd_client_id",     untappd_client_id.strip())
-    db.set_setting("untappd_client_secret", untappd_client_secret.strip())
+    db.set_setting("untappd_client_id", untappd_client_id.strip())
+    # Only overwrite secret when user typed a new value; blank = keep existing
+    secret = untappd_client_secret.strip()
+    if secret:
+        db.set_setting("untappd_client_secret", secret)
     return RedirectResponse("/settings/?saved=1&tab=untappd", status_code=303)
 
 

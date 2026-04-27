@@ -265,11 +265,12 @@
 
               <div class="mb-3">
                 <label class="form-label">Client Secret</label>
+                {% set _secret_set = settings.get('untappd_client_secret', '') != '' %}
                 <div class="input-group">
                   <input type="password" class="form-control font-monospace"
                          name="untappd_client_secret"
-                         value="{{ settings.get('untappd_client_secret', '') }}"
-                         placeholder="Your Untappd Client Secret"
+                         value=""
+                         placeholder="{{ '••••••••  (already saved — leave blank to keep)' if _secret_set else 'Your Untappd Client Secret' }}"
                          autocomplete="off"
                          id="secretInput">
                   <button type="button" class="btn btn-outline-secondary" onclick="toggleSecret()">

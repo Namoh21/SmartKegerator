@@ -26,9 +26,10 @@ from typing import Optional
 import uvicorn
 import yaml
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from data.database import Database
 
@@ -113,7 +114,38 @@ async def lifespan(app: FastAPI):
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="SmartKegerator", lifespan=lifespan)
+app = FastAPI(
+    title="SmartKegerator",
+    lifespan=lifespan,
+    docs_url=None,       # disable Swagger UI
+    redoc_url=None,      # disable ReDoc
+    openapi_url=None,    # disable /openapi.json entirely
+)
+
+
+class _SecurityHeaders(BaseHTTPMiddleware):
+    """Attach security headers to every response."""
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-Frame-Options"]        = "SAMEORIGIN"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"]     = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none';"
+        )
+        # Remove server banner
+        response.headers.pop("server", None)
+        return response
+
+
+app.add_middleware(_SecurityHeaders)
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 _setup_templates(templates)
@@ -148,4 +180,5 @@ if __name__ == "__main__":
         port=port,
         reload=False,
         log_level="info",
+        server_header=False,   # suppress 'server: uvicorn' banner
     )
