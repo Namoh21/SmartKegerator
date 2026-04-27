@@ -1,9 +1,7 @@
 """
-Flow meter manager — detects beer pours on up to 3 taps via GPIO edge events.
+Flow meter manager — detects beer pours on 1–4 taps via GPIO edge events.
 
-Replaces the original approach of spawning gpioWFI.py as a subprocess and
-parsing its stdout. Now uses gpiod 2.x directly inside a background thread,
-which is both faster and more reliable.
+Tap count and GPIO pins are read from the config `taps` section.
 
 Pour state machine per tap:
     IDLE  →  (tick_threshold ticks received)  →  POURING
@@ -37,12 +35,6 @@ except ImportError:
 _CHIP = "/dev/gpiochip0"
 
 
-class Tap(str, Enum):
-    LEFT   = "left"
-    CENTER = "center"
-    RIGHT  = "right"
-
-
 class _PourState(Enum):
     IDLE    = auto()
     POURING = auto()
@@ -50,12 +42,14 @@ class _PourState(Enum):
 
 class FlowMeterManager(QObject):
     """
-    Monitors 3 flow meter GPIO pins and manages pour lifecycle.
+    Monitors 1–4 flow meter GPIO pins and manages pour lifecycle.
+
+    Tap names (tap1–tap4) and pins come from config['taps'].
 
     Signals:
-        pour_started(tap: str)          — a pour has begun on the named tap
-        flow_tick(tap: str, ticks: int) — tick count updated during a pour
-        pour_finished(tap: str, ticks: int) — pour is complete; ticks is total
+        pour_started(tap: str)              — a pour has begun on the named tap
+        flow_tick(tap: str, ticks: int)     — tick count updated during a pour
+        pour_finished(tap: str, ticks: int) — pour complete; ticks is total count
     """
 
     pour_started  = pyqtSignal(str)
@@ -65,24 +59,40 @@ class FlowMeterManager(QObject):
     def __init__(self, config: dict, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
 
-        hw = config.get("hardware", {})
-        self._pins: dict[int, Tap] = {
-            hw.get("flow_meter_pin_left",   23): Tap.LEFT,
-            hw.get("flow_meter_pin_center", 24): Tap.CENTER,
-            hw.get("flow_meter_pin_right",  25): Tap.RIGHT,
-        }
+        hw       = config.get("hardware", {})
+        taps_cfg = config.get("taps", {})
+        count    = min(int(taps_cfg.get("count", 3)), 4)
+
+        # Build pin → tap_id mapping from config
+        self._pins: dict[int, str] = {}
+        for i in range(count):
+            tap_id   = f"tap{i + 1}"
+            tap_info = taps_cfg.get(tap_id, {})
+            pin      = tap_info.get("pin") if isinstance(tap_info, dict) else None
+            if pin is not None:
+                try:
+                    self._pins[int(pin)] = tap_id
+                except (TypeError, ValueError):
+                    log.warning("Invalid pin for %s: %s", tap_id, pin)
+
+        self._tap_ids         = list(self._pins.values())
         self._tick_threshold  = hw.get("tick_threshold",    3)
         self._end_pour_secs   = hw.get("end_pour_seconds", 5.0)
         self._chip_path       = hw.get("gpio_chip",        _CHIP)
 
         # Per-tap state
-        self._ticks:      dict[Tap, int]         = {t: 0     for t in Tap}
-        self._state:      dict[Tap, _PourState]  = {t: _PourState.IDLE for t in Tap}
-        self._last_tick:  dict[Tap, float]       = {t: 0.0   for t in Tap}
+        self._ticks:     dict[str, int]        = {t: 0              for t in self._tap_ids}
+        self._state:     dict[str, _PourState] = {t: _PourState.IDLE for t in self._tap_ids}
+        self._last_tick: dict[str, float]      = {t: 0.0            for t in self._tap_ids}
 
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread:          Optional[threading.Thread] = None
         self._watchdog_thread: Optional[threading.Thread] = None
+
+        log.info(
+            "FlowMeterManager configured: %d tap(s) on pins %s",
+            count, list(self._pins.keys()),
+        )
 
     # ------------------------------------------------------------------
     # Public control
@@ -106,17 +116,18 @@ class FlowMeterManager(QObject):
         self._running = False
         log.info("FlowMeterManager stopped")
 
-    def simulate_tick(self, tap: Tap) -> None:
+    def simulate_tick(self, tap_id: str) -> None:
         """Inject a synthetic tick — useful for testing without hardware."""
-        self._handle_tick(tap)
+        if tap_id in self._ticks:
+            self._handle_tick(tap_id)
 
     # ------------------------------------------------------------------
     # GPIO event loop (background thread)
     # ------------------------------------------------------------------
 
     def _event_loop(self) -> None:
-        if not _GPIOD_AVAILABLE:
-            log.warning("Flow meter event loop skipped — gpiod unavailable")
+        if not _GPIOD_AVAILABLE or not self._pins:
+            log.warning("Flow meter event loop skipped — gpiod unavailable or no pins configured")
             return
 
         pin_config = {
@@ -137,45 +148,44 @@ class FlowMeterManager(QObject):
                 while self._running:
                     if request.wait_edge_events(timedelta(seconds=0.5)):
                         for event in request.read_edge_events():
-                            tap = self._pins.get(event.line_offset)
-                            if tap is not None:
-                                self._handle_tick(tap)
+                            tap_id = self._pins.get(event.line_offset)
+                            if tap_id is not None:
+                                self._handle_tick(tap_id)
         except Exception as exc:
             log.error("Flow meter event loop crashed: %s", exc)
 
     # ------------------------------------------------------------------
-    # Watchdog loop — fires pour_finished when ticks go quiet (background thread)
+    # Watchdog loop (background thread)
     # ------------------------------------------------------------------
 
     def _watchdog_loop(self) -> None:
         while self._running:
             now = time.monotonic()
-            for tap in Tap:
-                if self._state[tap] is _PourState.POURING:
-                    idle_secs = now - self._last_tick[tap]
-                    if idle_secs >= self._end_pour_secs:
-                        self._finish_pour(tap)
+            for tap_id in self._tap_ids:
+                if self._state[tap_id] is _PourState.POURING:
+                    if now - self._last_tick[tap_id] >= self._end_pour_secs:
+                        self._finish_pour(tap_id)
             time.sleep(0.25)
 
     # ------------------------------------------------------------------
     # State machine
     # ------------------------------------------------------------------
 
-    def _handle_tick(self, tap: Tap) -> None:
-        self._ticks[tap]     += 1
-        self._last_tick[tap]  = time.monotonic()
+    def _handle_tick(self, tap_id: str) -> None:
+        self._ticks[tap_id]     += 1
+        self._last_tick[tap_id]  = time.monotonic()
 
-        if self._state[tap] is _PourState.IDLE:
-            if self._ticks[tap] >= self._tick_threshold:
-                self._state[tap] = _PourState.POURING
-                log.info("Pour started on %s tap", tap.value)
-                self.pour_started.emit(tap.value)
+        if self._state[tap_id] is _PourState.IDLE:
+            if self._ticks[tap_id] >= self._tick_threshold:
+                self._state[tap_id] = _PourState.POURING
+                log.info("Pour started on %s", tap_id)
+                self.pour_started.emit(tap_id)
         else:
-            self.flow_tick.emit(tap.value, self._ticks[tap])
+            self.flow_tick.emit(tap_id, self._ticks[tap_id])
 
-    def _finish_pour(self, tap: Tap) -> None:
-        total_ticks = self._ticks[tap]
-        self._state[tap] = _PourState.IDLE
-        self._ticks[tap] = 0
-        log.info("Pour finished on %s tap: %d ticks", tap.value, total_ticks)
-        self.pour_finished.emit(tap.value, total_ticks)
+    def _finish_pour(self, tap_id: str) -> None:
+        total_ticks = self._ticks[tap_id]
+        self._state[tap_id] = _PourState.IDLE
+        self._ticks[tap_id] = 0
+        log.info("Pour finished on %s: %d ticks", tap_id, total_ticks)
+        self.pour_finished.emit(tap_id, total_ticks)

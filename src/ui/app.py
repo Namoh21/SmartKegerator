@@ -140,12 +140,8 @@ class App(QObject):
     # ------------------------------------------------------------------
 
     def _on_pour_started(self, tap: str) -> None:
-        taps = self._db.get_tap_assignments()
-        keg_id = {
-            "left":   taps.left_keg_id,
-            "center": taps.center_keg_id,
-            "right":  taps.right_keg_id,
-        }.get(tap)
+        taps   = self._db.get_tap_assignments()
+        keg_id = taps.get_keg_id(tap)
 
         if keg_id is None:
             log.warning("Pour started on %s tap but no keg is assigned — ignoring", tap)

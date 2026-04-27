@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from data.database import Database
-from data.models import Beer, Keg
+from data.models import Beer, Keg, get_configured_taps
 
 log = logging.getLogger(__name__)
 
@@ -136,9 +136,9 @@ class MainWindow(QWidget):
         row.setSpacing(8)
 
         self._tap_cards: dict[str, _TapCard] = {}
-        for tap in ("left", "center", "right"):
-            card = _TapCard(tap)
-            self._tap_cards[tap] = card
+        for tap_id, display_name in get_configured_taps(self._config):
+            card = _TapCard(tap_id, display_name)
+            self._tap_cards[tap_id] = card
             row.addWidget(card, stretch=3)
 
         row.addWidget(self._build_sidebar(), stretch=2)
@@ -172,15 +172,11 @@ class MainWindow(QWidget):
 
     def refresh(self) -> None:
         taps = self._db.get_tap_assignments()
-        mapping = {
-            "left":   taps.left_keg_id,
-            "center": taps.center_keg_id,
-            "right":  taps.right_keg_id,
-        }
-        for tap_name, keg_id in mapping.items():
-            keg  = self._db.get_keg(keg_id)  if keg_id  is not None else None
-            beer = self._db.get_beer(keg.beer_id) if keg else None
-            self._tap_cards[tap_name].update(keg, beer)
+        for tap_id, card in self._tap_cards.items():
+            keg_id = taps.get_keg_id(tap_id)
+            keg    = self._db.get_keg(keg_id) if keg_id is not None else None
+            beer   = self._db.get_beer(keg.beer_id) if keg else None
+            card.update(keg, beer)
 
     # ------------------------------------------------------------------
     # Sensor slot
@@ -208,17 +204,16 @@ class MainWindow(QWidget):
 # ---------------------------------------------------------------------------
 
 class _TapCard(QFrame):
-    def __init__(self, tap_name: str, parent=None) -> None:
+    def __init__(self, tap_id: str, display_name: str = "", parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("card")
-        self._tap_name = tap_name.upper()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
 
         # Tap label
-        tap_lbl = QLabel(self._tap_name)
+        tap_lbl = QLabel((display_name or tap_id).upper())
         tap_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tap_lbl.setStyleSheet(f"color: {_MUTED}; font-size: 11px; font-weight: bold; letter-spacing: 2px;")
         layout.addWidget(tap_lbl)

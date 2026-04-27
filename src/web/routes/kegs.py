@@ -5,8 +5,8 @@ from datetime import datetime
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from data.models import Keg
-from web.server import get_db, templates, ctx
+from data.models import Keg, get_configured_taps
+from web.server import get_db, get_config, templates, ctx
 from web.helpers import keg_stats
 
 router = APIRouter(prefix="/kegs")
@@ -14,18 +14,20 @@ router = APIRouter(prefix="/kegs")
 
 @router.get("/", response_class=HTMLResponse)
 async def keg_list(request: Request):
-    db   = get_db()
-    kegs = db.get_all_kegs()
-    taps = db.get_tap_assignments()
+    db     = get_db()
+    config = get_config()
+    kegs   = db.get_all_kegs()
+    taps   = db.get_tap_assignments()
 
-    tap_keg_map = {
-        taps.left_keg_id:   "Left",
-        taps.center_keg_id: "Center",
-        taps.right_keg_id:  "Right",
-    }
+    # Build keg_id → tap display name for the keg cards
+    keg_tap_map: dict[int, str] = {}
+    for tap_id, display_name in get_configured_taps(config):
+        keg_id = taps.get_keg_id(tap_id)
+        if keg_id is not None:
+            keg_tap_map[keg_id] = display_name
 
-    stats   = [keg_stats(db, k, tap=tap_keg_map.get(k.id)) for k in kegs]
-    beers   = db.get_all_beers()
+    stats    = [keg_stats(db, k, tap=keg_tap_map.get(k.id)) for k in kegs]
+    beers    = db.get_all_beers()
     all_kegs = db.get_all_kegs()
 
     return templates.TemplateResponse(
@@ -37,6 +39,7 @@ async def keg_list(request: Request):
             beers=beers,
             all_kegs=all_kegs,
             taps=taps,
+            configured_taps=get_configured_taps(config),
         ),
     )
 
@@ -99,8 +102,7 @@ async def assign_tap(
     tap:    str = Form(...),
     keg_id: str = Form(...),
 ):
-    db = get_db()
+    db         = get_db()
     keg_id_int = int(keg_id) if keg_id and keg_id != "none" else None
-    if tap in ("left", "center", "right"):
-        db.set_tap(tap, keg_id_int)
+    db.set_tap(tap, keg_id_int)
     return RedirectResponse("/kegs/", status_code=303)

@@ -103,6 +103,24 @@ class Payment:
 
 @dataclass
 class TapAssignment:
-    left_keg_id: Optional[int] = None
-    center_keg_id: Optional[int] = None
-    right_keg_id: Optional[int] = None
+    """Maps tap IDs (tap1–tap4) to keg IDs."""
+    taps: dict[str, Optional[int]] = field(default_factory=dict)
+
+    def get_keg_id(self, tap: str) -> Optional[int]:
+        return self.taps.get(tap)
+
+    def items(self):
+        return self.taps.items()
+
+
+def get_configured_taps(config: dict) -> list[tuple[str, str]]:
+    """Return [(tap_id, display_name), ...] for all configured taps."""
+    taps_cfg = config.get("taps", {})
+    count    = min(int(taps_cfg.get("count", 3)), 4)
+    result   = []
+    for i in range(count):
+        tap_id   = f"tap{i + 1}"
+        tap_info = taps_cfg.get(tap_id, {})
+        name     = tap_info.get("name", f"Tap {i + 1}") if isinstance(tap_info, dict) else f"Tap {i + 1}"
+        result.append((tap_id, name))
+    return result

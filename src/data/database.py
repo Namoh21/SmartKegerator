@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS kegs (
 );
 
 CREATE TABLE IF NOT EXISTS tap_assignments (
-    tap    TEXT PRIMARY KEY CHECK(tap IN ('left', 'center', 'right')),
+    tap    TEXT PRIMARY KEY,
     keg_id INTEGER REFERENCES kegs(id)
 );
 
@@ -105,9 +105,10 @@ CREATE INDEX IF NOT EXISTS idx_encodings_user ON face_encodings(user_id);
 
 _SEED = f"""
 INSERT OR IGNORE INTO users (id, name) VALUES ({UNKNOWN_USER_ID}, 'Unknown');
-INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES ('left',   NULL);
-INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES ('center', NULL);
-INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES ('right',  NULL);
+INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES ('tap1', NULL);
+INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES ('tap2', NULL);
+INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES ('tap3', NULL);
+INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES ('tap4', NULL);
 """
 
 
@@ -155,7 +156,8 @@ class Database:
         self._migrate()
 
     def _migrate(self) -> None:
-        """Add columns introduced after the initial schema — safe to re-run."""
+        """Schema migrations — safe to re-run on every startup."""
+        # Beer columns added after initial release
         new_columns = [
             "ALTER TABLE beers ADD COLUMN description    TEXT    NOT NULL DEFAULT ''",
             "ALTER TABLE beers ADD COLUMN untappd_id     INTEGER",
@@ -168,6 +170,37 @@ class Database:
                     cur.execute(sql)
                 except sqlite3.OperationalError:
                     pass  # column already exists
+
+        # Migrate tap_assignments: left/center/right → tap1/tap2/tap3
+        # Also recreates table without the old CHECK constraint.
+        with self._cursor() as cur:
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tap_assignments'")
+            if cur.fetchone():
+                cur.execute("SELECT tap FROM tap_assignments LIMIT 1")
+                row = cur.fetchone()
+                if row and row["tap"] in ("left", "center", "right"):
+                    cur.executescript("""
+                        CREATE TABLE IF NOT EXISTS _tap_assignments_new (
+                            tap    TEXT PRIMARY KEY,
+                            keg_id INTEGER REFERENCES kegs(id)
+                        );
+                        INSERT OR IGNORE INTO _tap_assignments_new (tap, keg_id)
+                            SELECT CASE tap
+                                WHEN 'left'   THEN 'tap1'
+                                WHEN 'center' THEN 'tap2'
+                                WHEN 'right'  THEN 'tap3'
+                                ELSE tap
+                            END, keg_id
+                            FROM tap_assignments;
+                        DROP TABLE tap_assignments;
+                        ALTER TABLE _tap_assignments_new RENAME TO tap_assignments;
+                    """)
+        # Ensure all four tap rows exist after migration
+        with self._cursor() as cur:
+            for tap in ("tap1", "tap2", "tap3", "tap4"):
+                cur.execute(
+                    "INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES (?, NULL)", (tap,)
+                )
 
     # ------------------------------------------------------------------
     # Beer
@@ -290,19 +323,14 @@ class Database:
     def get_tap_assignments(self) -> TapAssignment:
         with self._cursor() as cur:
             cur.execute("SELECT tap, keg_id FROM tap_assignments")
-            rows = {r["tap"]: r["keg_id"] for r in cur.fetchall()}
-        return TapAssignment(
-            left_keg_id=rows.get("left"),
-            center_keg_id=rows.get("center"),
-            right_keg_id=rows.get("right"),
-        )
+            return TapAssignment(taps={r["tap"]: r["keg_id"] for r in cur.fetchall()})
 
     def set_tap(self, tap: str, keg_id: Optional[int]) -> None:
-        assert tap in ("left", "center", "right")
         with self._cursor() as cur:
             cur.execute(
-                "UPDATE tap_assignments SET keg_id = ? WHERE tap = ?",
-                (keg_id, tap),
+                "INSERT INTO tap_assignments (tap, keg_id) VALUES (?, ?) "
+                "ON CONFLICT(tap) DO UPDATE SET keg_id = excluded.keg_id",
+                (tap, keg_id),
             )
 
     # ------------------------------------------------------------------

@@ -1,3 +1,18 @@
+taps:
+  count: 3          # number of active taps: 1, 2, 3, or 4
+  tap1:
+    name: Left      # display name shown in the UI
+    pin: 23         # BCM GPIO pin for this flow meter
+  tap2:
+    name: Center
+    pin: 24
+  tap3:
+    name: Right
+    pin: 25
+  tap4:
+    name: Tap 4
+    pin: null       # null = not connected / not used
+
 hardware:
   # Camera
   camera_index: 0
@@ -6,10 +21,7 @@ hardware:
   camera_use_color: true
   camera_leds_pin: 18
 
-  # Flow meters (GPIO BCM pin numbers)
-  flow_meter_pin_left: 23
-  flow_meter_pin_center: 24
-  flow_meter_pin_right: 25
+  # Flow meter calibration (shared across all taps)
   ticks_per_liter: 500
   tick_threshold: 3          # ticks required before a pour is registered
   end_pour_seconds: 5.0      # seconds of no ticks before pour ends
