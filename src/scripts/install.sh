@@ -30,7 +30,7 @@ section() { echo -e "\n${GREEN}── $* ──${NC}"; }
 # ---------------------------------------------------------------------------
 [[ $EUID -eq 0 ]] || error "Run with sudo:  sudo ./install.sh"
 REAL_USER="${SUDO_USER:-pi}"
-REAL_HOME=$(eval echo "~${REAL_USER}")
+REAL_HOME=$(getent passwd "${REAL_USER}" | cut -d: -f6)
 info "Installing for user: ${REAL_USER}  (home: ${REAL_HOME})"
 
 # ---------------------------------------------------------------------------
@@ -381,6 +381,7 @@ case "${COMPOSITOR}" in
     labwc)
         LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
         mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
+        chown "${REAL_USER}:${REAL_USER}" "$(dirname "${LABWC_AUTOSTART}")"
         # Kill the desktop panel so only the kiosk app is visible
         if ! grep -q "wf-panel-pi" "${LABWC_AUTOSTART}" 2>/dev/null; then
             printf '# Kiosk mode — hide desktop panel\npkill -x wf-panel-pi 2>/dev/null || true\n' \
@@ -398,6 +399,7 @@ case "${COMPOSITOR}" in
         # Wayfire reads autostart from the [autostart] section of wayfire.ini
         WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
         mkdir -p "$(dirname "${WAYFIRE_INI}")"
+        chown "${REAL_USER}:${REAL_USER}" "$(dirname "${WAYFIRE_INI}")"
         if ! grep -q "smartkegerator" "${WAYFIRE_INI}" 2>/dev/null; then
             if grep -q "^\[autostart\]" "${WAYFIRE_INI}" 2>/dev/null; then
                 sed -i "/^\[autostart\]/a smartkegerator = ${LAUNCH_SCRIPT}" "${WAYFIRE_INI}"
@@ -482,7 +484,7 @@ section "Hardware setup"
 
 SETUP_SCRIPT="${SRC_DIR}/scripts/setup_hardware.sh"
 if [[ -f "${SETUP_SCRIPT}" ]]; then
-    bash "${SETUP_SCRIPT}"
+    bash "${SETUP_SCRIPT}" || warn "Hardware setup encountered errors — review output above."
 else
     warn "setup_hardware.sh not found at ${SETUP_SCRIPT} — run it manually after install."
 fi

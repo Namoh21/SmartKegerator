@@ -87,7 +87,7 @@ fi
 echo ""
 echo "── GPIO permissions ──"
 REAL_USER="${SUDO_USER:-pi}"
-REAL_HOME=$(eval echo "~${REAL_USER}")
+REAL_HOME=$(getent passwd "${REAL_USER}" | cut -d: -f6)
 if groups "${REAL_USER}" | grep -q gpio; then
     ok "User ${REAL_USER} is already in the gpio group"
 else
@@ -187,6 +187,7 @@ case "${COMPOSITOR}" in
         # is forced on after the compositor starts.
         LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
         mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
+        chown "${REAL_USER}:${REAL_USER}" "$(dirname "${LABWC_AUTOSTART}")"
         if ! grep -q "wlopm" "${LABWC_AUTOSTART}" 2>/dev/null; then
             # Kill any swayidle instance and keep display on
             printf 'pkill swayidle 2>/dev/null || true\n' >> "${LABWC_AUTOSTART}"
