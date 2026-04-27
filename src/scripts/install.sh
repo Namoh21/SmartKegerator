@@ -317,6 +317,8 @@ ExecStart=${SRC_DIR}/scripts/launch_gui.sh
 Restart=on-failure
 RestartSec=5
 Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=QT_QPA_PLATFORM=wayland
 
 [Install]
 WantedBy=default.target
