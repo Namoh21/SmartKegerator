@@ -162,11 +162,13 @@ class _SecurityHeaders(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"]     = "camera=(), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net "
+                "https://challenges.cloudflare.com; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "font-src 'self' https://cdn.jsdelivr.net; "
             "img-src 'self' data: https:; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://cloudflareinsights.com; "
+            "frame-src https://challenges.cloudflare.com; "
             "frame-ancestors 'none';"
         )
         try:
