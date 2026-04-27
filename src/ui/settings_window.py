@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import yaml
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
@@ -82,6 +82,8 @@ _STYLE = f"""
 
 
 class SettingsWindow(QDialog):
+    users_requested = pyqtSignal()
+
     def __init__(self, config: dict, db, parent=None) -> None:
         super().__init__(parent)
         self._config = config
@@ -211,6 +213,11 @@ class SettingsWindow(QDialog):
         bar.setFixedHeight(50)
         row = QHBoxLayout(bar)
         row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+
+        users_btn = QPushButton("Manage Users")
+        users_btn.clicked.connect(self._open_users)
+        row.addWidget(users_btn)
 
         if self._config_path:
             path_lbl = QLabel(f"Config: {self._config_path}")
@@ -228,6 +235,10 @@ class SettingsWindow(QDialog):
         row.addWidget(save_btn)
 
         return bar
+
+    def _open_users(self) -> None:
+        self.accept()   # close settings first, then App opens users via signal
+        self.users_requested.emit()
 
     # ------------------------------------------------------------------
     # Widget factory

@@ -200,13 +200,20 @@ class UsersWindow(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        # Name header
+        # Name header + history button
+        name_row = QHBoxLayout()
         self._lbl_name = QLabel("Select a user")
         f = QFont()
         f.setPointSize(19)
         f.setWeight(QFont.Weight.Bold)
         self._lbl_name.setFont(f)
-        layout.addWidget(self._lbl_name)
+        name_row.addWidget(self._lbl_name, stretch=1)
+
+        self._history_btn = QPushButton("View History")
+        self._history_btn.setEnabled(False)
+        self._history_btn.clicked.connect(self._view_history)
+        name_row.addWidget(self._history_btn)
+        layout.addLayout(name_row)
 
         # Camera + photo list side by side
         mid = QHBoxLayout()
@@ -304,6 +311,7 @@ class UsersWindow(QDialog):
         if row < 0:
             self._selected_user = None
             self._lbl_name.setText("Select a user")
+            self._history_btn.setEnabled(False)
             if self._is_admin:
                 self._capture_btn.setEnabled(False)
                 self._train_btn.setEnabled(False)
@@ -320,6 +328,7 @@ class UsersWindow(QDialog):
 
         self._selected_user = user
         self._lbl_name.setText(user.name)
+        self._history_btn.setEnabled(user.id != UNKNOWN_USER_ID)
 
         if self._is_admin:
             is_real_user = user.id != UNKNOWN_USER_ID
@@ -405,6 +414,17 @@ class UsersWindow(QDialog):
             if not self._is_admin else
             f"Welcome, {user.name}! Use the camera panel to capture training photos.",
         )
+
+    def _view_history(self) -> None:
+        if not self._selected_user:
+            return
+        from ui.history_window import HistoryWindow
+        w = HistoryWindow(
+            self._config, self._db, self,
+            current_user_id=self._selected_user.id,
+            is_admin=self._is_admin,
+        )
+        w.exec()
 
     def _delete_user(self) -> None:
         if not self._selected_user:

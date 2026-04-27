@@ -2,26 +2,28 @@
 Main window — always-visible home screen.
 
 Layout (800 × 480):
-┌─ Header bar ─────────────────────────────────────────── 50 px ─┐
-│  SmartKegerator          [History]  [Users]  [Settings]         │
-├─ Tap cards (3) ─────────────────── Sidebar ─────────────────────┤
-│  ┌─ Left ──┐  ┌─ Center ─┐  ┌─ Right ──┐  │  Ambient: 68°F     │
-│  │ Beer    │  │ Beer     │  │ Beer     │  │  Humidity: 45%     │
-│  │ Name    │  │ Name     │  │ Name     │  │                    │
-│  │ ▓▓▓▓░░ │  │ ▓▓▓▓▓▓▓ │  │ ▓▓░░░░ │  │  Liquid: 38°F      │
-│  │ 62%     │  │ 100%     │  │ 33%      │  │                    │
-│  │ ABV 5.2 │  │ ABV 6.5  │  │ ABV 4.2  │  │                    │
-│  │ $2.50/pt│  │ $3.00/pt │  │ $2.75/pt │  │                    │
-│  └─────────┘  └──────────┘  └──────────┘  │                    │
-└─────────────────────────────────────────────────────────────────┘
+┌─ Header ─────────────────────────────────────────── 60 px ─┐
+│  Mon Apr 27 · 2:32 PM  │  SmartKegerator  │  68°F · 45% Hum│
+├─ Tap cards (fill remaining area) ────────────────────────── ┤
+│  ┌─ LEFT TAP ──────┐  ┌─ CENTER TAP ─────┐  ┌─ RIGHT ─────┐│
+│  │  Beer Name      │  │  Beer Name       │  │  Beer Name  ││
+│  │  Company/Style  │  │  Company/Style   │  │  Co./Style  ││
+│  │  ████████░ 75%  │  │  ██████████ 100% │  │  ████░ 33%  ││
+│  │  ABV 5.2% IBU52 │  │  ABV 6.5% IBU40  │  │  ABV 4.2%   ││
+│  │  $2.50 / pint   │  │  $3.00 / pint    │  │  $2.75/pint ││
+│  └─────────────────┘  └──────────────────┘  └─────────────┘│
+├─ Footer ─────────────────────────────────────── 50 px ─────┤
+│  Welcome, Brian!                              [⚙ Settings]  │
+└────────────────────────────────────────────────────────────┘
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton,
@@ -33,13 +35,13 @@ from data.models import Beer, Keg, get_configured_taps
 
 log = logging.getLogger(__name__)
 
-_DARK_BG   = "#1a1a2e"
-_CARD_BG   = "#16213e"
-_ACCENT    = "#e94560"
-_TEXT      = "#eaeaea"
-_MUTED     = "#8888aa"
-_LEVEL_OK  = "#2ecc71"
-_LEVEL_LOW = "#e67e22"
+_DARK_BG     = "#1a1a2e"
+_CARD_BG     = "#16213e"
+_ACCENT      = "#e94560"
+_TEXT        = "#eaeaea"
+_MUTED       = "#8888aa"
+_LEVEL_OK    = "#2ecc71"
+_LEVEL_LOW   = "#e67e22"
 _LEVEL_EMPTY = "#e74c3c"
 
 _GLOBAL_STYLE = f"""
@@ -69,6 +71,7 @@ _GLOBAL_STYLE = f"""
         border-radius: 4px;
         text-align: center;
         background-color: #0f0f23;
+        font-size: 15px;
     }}
     QProgressBar::chunk {{
         border-radius: 4px;
@@ -77,9 +80,7 @@ _GLOBAL_STYLE = f"""
 
 
 class MainWindow(QWidget):
-    history_requested  = pyqtSignal()
     settings_requested = pyqtSignal()
-    users_requested    = pyqtSignal()
 
     def __init__(self, config: dict, db: Database, recognizer=None, parent=None) -> None:
         super().__init__(parent)
@@ -93,10 +94,17 @@ class MainWindow(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
-        root.setSpacing(8)
+        root.setSpacing(6)
 
         root.addWidget(self._build_header())
         root.addLayout(self._build_content(), stretch=1)
+        root.addWidget(self._build_footer())
+
+        # Clock — tick every second
+        self._clock = QTimer()
+        self._clock.timeout.connect(self._update_clock)
+        self._clock.start(1000)
+        self._update_clock()
 
         self.refresh()
 
@@ -109,32 +117,33 @@ class MainWindow(QWidget):
         bar.setFixedHeight(60)
         row = QHBoxLayout(bar)
         row.setContentsMargins(4, 0, 4, 0)
+        row.setSpacing(0)
 
-        title = QLabel("SmartKegerator")
+        # Left: date/time
+        self._lbl_datetime = QLabel()
+        self._lbl_datetime.setStyleSheet(
+            f"color: {_MUTED}; font-size: 17px; font-family: monospace;"
+        )
+        row.addWidget(self._lbl_datetime, stretch=3)
+
+        # Center: kegerator name
+        name = self._config.get("ui", {}).get("name", "SmartKegerator")
+        title = QLabel(name)
         font  = QFont()
         font.setPointSize(22)
         font.setWeight(QFont.Weight.Bold)
         title.setFont(font)
         title.setStyleSheet(f"color: {_ACCENT};")
-        row.addWidget(title)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        row.addWidget(title, stretch=4)
 
-        # Current user greeting — updated by App.set_current_user()
-        self._lbl_current_user = QLabel("Tap to pour")
-        self._lbl_current_user.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 17px;")
-        row.addWidget(self._lbl_current_user, stretch=1)
-
-        for label, signal in [
-            ("History",  self.history_requested),
-            ("Users",    self.users_requested),
-        ]:
-            btn = QPushButton(label)
-            btn.clicked.connect(signal.emit)
-            row.addWidget(btn)
-
-        self._settings_btn = QPushButton("\U0001f512 Settings")
-        self._settings_btn.clicked.connect(self.settings_requested.emit)
-        row.addWidget(self._settings_btn)
+        # Right: ambient temp + humidity
+        self._lbl_env = QLabel("—")
+        self._lbl_env.setStyleSheet(
+            f"color: {_MUTED}; font-size: 17px; font-family: monospace;"
+        )
+        self._lbl_env.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(self._lbl_env, stretch=3)
 
         return bar
 
@@ -146,35 +155,41 @@ class MainWindow(QWidget):
         for tap_id, display_name in get_configured_taps(self._config):
             card = _TapCard(tap_id, display_name)
             self._tap_cards[tap_id] = card
-            row.addWidget(card, stretch=3)
+            row.addWidget(card, stretch=1)
 
-        row.addWidget(self._build_sidebar(), stretch=2)
         return row
 
-    def _build_sidebar(self) -> QFrame:
-        frame = QFrame()
-        frame.setObjectName("card")
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
+    def _build_footer(self) -> QWidget:
+        bar = QWidget()
+        bar.setFixedHeight(50)
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(4, 0, 4, 0)
 
-        header = QLabel("Environment")
-        header.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(header)
+        self._lbl_current_user = QLabel("Tap to pour")
+        self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 17px;")
+        row.addWidget(self._lbl_current_user, stretch=1)
 
-        self._lbl_ambient  = _reading_label("Ambient", "—")
-        self._lbl_humidity = _reading_label("Humidity", "—")
-        self._lbl_liquid   = _reading_label("Liquid", "—")
+        self._settings_btn = QPushButton("⚙  Settings")
+        self._settings_btn.clicked.connect(self.settings_requested.emit)
+        row.addWidget(self._settings_btn)
 
-        for widget in (self._lbl_ambient, self._lbl_humidity, self._lbl_liquid):
-            layout.addWidget(widget)
-
-        layout.addStretch()
-        return frame
+        return bar
 
     # ------------------------------------------------------------------
-    # Data refresh
+    # Clock
+    # ------------------------------------------------------------------
+
+    def _update_clock(self) -> None:
+        now = datetime.now()
+        # %-I / %-d strip leading zeros on Linux (Pi)
+        try:
+            text = now.strftime("%-I:%M %p  ·  %a %b %-d")
+        except ValueError:
+            text = now.strftime("%I:%M %p  ·  %a %b %d")
+        self._lbl_datetime.setText(text)
+
+    # ------------------------------------------------------------------
+    # Public API called by App
     # ------------------------------------------------------------------
 
     def set_current_user(
@@ -185,7 +200,7 @@ class MainWindow(QWidget):
     ) -> None:
         """Called by App whenever the touchscreen session user changes."""
         if user_id is not None:
-            badge = " ⚡ Admin" if is_admin else ""
+            badge = "  ⚡ Admin" if is_admin else ""
             self._lbl_current_user.setText(f"Welcome, {name}!{badge}")
             color = _ACCENT if not is_admin else "#f0c040"
             self._lbl_current_user.setStyleSheet(
@@ -195,12 +210,10 @@ class MainWindow(QWidget):
             self._lbl_current_user.setText("Tap to pour")
             self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 17px;")
 
-        # Reflect admin state on the Settings button
+        # Dim settings button for non-admins (click still works — App guards access)
         if is_admin:
-            self._settings_btn.setText("Settings")
             self._settings_btn.setStyleSheet("")
         else:
-            self._settings_btn.setText("\U0001f512 Settings")
             self._settings_btn.setStyleSheet(f"color: {_MUTED};")
 
     def refresh(self) -> None:
@@ -221,15 +234,14 @@ class MainWindow(QWidget):
         humidity:  Optional[float],
         liquid_f:  Optional[float],
     ) -> None:
-        self._lbl_ambient.setText(
-            f"Ambient:  {ambient_f:.1f} °F" if ambient_f is not None else "Ambient:  —"
-        )
-        self._lbl_humidity.setText(
-            f"Humidity: {humidity:.0f} %" if humidity is not None else "Humidity: —"
-        )
-        self._lbl_liquid.setText(
-            f"Liquid:   {liquid_f:.1f} °F" if liquid_f is not None else "Liquid:   —"
-        )
+        parts: list[str] = []
+        if ambient_f is not None:
+            parts.append(f"{ambient_f:.0f}°F")
+        if humidity is not None:
+            parts.append(f"{humidity:.0f}% Hum")
+        if liquid_f is not None:
+            parts.append(f"Liq {liquid_f:.0f}°F")
+        self._lbl_env.setText("  ·  ".join(parts) if parts else "—")
 
 
 # ---------------------------------------------------------------------------
@@ -242,21 +254,23 @@ class _TapCard(QFrame):
         self.setObjectName("card")
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(12, 14, 12, 14)
+        layout.setSpacing(8)
 
         # Tap label
         tap_lbl = QLabel((display_name or tap_id).upper())
         tap_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tap_lbl.setStyleSheet(f"color: {_MUTED}; font-size: 15px; font-weight: bold; letter-spacing: 2px;")
+        tap_lbl.setStyleSheet(
+            f"color: {_MUTED}; font-size: 17px; font-weight: bold; letter-spacing: 2px;"
+        )
         layout.addWidget(tap_lbl)
 
-        # Beer name
+        # Beer name — largest element, most readable from distance
         self._lbl_beer = QLabel("No Keg")
         self._lbl_beer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_beer.setWordWrap(True)
         font = QFont()
-        font.setPointSize(18)
+        font.setPointSize(26)
         font.setWeight(QFont.Weight.Bold)
         self._lbl_beer.setFont(font)
         layout.addWidget(self._lbl_beer)
@@ -264,36 +278,40 @@ class _TapCard(QFrame):
         # Company / style
         self._lbl_sub = QLabel("")
         self._lbl_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_sub.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
+        self._lbl_sub.setStyleSheet(f"color: {_MUTED}; font-size: 18px;")
         self._lbl_sub.setWordWrap(True)
         layout.addWidget(self._lbl_sub)
+
+        layout.addStretch()
 
         # Level bar
         self._bar = QProgressBar()
         self._bar.setRange(0, 100)
         self._bar.setValue(0)
-        self._bar.setFixedHeight(28)
+        self._bar.setFixedHeight(32)
         self._bar.setTextVisible(True)
         layout.addWidget(self._bar)
 
         # Stats row (ABV · IBU)
         self._lbl_stats = QLabel("")
         self._lbl_stats.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_stats.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
+        self._lbl_stats.setStyleSheet(f"color: {_MUTED}; font-size: 18px;")
         layout.addWidget(self._lbl_stats)
 
         # Price
         self._lbl_price = QLabel("")
         self._lbl_price.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_price.setStyleSheet(f"color: {_ACCENT}; font-size: 17px; font-weight: bold;")
+        self._lbl_price.setStyleSheet(
+            f"color: {_ACCENT}; font-size: 20px; font-weight: bold;"
+        )
         layout.addWidget(self._lbl_price)
 
-        layout.addStretch()
         self.update(None, None)
 
     def update(self, keg: Optional[Keg], beer: Optional[Beer]) -> None:  # type: ignore[override]
         if keg is None or beer is None:
             self._lbl_beer.setText("No Keg")
+            self._lbl_beer.setStyleSheet(f"color: {_MUTED};")
             self._lbl_sub.setText("")
             self._bar.setValue(0)
             self._bar.setFormat("Empty")
@@ -303,6 +321,7 @@ class _TapCard(QFrame):
             return
 
         self._lbl_beer.setText(beer.name)
+        self._lbl_beer.setStyleSheet("")
         sub_parts = [p for p in (beer.company, beer.style) if p]
         self._lbl_sub.setText("  ·  ".join(sub_parts))
 
@@ -327,13 +346,3 @@ class _TapCard(QFrame):
 
         price_per_pint = keg.price_for_ounces(16.0)
         self._lbl_price.setText(f"${price_per_pint:.2f} / pint" if price_per_pint else "")
-
-
-# ---------------------------------------------------------------------------
-# Helper
-# ---------------------------------------------------------------------------
-
-def _reading_label(title: str, value: str) -> QLabel:
-    lbl = QLabel(f"{title}:  {value}")
-    lbl.setStyleSheet(f"color: {_TEXT}; font-size: 17px; font-family: monospace;")
-    return lbl

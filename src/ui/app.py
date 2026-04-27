@@ -164,9 +164,7 @@ class App(QObject):
         self._recognizer.user_identified.connect(self._on_user_identified)
 
         # Main window navigation
-        self._main_window.history_requested.connect(self._open_history)
         self._main_window.settings_requested.connect(self._open_settings)
-        self._main_window.users_requested.connect(self._open_users)
 
     # ------------------------------------------------------------------
     # Hardware startup
@@ -401,6 +399,7 @@ class App(QObject):
             return
         from ui.settings_window import SettingsWindow
         w = SettingsWindow(self._config, self._db, self._main_window)
+        w.users_requested.connect(self._open_users)
         if self._fullscreen:
             w.showFullScreen()
         w.exec()
