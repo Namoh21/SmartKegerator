@@ -40,9 +40,10 @@ async def setup_page(request: Request):
 
 @router.post("/setup", response_class=RedirectResponse)
 async def setup_submit(
-    username:  str = Form(...),
-    password:  str = Form(...),
-    password2: str = Form(...),
+    username:     str = Form(...),
+    display_name: str = Form(""),
+    password:     str = Form(...),
+    password2:    str = Form(...),
 ):
     db       = get_db()
     username = username.strip()
@@ -59,7 +60,7 @@ async def setup_submit(
     if db.get_admin_by_username(username):
         return RedirectResponse("/admin/setup?error=taken", status_code=303)
 
-    db.add_admin(username, hash_password(password))
+    db.add_admin(username, hash_password(password), display_name=display_name)
     return RedirectResponse("/admin/login?created=1", status_code=303)
 
 

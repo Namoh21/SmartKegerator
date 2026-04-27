@@ -100,7 +100,8 @@ CREATE TABLE IF NOT EXISTS admins (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
     password_hash TEXT    NOT NULL,
-    created_at    REAL    NOT NULL DEFAULT 0.0
+    created_at    REAL    NOT NULL DEFAULT 0.0,
+    user_id       INTEGER REFERENCES users(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_pours_time    ON pours(time);
@@ -208,6 +209,23 @@ class Database:
                 cur.execute(
                     "INSERT OR IGNORE INTO tap_assignments (tap, keg_id) VALUES (?, NULL)", (tap,)
                 )
+
+        # Add user_id column to admins table (links admin → drinking user)
+        try:
+            with self._cursor() as cur:
+                cur.execute("ALTER TABLE admins ADD COLUMN user_id INTEGER REFERENCES users(id)")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
+        # For existing admins with no linked user, create a user record for each
+        with self._cursor() as cur:
+            cur.execute("SELECT id, username FROM admins WHERE user_id IS NULL")
+            orphans = cur.fetchall()
+        for row in orphans:
+            with self._cursor() as cur:
+                cur.execute("INSERT INTO users (name) VALUES (?)", (row["username"],))
+                uid = cur.lastrowid
+                cur.execute("UPDATE admins SET user_id = ? WHERE id = ?", (uid, row["id"]))
 
     # ------------------------------------------------------------------
     # Beer
@@ -495,25 +513,54 @@ class Database:
 
     def get_all_admins(self) -> list[dict]:
         with self._cursor() as cur:
-            cur.execute("SELECT id, username, created_at FROM admins ORDER BY created_at")
-            return [{"id": r["id"], "username": r["username"], "created_at": r["created_at"]}
-                    for r in cur.fetchall()]
+            cur.execute("""
+                SELECT a.id, a.username, a.created_at, a.user_id,
+                       u.name AS display_name
+                FROM admins a
+                LEFT JOIN users u ON u.id = a.user_id
+                ORDER BY a.created_at
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+    def get_admin_user_ids(self) -> set:
+        """Return set of user_ids that have admin accounts."""
+        with self._cursor() as cur:
+            cur.execute("SELECT user_id FROM admins WHERE user_id IS NOT NULL")
+            return {r["user_id"] for r in cur.fetchall()}
 
     def get_admin_by_username(self, username: str) -> Optional[dict]:
         with self._cursor() as cur:
             cur.execute(
-                "SELECT id, username, password_hash FROM admins WHERE username = ?",
+                "SELECT id, username, password_hash, user_id FROM admins WHERE username = ?",
                 (username,)
             )
             row = cur.fetchone()
             return dict(row) if row else None
 
-    def add_admin(self, username: str, password_hash: str) -> None:
+    def add_admin(self, username: str, password_hash: str, display_name: str = "") -> int:
+        """Create an admin account and link it to a drinking-user record.
+
+        If a user with the given display_name already exists that user is
+        reused; otherwise a new one is created.  Returns the new admin id.
+        """
+        name = display_name.strip() or username.strip()
+        # Find or create the linked user
+        with self._cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE name = ? AND id != ?",
+                        (name, UNKNOWN_USER_ID))
+            row = cur.fetchone()
+            if row:
+                user_id = row["id"]
+            else:
+                cur.execute("INSERT INTO users (name) VALUES (?)", (name,))
+                user_id = cur.lastrowid
+        # Create the admin record
         with self._cursor() as cur:
             cur.execute(
-                "INSERT INTO admins (username, password_hash, created_at) VALUES (?, ?, ?)",
-                (username, password_hash, time.time()),
+                "INSERT INTO admins (username, password_hash, created_at, user_id) VALUES (?, ?, ?, ?)",
+                (username, password_hash, time.time(), user_id),
             )
+            return cur.lastrowid
 
     def delete_admin(self, admin_id: int) -> None:
         with self._cursor() as cur:

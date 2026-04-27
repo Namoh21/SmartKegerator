@@ -416,8 +416,11 @@
                 {% for a in admins %}
                 <tr>
                   <td class="ps-3">
-                    <i class="bi bi-person-badge me-1 text-accent"></i>
-                    <strong>{{ a.username }}</strong>
+                    <i class="bi bi-shield-check me-1 text-warning"></i>
+                    <strong>{{ a.display_name or a.username }}</strong>
+                    {% if a.display_name and a.display_name != a.username %}
+                    <span class="text-muted small ms-1">({{ a.username }})</span>
+                    {% endif %}
                     {% if a.username == admin_username %}
                     <span class="badge bg-secondary ms-1">you</span>
                     {% endif %}
@@ -482,12 +485,17 @@
           <div class="card-body">
             <form method="post" action="/settings/admins/add" autocomplete="off">
               <div class="row g-2 align-items-end">
-                <div class="col-sm-4">
-                  <label class="form-label small">Username</label>
+                <div class="col-sm-3">
+                  <label class="form-label small">Display name</label>
+                  <input type="text" class="form-control form-control-sm" name="display_name"
+                         placeholder="Their Name" autocomplete="off">
+                </div>
+                <div class="col-sm-3">
+                  <label class="form-label small">Login username</label>
                   <input type="text" class="form-control form-control-sm" name="username"
                          placeholder="username" required autocomplete="off">
                 </div>
-                <div class="col-sm-4">
+                <div class="col-sm-3">
                   <label class="form-label small">Password</label>
                   <input type="password" class="form-control form-control-sm" name="password"
                          placeholder="≥ 8 characters" required autocomplete="new-password">
@@ -497,6 +505,9 @@
                     <i class="bi bi-plus-lg me-1"></i>Add
                   </button>
                 </div>
+              </div>
+              <div class="form-text text-muted mt-1">
+                Display name appears in pour history and the users list. Login username is used to sign in.
               </div>
             </form>
           </div>

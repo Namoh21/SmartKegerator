@@ -214,8 +214,9 @@ async def detect_sensors():
 
 @router.post("/admins/add", response_class=RedirectResponse)
 async def admin_add(
-    username: str = Form(...),
-    password: str = Form(...),
+    username:     str = Form(...),
+    display_name: str = Form(""),
+    password:     str = Form(...),
 ):
     db       = get_db()
     username = username.strip()
@@ -225,7 +226,7 @@ async def admin_add(
         return RedirectResponse("/settings/?error=short&tab=admins", status_code=303)
     if db.get_admin_by_username(username):
         return RedirectResponse("/settings/?error=taken&tab=admins", status_code=303)
-    db.add_admin(username, hash_password(password))
+    db.add_admin(username, hash_password(password), display_name=display_name)
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 

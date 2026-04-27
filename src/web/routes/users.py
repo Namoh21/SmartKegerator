@@ -26,7 +26,7 @@ async def user_list(request: Request):
     return templates.TemplateResponse(
         request,
         "users.html",
-        ctx(request, stats=stats),
+        ctx(request, stats=stats, admin_user_ids=db.get_admin_user_ids()),
     )
 
 

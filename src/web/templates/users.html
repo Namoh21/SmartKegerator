@@ -33,7 +33,14 @@
 
           <!-- Info -->
           <div class="flex-grow-1 min-w-0">
-            <h5 class="mb-1 text-white text-truncate">{{ s.name }}</h5>
+            <h5 class="mb-1 text-white text-truncate">
+              {{ s.name }}
+              {% if s.user_id in admin_user_ids %}
+              <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;" title="Administrator">
+                <i class="bi bi-shield-check"></i> Admin
+              </span>
+              {% endif %}
+            </h5>
             <div class="row g-1 small">
               <div class="col-7 text-muted">Balance owed</div>
               <div class="col-5 text-end fw-bold {% if s.balance > 0 %}text-danger{% else %}text-success{% endif %}">

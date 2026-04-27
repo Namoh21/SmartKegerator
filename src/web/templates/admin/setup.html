@@ -36,9 +36,15 @@
 
   <form method="post" action="/admin/setup" autocomplete="off">
     <div class="mb-3">
-      <label class="form-label">Username</label>
+      <label class="form-label">Display name <span class="text-muted small">(shown in pour history)</span></label>
+      <input type="text" class="form-control" name="display_name"
+             placeholder="Your Name" autofocus autocomplete="name">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Login username</label>
       <input type="text" class="form-control" name="username"
-             placeholder="admin" required autofocus autocomplete="username">
+             placeholder="admin" required autocomplete="username">
     </div>
 
     <div class="mb-3">
