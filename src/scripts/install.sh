@@ -168,6 +168,11 @@ info "System packages installed."
 # ---------------------------------------------------------------------------
 section "Python virtual environment"
 
+# /opt is root-owned — create the install dir now so the real user can
+# write into it (venv, wheel cache, etc.)
+mkdir -p "${INSTALL_DIR}"
+chown "${REAL_USER}:${REAL_USER}" "${INSTALL_DIR}"
+
 # --system-site-packages lets the venv use apt-installed packages
 # (python3-opencv, python3-pyqt6, python3-libgpiod, python3-yaml)
 if [[ ! -d "${VENV_DIR}" ]]; then
