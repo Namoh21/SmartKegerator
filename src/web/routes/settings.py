@@ -10,6 +10,7 @@ import yaml
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from ui.theme import THEMES
 from web.auth import hash_password
 from web.server import get_db, get_config_path, reload_config, templates, ctx
 
@@ -76,8 +77,27 @@ async def settings_page(request: Request):
     return templates.TemplateResponse(
         request,
         "settings.html",
-        ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS, admins=admins),
+        ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS,
+            admins=admins, themes=THEMES),
     )
+
+
+# ---------------------------------------------------------------------------
+# Appearance (name + theme)
+# ---------------------------------------------------------------------------
+
+@router.post("/appearance", response_class=RedirectResponse)
+async def settings_save_appearance(
+    site_name: str = Form("SmartKegerator"),
+    theme:     str = Form("dark_blue"),
+):
+    from ui.theme import THEMES as _THEMES
+    cfg = _read_yaml()
+    cfg.setdefault("ui", {})
+    cfg["ui"]["name"]  = site_name.strip() or "SmartKegerator"
+    cfg["ui"]["theme"] = theme if theme in _THEMES else "dark_blue"
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=appearance", status_code=303)
 
 
 # ---------------------------------------------------------------------------

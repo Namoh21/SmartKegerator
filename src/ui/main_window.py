@@ -12,7 +12,7 @@ Layout (800 × 480):
 │  │  ABV 5.2% IBU52 │  │  ABV 6.5% IBU40  │  │  ABV 4.2%   ││
 │  │  $2.50 / pint   │  │  $3.00 / pint    │  │  $2.75/pint ││
 │  └─────────────────┘  └──────────────────┘  └─────────────┘│
-├─ Footer ─────────────────────────────────────── 50 px ─────┤
+├─ Footer ─────────────────────────────────────────── 50 px ──┤
 │  Welcome, Brian!                              [⚙ Settings]  │
 └────────────────────────────────────────────────────────────┘
 """
@@ -27,50 +27,44 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton,
-    QSizePolicy, QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget,
 )
 
 from data.database import Database
 from data.models import Beer, Keg, get_configured_taps
+from ui.theme import get as _get_theme, site_name as _site_name
 
 log = logging.getLogger(__name__)
 
-_DARK_BG     = "#1a1a2e"
-_CARD_BG     = "#16213e"
-_ACCENT      = "#e94560"
-_TEXT        = "#eaeaea"
-_MUTED       = "#8888aa"
-_LEVEL_OK    = "#2ecc71"
-_LEVEL_LOW   = "#e67e22"
-_LEVEL_EMPTY = "#e74c3c"
 
-_GLOBAL_STYLE = f"""
+def _build_style(c: dict) -> str:
+    return f"""
     QWidget {{
-        background-color: {_DARK_BG};
-        color: {_TEXT};
+        background-color: {c['bg']};
+        color: {c['text']};
         font-family: 'DejaVu Sans', Arial, sans-serif;
     }}
     QFrame#card {{
-        background-color: {_CARD_BG};
-        border: 1px solid #2a2a4e;
+        background-color: {c['card']};
+        border: 1px solid {c['border']};
         border-radius: 8px;
     }}
     QPushButton {{
-        background-color: #2a2a4e;
-        color: {_TEXT};
-        border: 1px solid {_ACCENT};
+        background-color: {c['card']};
+        color: {c['text']};
+        border: 1px solid {c['accent']};
         border-radius: 4px;
         padding: 8px 18px;
         font-size: 17px;
     }}
     QPushButton:pressed {{
-        background-color: {_ACCENT};
+        background-color: {c['accent']};
     }}
     QProgressBar {{
-        border: 1px solid #2a2a4e;
+        border: 1px solid {c['border']};
         border-radius: 4px;
         text-align: center;
-        background-color: #0f0f23;
+        background-color: {c['deep']};
         font-size: 15px;
     }}
     QProgressBar::chunk {{
@@ -87,9 +81,10 @@ class MainWindow(QWidget):
         self._config     = config
         self._db         = db
         self._recognizer = recognizer
+        self._c          = _get_theme(config)
 
-        self.setWindowTitle("SmartKegerator")
-        self.setStyleSheet(_GLOBAL_STYLE)
+        self.setWindowTitle(_site_name(config))
+        self.setStyleSheet(_build_style(self._c))
         self.setMinimumSize(800, 480)
 
         root = QVBoxLayout(self)
@@ -113,6 +108,7 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------
 
     def _build_header(self) -> QWidget:
+        c   = self._c
         bar = QWidget()
         bar.setFixedHeight(60)
         row = QHBoxLayout(bar)
@@ -122,25 +118,24 @@ class MainWindow(QWidget):
         # Left: date/time
         self._lbl_datetime = QLabel()
         self._lbl_datetime.setStyleSheet(
-            f"color: {_MUTED}; font-size: 17px; font-family: monospace;"
+            f"color: {c['muted']}; font-size: 17px; font-family: monospace;"
         )
         row.addWidget(self._lbl_datetime, stretch=3)
 
         # Center: kegerator name
-        name = self._config.get("ui", {}).get("name", "SmartKegerator")
-        title = QLabel(name)
+        title = QLabel(_site_name(self._config))
         font  = QFont()
         font.setPointSize(22)
         font.setWeight(QFont.Weight.Bold)
         title.setFont(font)
-        title.setStyleSheet(f"color: {_ACCENT};")
+        title.setStyleSheet(f"color: {c['accent']};")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         row.addWidget(title, stretch=4)
 
         # Right: ambient temp + humidity
         self._lbl_env = QLabel("—")
         self._lbl_env.setStyleSheet(
-            f"color: {_MUTED}; font-size: 17px; font-family: monospace;"
+            f"color: {c['muted']}; font-size: 17px; font-family: monospace;"
         )
         self._lbl_env.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         row.addWidget(self._lbl_env, stretch=3)
@@ -153,20 +148,21 @@ class MainWindow(QWidget):
 
         self._tap_cards: dict[str, _TapCard] = {}
         for tap_id, display_name in get_configured_taps(self._config):
-            card = _TapCard(tap_id, display_name)
+            card = _TapCard(tap_id, display_name, self._c)
             self._tap_cards[tap_id] = card
             row.addWidget(card, stretch=1)
 
         return row
 
     def _build_footer(self) -> QWidget:
+        c   = self._c
         bar = QWidget()
         bar.setFixedHeight(50)
         row = QHBoxLayout(bar)
         row.setContentsMargins(4, 0, 4, 0)
 
-        self._lbl_current_user = QLabel("Tap to pour")
-        self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 17px;")
+        self._lbl_current_user = QLabel("")
+        self._lbl_current_user.setStyleSheet(f"color: {c['muted']}; font-size: 17px;")
         row.addWidget(self._lbl_current_user, stretch=1)
 
         self._settings_btn = QPushButton("⚙  Settings")
@@ -181,7 +177,6 @@ class MainWindow(QWidget):
 
     def _update_clock(self) -> None:
         now = datetime.now()
-        # %-I / %-d strip leading zeros on Linux (Pi)
         try:
             text = now.strftime("%-I:%M %p  ·  %a %b %-d")
         except ValueError:
@@ -198,23 +193,22 @@ class MainWindow(QWidget):
         name: str,
         is_admin: bool = False,
     ) -> None:
-        """Called by App whenever the touchscreen session user changes."""
+        c = self._c
         if user_id is not None:
             badge = "  ⚡ Admin" if is_admin else ""
             self._lbl_current_user.setText(f"Welcome, {name}!{badge}")
-            color = _ACCENT if not is_admin else "#f0c040"
+            color = c['accent'] if not is_admin else "#f0c040"
             self._lbl_current_user.setStyleSheet(
                 f"color: {color}; font-size: 17px; font-weight: bold;"
             )
         else:
-            self._lbl_current_user.setText("Tap to pour")
-            self._lbl_current_user.setStyleSheet(f"color: {_MUTED}; font-size: 17px;")
+            self._lbl_current_user.setText("")
+            self._lbl_current_user.setStyleSheet(f"color: {c['muted']}; font-size: 17px;")
 
-        # Dim settings button for non-admins (click still works — App guards access)
         if is_admin:
             self._settings_btn.setStyleSheet("")
         else:
-            self._settings_btn.setStyleSheet(f"color: {_MUTED};")
+            self._settings_btn.setStyleSheet(f"color: {c['muted']};")
 
     def refresh(self) -> None:
         taps = self._db.get_tap_assignments()
@@ -249,8 +243,9 @@ class MainWindow(QWidget):
 # ---------------------------------------------------------------------------
 
 class _TapCard(QFrame):
-    def __init__(self, tap_id: str, display_name: str = "", parent=None) -> None:
+    def __init__(self, tap_id: str, display_name: str = "", c: dict = {}, parent=None) -> None:
         super().__init__(parent)
+        self._c = c
         self.setObjectName("card")
 
         layout = QVBoxLayout(self)
@@ -261,11 +256,11 @@ class _TapCard(QFrame):
         tap_lbl = QLabel((display_name or tap_id).upper())
         tap_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tap_lbl.setStyleSheet(
-            f"color: {_MUTED}; font-size: 17px; font-weight: bold; letter-spacing: 2px;"
+            f"color: {c.get('muted', '#888')}; font-size: 17px; font-weight: bold; letter-spacing: 2px;"
         )
         layout.addWidget(tap_lbl)
 
-        # Beer name — largest element, most readable from distance
+        # Beer name
         self._lbl_beer = QLabel("No Keg")
         self._lbl_beer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_beer.setWordWrap(True)
@@ -278,7 +273,7 @@ class _TapCard(QFrame):
         # Company / style
         self._lbl_sub = QLabel("")
         self._lbl_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_sub.setStyleSheet(f"color: {_MUTED}; font-size: 18px;")
+        self._lbl_sub.setStyleSheet(f"color: {c.get('muted', '#888')}; font-size: 18px;")
         self._lbl_sub.setWordWrap(True)
         layout.addWidget(self._lbl_sub)
 
@@ -295,27 +290,28 @@ class _TapCard(QFrame):
         # Stats row (ABV · IBU)
         self._lbl_stats = QLabel("")
         self._lbl_stats.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_stats.setStyleSheet(f"color: {_MUTED}; font-size: 18px;")
+        self._lbl_stats.setStyleSheet(f"color: {c.get('muted', '#888')}; font-size: 18px;")
         layout.addWidget(self._lbl_stats)
 
         # Price
         self._lbl_price = QLabel("")
         self._lbl_price.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_price.setStyleSheet(
-            f"color: {_ACCENT}; font-size: 20px; font-weight: bold;"
+            f"color: {c.get('accent', '#e94560')}; font-size: 20px; font-weight: bold;"
         )
         layout.addWidget(self._lbl_price)
 
         self.update(None, None)
 
     def update(self, keg: Optional[Keg], beer: Optional[Beer]) -> None:  # type: ignore[override]
+        c = self._c
         if keg is None or beer is None:
             self._lbl_beer.setText("No Keg")
-            self._lbl_beer.setStyleSheet(f"color: {_MUTED};")
+            self._lbl_beer.setStyleSheet(f"color: {c.get('muted', '#888')};")
             self._lbl_sub.setText("")
             self._bar.setValue(0)
             self._bar.setFormat("Empty")
-            self._bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {_LEVEL_EMPTY}; }}")
+            self._bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {c.get('err', '#e74c3c')}; }}")
             self._lbl_stats.setText("")
             self._lbl_price.setText("")
             return
@@ -330,12 +326,12 @@ class _TapCard(QFrame):
         self._bar.setFormat(f"{pct}%  ({keg.liters_remaining:.1f} L left)")
 
         if pct > 25:
-            color = _LEVEL_OK
+            bar_color = c.get('ok', '#2ecc71')
         elif pct > 10:
-            color = _LEVEL_LOW
+            bar_color = c.get('warn', '#e67e22')
         else:
-            color = _LEVEL_EMPTY
-        self._bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {color}; }}")
+            bar_color = c.get('err', '#e74c3c')
+        self._bar.setStyleSheet(f"QProgressBar::chunk {{ background-color: {bar_color}; }}")
 
         stats_parts = []
         if beer.abv:

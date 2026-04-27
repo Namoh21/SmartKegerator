@@ -33,32 +33,27 @@ from PyQt6.QtWidgets import (
 
 from data.database import Database
 from data.models import Beer, Keg, UNKNOWN_USER_ID
+from ui.theme import get as _get_theme
 
 log = logging.getLogger(__name__)
 
-_DARK_BG     = "#1a1a2e"
-_CARD_BG     = "#16213e"
-_ACCENT      = "#e94560"
-_TEXT        = "#eaeaea"
-_MUTED       = "#8888aa"
-_GREEN       = "#2ecc71"
-_ORANGE      = "#e67e22"
-
 _OUNCES_PER_LITER = 33.814
 
-_STYLE = f"""
+
+def _build_style(c: dict) -> str:
+    return f"""
     QWidget {{
-        background-color: {_DARK_BG};
-        color: {_TEXT};
+        background-color: {c['bg']};
+        color: {c['text']};
         font-family: 'DejaVu Sans', Arial, sans-serif;
     }}
     QFrame#card {{
-        background-color: {_CARD_BG};
-        border: 1px solid #2a2a4e;
+        background-color: {c['card']};
+        border: 1px solid {c['border']};
         border-radius: 8px;
     }}
     QPushButton {{
-        background-color: {_ACCENT};
+        background-color: {c['accent']};
         color: white;
         border: none;
         border-radius: 4px;
@@ -67,7 +62,7 @@ _STYLE = f"""
         font-weight: bold;
     }}
     QPushButton:pressed {{
-        background-color: #c0392b;
+        background-color: {c['err']};
     }}
 """
 
@@ -79,6 +74,7 @@ class PouringWindow(QWidget):
         super().__init__(parent)
         self._config = config
         self._db     = db
+        self._c      = _get_theme(config)
 
         # Current pour state
         self._tap:         Optional[str]  = None
@@ -91,7 +87,7 @@ class PouringWindow(QWidget):
         self._face_found:  bool  = False
 
         self.setWindowTitle("Pouring")
-        self.setStyleSheet(_STYLE)
+        self.setStyleSheet(_build_style(self._c))
 
         root = QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
@@ -181,13 +177,13 @@ class PouringWindow(QWidget):
 
         self._lbl_confidence = QLabel("")
         self._lbl_confidence.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_confidence.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
+        self._lbl_confidence.setStyleSheet(f"color: {self._c['muted']}; font-size: 15px;")
         layout.addWidget(self._lbl_confidence)
 
         # Divider
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
-        line.setStyleSheet("color: #2a2a4e;")
+        line.setStyleSheet(f"color: {self._c['border']};")
         layout.addWidget(line)
 
         # Beer info
@@ -206,7 +202,7 @@ class PouringWindow(QWidget):
 
         self._lbl_beer_sub = QLabel("")
         self._lbl_beer_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_beer_sub.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
+        self._lbl_beer_sub.setStyleSheet(f"color: {self._c['muted']}; font-size: 15px;")
         self._lbl_beer_sub.setWordWrap(True)
         layout.addWidget(self._lbl_beer_sub)
 
@@ -215,7 +211,7 @@ class PouringWindow(QWidget):
         # Pour amount card
         pour_frame = QFrame()
         pour_frame.setStyleSheet(
-            f"background-color: #0f0f23; border: 1px solid {_ACCENT}; border-radius: 6px;"
+            f"background-color: {self._c['deep']}; border: 1px solid {self._c['accent']}; border-radius: 6px;"
         )
         pour_layout = QVBoxLayout(pour_frame)
         pour_layout.setContentsMargins(12, 8, 12, 8)
@@ -227,12 +223,12 @@ class PouringWindow(QWidget):
         oz_font.setPointSize(27)
         oz_font.setWeight(QFont.Weight.Bold)
         self._lbl_ounces.setFont(oz_font)
-        self._lbl_ounces.setStyleSheet(f"color: {_GREEN};")
+        self._lbl_ounces.setStyleSheet(f"color: {self._c['ok']};")
         pour_layout.addWidget(self._lbl_ounces)
 
         self._lbl_price = QLabel("$0.00")
         self._lbl_price.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_price.setStyleSheet(f"color: {_MUTED}; font-size: 18px;")
+        self._lbl_price.setStyleSheet(f"color: {self._c['muted']}; font-size: 18px;")
         pour_layout.addWidget(self._lbl_price)
 
         layout.addWidget(pour_frame)
@@ -308,18 +304,18 @@ class PouringWindow(QWidget):
         self._lbl_user.setText(self._user_name)
         self._lbl_confidence.setText(f"Confidence: {confidence * 100:.0f}%")
         self._lbl_confidence.setStyleSheet(
-            f"color: {_GREEN}; font-size: 15px;" if confidence >= 0.7
-            else f"color: {_ORANGE}; font-size: 15px;"
+            f"color: {self._c['ok']}; font-size: 15px;" if confidence >= 0.7
+            else f"color: {self._c['warn']}; font-size: 15px;"
         )
 
     def on_face_detected(self, found: bool) -> None:
         self._face_found = found
         if found:
             self._lbl_face_status.setText("● Face detected")
-            self._lbl_face_status.setStyleSheet(f"color: {_GREEN}; font-size: 15px;")
+            self._lbl_face_status.setStyleSheet(f"color: {self._c['ok']}; font-size: 15px;")
         else:
             self._lbl_face_status.setText("○ No face detected")
-            self._lbl_face_status.setStyleSheet(f"color: {_MUTED}; font-size: 15px;")
+            self._lbl_face_status.setStyleSheet(f"color: {self._c['muted']}; font-size: 15px;")
 
     # ------------------------------------------------------------------
     # Internal helpers

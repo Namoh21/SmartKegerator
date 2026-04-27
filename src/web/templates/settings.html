@@ -34,11 +34,12 @@
     <!-- ── Tab navigation ────────────────────────────────────────────── -->
     <ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
       {% for tab_id, tab_icon, tab_label in [
-          ('taps',    'bi-diagram-3',   'Taps'),
-          ('camera',  'bi-camera',      'Camera'),
-          ('sensors', 'bi-thermometer', 'Sensors'),
-          ('untappd', 'bi-cup-straw',   'Untappd'),
-          ('admins',  'bi-shield-lock', 'Administrators'),
+          ('appearance', 'bi-palette',     'Appearance'),
+          ('taps',       'bi-diagram-3',   'Taps'),
+          ('camera',     'bi-camera',      'Camera'),
+          ('sensors',    'bi-thermometer', 'Sensors'),
+          ('untappd',    'bi-cup-straw',   'Untappd'),
+          ('admins',     'bi-shield-lock', 'Administrators'),
       ] %}
       {% if tab_id != 'admins' or is_admin %}
       <li class="nav-item" role="presentation">
@@ -52,6 +53,67 @@
     </ul>
 
     <div class="tab-content" id="settingsTabContent">
+
+      <!-- ══════════════════════════════════════════════════════════════
+           TAB: APPEARANCE
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="tab-pane fade {% if active_tab == 'appearance' %}show active{% endif %}" id="pane-appearance">
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-palette me-2"></i><strong>Appearance</strong></div>
+          <div class="card-body">
+            {% if is_admin %}
+            <form method="post" action="/settings/appearance">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Kegerator name</label>
+                <input type="text" class="form-control" name="site_name"
+                       value="{{ yaml_config.get('ui', {}).get('name', 'SmartKegerator') }}"
+                       placeholder="SmartKegerator" maxlength="40">
+                <div class="form-text text-muted">Shown in the navbar, browser tab, and touchscreen header.</div>
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Color theme</label>
+                <div class="row g-2">
+                  {% set current_theme = yaml_config.get('ui', {}).get('theme', 'dark_blue') %}
+                  {% for theme_key, theme_meta in themes.items() %}
+                  <div class="col-6 col-md-3">
+                    <div class="form-check p-0">
+                      <input class="d-none" type="radio" name="theme"
+                             id="theme_{{ theme_key }}" value="{{ theme_key }}"
+                             {% if current_theme == theme_key %}checked{% endif %}>
+                      <label class="d-block rounded p-3 border theme-swatch"
+                             for="theme_{{ theme_key }}"
+                             style="background:{{ theme_meta.bg }}; border-color:{{ theme_meta.accent }} !important; cursor:pointer;">
+                        <span class="fw-bold" style="color:{{ theme_meta.accent }};">{{ theme_meta.label }}</span><br>
+                        <span class="small" style="color:{{ theme_meta.muted }};">Aa  Sample text</span><br>
+                        <span class="small fw-bold" style="color:{{ theme_meta.ok }};">● OK</span>
+                        <span class="small fw-bold ms-2" style="color:{{ theme_meta.warn }};">● Low</span>
+                      </label>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+                <div class="form-text text-muted mt-2">
+                  <i class="bi bi-info-circle me-1"></i>Touchscreen requires a restart to apply the new theme.
+                  The web interface updates immediately.
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-accent">
+                <i class="bi bi-save me-1"></i>Save Appearance
+              </button>
+            </form>
+            {% else %}
+            <dl class="row mb-0">
+              <dt class="col-sm-3">Name</dt>
+              <dd class="col-sm-9">{{ yaml_config.get('ui', {}).get('name', 'SmartKegerator') }}</dd>
+              <dt class="col-sm-3">Theme</dt>
+              <dd class="col-sm-9">{{ themes.get(yaml_config.get('ui', {}).get('theme', 'dark_blue'), {}).get('label', '—') }}</dd>
+            </dl>
+            {% endif %}
+          </div>
+        </div>
+      </div>
 
       <!-- ══════════════════════════════════════════════════════════════
            TAB: TAPS
@@ -544,6 +606,10 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .theme-swatch { transition: box-shadow .15s; }
+  input[type=radio]:checked + .theme-swatch { box-shadow: 0 0 0 3px var(--sk-accent); }
+</style>
 <script>
 function updateTapRows() {
   const sel = document.getElementById('tapCountSelect');

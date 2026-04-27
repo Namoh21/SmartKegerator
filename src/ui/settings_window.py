@@ -19,27 +19,25 @@ import yaml
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QCheckBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
+    QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
     QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from ui.theme import get as _get_theme, THEMES
+
 log = logging.getLogger(__name__)
 
-_DARK_BG = "#1a1a2e"
-_CARD_BG = "#16213e"
-_ACCENT  = "#e94560"
-_TEXT    = "#eaeaea"
-_MUTED   = "#8888aa"
 
-_STYLE = f"""
+def _build_style(c: dict) -> str:
+    return f"""
     QDialog, QWidget, QScrollArea, QGroupBox {{
-        background-color: {_DARK_BG};
-        color: {_TEXT};
+        background-color: {c['bg']};
+        color: {c['text']};
         font-family: 'DejaVu Sans', Arial, sans-serif;
     }}
     QGroupBox {{
-        border: 1px solid #2a2a4e;
+        border: 1px solid {c['border']};
         border-radius: 6px;
         margin-top: 10px;
         padding-top: 6px;
@@ -47,37 +45,37 @@ _STYLE = f"""
     QGroupBox::title {{
         subcontrol-origin: margin;
         left: 10px;
-        color: {_MUTED};
-        font-size: 11px;
+        color: {c['muted']};
+        font-size: 13px;
         letter-spacing: 1px;
     }}
-    QLineEdit, QSpinBox, QDoubleSpinBox {{
-        background-color: {_CARD_BG};
-        color: {_TEXT};
-        border: 1px solid #2a2a4e;
+    QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
+        background-color: {c['card']};
+        color: {c['text']};
+        border: 1px solid {c['border']};
         border-radius: 4px;
         padding: 4px 8px;
         min-width: 180px;
     }}
-    QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
-        border-color: {_ACCENT};
+    QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
+        border-color: {c['accent']};
     }}
     QCheckBox {{
-        color: {_TEXT};
+        color: {c['text']};
     }}
     QPushButton {{
-        background-color: #2a2a4e;
-        color: {_TEXT};
-        border: 1px solid {_ACCENT};
+        background-color: {c['card']};
+        color: {c['text']};
+        border: 1px solid {c['accent']};
         border-radius: 4px;
         padding: 7px 18px;
     }}
     QPushButton#save {{
-        background-color: {_ACCENT};
+        background-color: {c['accent']};
         color: white;
         border: none;
     }}
-    QPushButton:pressed {{ background-color: {_ACCENT}; }}
+    QPushButton:pressed {{ background-color: {c['accent']}; }}
 """
 
 
@@ -86,12 +84,13 @@ class SettingsWindow(QDialog):
 
     def __init__(self, config: dict, db, parent=None) -> None:
         super().__init__(parent)
-        self._config = config
+        self._config      = config
         self._config_path = _find_config_path()
         self._widgets: dict[tuple[str, str], QWidget] = {}
+        self._c           = _get_theme(config)
 
         self.setWindowTitle("Settings")
-        self.setStyleSheet(_STYLE)
+        self.setStyleSheet(_build_style(self._c))
         self.setMinimumSize(540, 580)
         self.resize(560, 640)
 
@@ -134,6 +133,8 @@ class SettingsWindow(QDialog):
         layout    = QVBoxLayout(container)
         layout.setSpacing(14)
         layout.setContentsMargins(4, 4, 4, 4)
+
+        layout.addWidget(self._build_appearance_group())
 
         layout.addWidget(self._build_group(
             "POUR",
@@ -192,6 +193,30 @@ class SettingsWindow(QDialog):
         layout.addStretch()
         scroll.setWidget(container)
         return scroll
+
+    def _build_appearance_group(self) -> QGroupBox:
+        group = QGroupBox("APPEARANCE  (restart required)")
+        form  = QFormLayout(group)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setSpacing(8)
+        form.setContentsMargins(12, 16, 12, 12)
+
+        # Kegerator name
+        self._w_name = QLineEdit(
+            self._config.get("ui", {}).get("name", "SmartKegerator")
+        )
+        form.addRow("Kegerator name:", self._w_name)
+
+        # Color theme
+        self._w_theme = QComboBox()
+        current_theme = self._config.get("ui", {}).get("theme", "dark_blue")
+        for key, meta in THEMES.items():
+            self._w_theme.addItem(meta["label"], userData=key)
+            if key == current_theme:
+                self._w_theme.setCurrentIndex(self._w_theme.count() - 1)
+        form.addRow("Color theme:", self._w_theme)
+
+        return group
 
     def _build_group(self, title: str, fields: list) -> QGroupBox:
         group  = QGroupBox(title)
@@ -280,6 +305,11 @@ class SettingsWindow(QDialog):
     # ------------------------------------------------------------------
 
     def _save(self) -> None:
+        # Appearance fields
+        self._config.setdefault("ui", {})
+        self._config["ui"]["name"]  = self._w_name.text().strip() or "SmartKegerator"
+        self._config["ui"]["theme"] = self._w_theme.currentData()
+
         for (section, key), widget in self._widgets.items():
             value = self._read_widget(widget)
             if section not in self._config:

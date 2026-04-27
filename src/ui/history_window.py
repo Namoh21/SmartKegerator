@@ -29,53 +29,47 @@ from PyQt6.QtWidgets import (
 
 from data.database import Database
 from data.models import Pour, User
+from ui.theme import get as _get_theme
 
 log = logging.getLogger(__name__)
 
+_PG_AVAILABLE = False
 try:
     import pyqtgraph as pg
-    pg.setConfigOption("background", "#1a1a2e")
-    pg.setConfigOption("foreground", "#eaeaea")
     _PG_AVAILABLE = True
 except ImportError:
-    _PG_AVAILABLE = False
     log.warning("pyqtgraph not available — history graph will be hidden")
 
-_DARK_BG  = "#1a1a2e"
-_CARD_BG  = "#16213e"
-_ACCENT   = "#e94560"
-_TEXT     = "#eaeaea"
-_MUTED    = "#8888aa"
-_GREEN    = "#2ecc71"
 
-_STYLE = f"""
+def _build_style(c: dict) -> str:
+    return f"""
     QDialog, QWidget {{
-        background-color: {_DARK_BG};
-        color: {_TEXT};
+        background-color: {c['bg']};
+        color: {c['text']};
         font-family: 'DejaVu Sans', Arial, sans-serif;
     }}
     QTableWidget {{
         background-color: {_CARD_BG};
         alternate-background-color: #1e1e3a;
         gridline-color: #2a2a4e;
-        border: 1px solid #2a2a4e;
+        border: 1px solid {c['border']};
         border-radius: 4px;
     }}
     QTableWidget::item:selected {{
-        background-color: {_ACCENT};
+        background-color: {c['accent']};
     }}
     QHeaderView::section {{
-        background-color: #0f0f23;
-        color: {_MUTED};
+        background-color: {c['deep']};
+        color: {c['muted']};
         padding: 8px;
         border: none;
         font-size: 15px;
         letter-spacing: 1px;
     }}
     QComboBox {{
-        background-color: {_CARD_BG};
-        color: {_TEXT};
-        border: 1px solid #2a2a4e;
+        background-color: {c['card']};
+        color: {c['text']};
+        border: 1px solid {c['border']};
         border-radius: 4px;
         padding: 6px 12px;
         min-width: 140px;
@@ -83,14 +77,14 @@ _STYLE = f"""
     }}
     QComboBox::drop-down {{ border: none; }}
     QPushButton {{
-        background-color: #2a2a4e;
-        color: {_TEXT};
-        border: 1px solid {_ACCENT};
+        background-color: {c['card']};
+        color: {c['text']};
+        border: 1px solid {c['accent']};
         border-radius: 4px;
         padding: 8px 20px;
         font-size: 16px;
     }}
-    QPushButton:pressed {{ background-color: {_ACCENT}; }}
+    QPushButton:pressed {{ background-color: {c['accent']}; }}
 """
 
 _PERIODS = {
@@ -117,10 +111,14 @@ class HistoryWindow(QDialog):
         self._current_user_id = current_user_id
         self._is_admin        = is_admin
         self._users: dict[int, str] = {}
+        self._c               = _get_theme(config)
 
         title = "Pour History" if is_admin else "My Pour History"
         self.setWindowTitle(title)
-        self.setStyleSheet(_STYLE)
+        self.setStyleSheet(_build_style(self._c))
+        if _PG_AVAILABLE:
+            pg.setConfigOption("background", self._c['bg'])
+            pg.setConfigOption("foreground", self._c['text'])
         self.setMinimumSize(860, 560)
         self.resize(960, 620)
 
@@ -152,7 +150,7 @@ class HistoryWindow(QDialog):
         f.setPointSize(20)
         f.setWeight(QFont.Weight.Bold)
         title.setFont(f)
-        title.setStyleSheet(f"color: {_ACCENT};")
+        title.setStyleSheet(f"color: {self._c['accent']};")
         row.addWidget(title)
 
         row.addStretch()
@@ -193,10 +191,11 @@ class HistoryWindow(QDialog):
         row.setContentsMargins(4, 0, 4, 0)
         row.setSpacing(30)
 
-        self._lbl_count   = _stat_label("Pours", "0")
-        self._lbl_oz      = _stat_label("Total oz", "0.0")
-        self._lbl_spent   = _stat_label("Total", "$0.00")
-        self._lbl_balance = _stat_label("Balance", "$0.00")
+        tc = self._c['text']
+        self._lbl_count   = _stat_label("Pours", "0", tc)
+        self._lbl_oz      = _stat_label("Total oz", "0.0", tc)
+        self._lbl_spent   = _stat_label("Total", "$0.00", tc)
+        self._lbl_balance = _stat_label("Balance", "$0.00", tc)
 
         for w in (self._lbl_count, self._lbl_oz, self._lbl_spent, self._lbl_balance):
             row.addWidget(w)
@@ -347,7 +346,7 @@ class HistoryWindow(QDialog):
         x = list(range(days))
         y = [buckets.get(i, 0.0) for i in x]
 
-        bar = pg.BarGraphItem(x=x, height=y, width=0.7, brush=_ACCENT)
+        bar = pg.BarGraphItem(x=x, height=y, width=0.7, brush=self._c['accent'])
         self._plot.addItem(bar)
         self._plot.setXRange(-0.5, days - 0.5)
 
@@ -356,7 +355,7 @@ class HistoryWindow(QDialog):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _stat_label(title: str, value: str) -> QLabel:
+def _stat_label(title: str, value: str, text_color: str = "#eaeaea") -> QLabel:
     lbl = QLabel(f"{title}: {value}")
-    lbl.setStyleSheet(f"color: {_TEXT}; font-size: 17px;")
+    lbl.setStyleSheet(f"color: {text_color}; font-size: 17px;")
     return lbl

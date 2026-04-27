@@ -36,58 +36,53 @@ from PyQt6.QtWidgets import (
 
 from data.database import Database
 from data.models import User, UNKNOWN_USER_ID
+from ui.theme import get as _get_theme
 
 log = logging.getLogger(__name__)
 
-_DARK_BG = "#1a1a2e"
-_CARD_BG = "#16213e"
-_ACCENT  = "#e94560"
-_TEXT    = "#eaeaea"
-_MUTED   = "#8888aa"
-_GREEN   = "#2ecc71"
-_ORANGE  = "#e67e22"
 
-_STYLE = f"""
+def _build_style(c: dict) -> str:
+    return f"""
     QDialog, QWidget {{
-        background-color: {_DARK_BG};
-        color: {_TEXT};
+        background-color: {c['bg']};
+        color: {c['text']};
         font-family: 'DejaVu Sans', Arial, sans-serif;
     }}
     QListWidget {{
-        background-color: {_CARD_BG};
-        border: 1px solid #2a2a4e;
+        background-color: {c['card']};
+        border: 1px solid {c['border']};
         border-radius: 4px;
         font-size: 17px;
     }}
     QListWidget::item:selected {{
-        background-color: {_ACCENT};
+        background-color: {c['accent']};
         color: white;
     }}
     QListWidget::item:hover {{
-        background-color: #2a2a4e;
+        background-color: {c['border']};
     }}
     QPushButton {{
-        background-color: #2a2a4e;
-        color: {_TEXT};
-        border: 1px solid {_ACCENT};
+        background-color: {c['card']};
+        color: {c['text']};
+        border: 1px solid {c['accent']};
         border-radius: 4px;
         padding: 8px 18px;
         font-size: 16px;
     }}
-    QPushButton:pressed {{ background-color: {_ACCENT}; }}
+    QPushButton:pressed {{ background-color: {c['accent']}; }}
     QPushButton#danger {{
-        border-color: {_ORANGE};
+        border-color: {c['warn']};
     }}
     QPushButton#train {{
-        background-color: {_GREEN};
+        background-color: {c['ok']};
         color: #111;
         border: none;
         font-weight: bold;
     }}
     QDoubleSpinBox {{
-        background-color: {_CARD_BG};
-        color: {_TEXT};
-        border: 1px solid #2a2a4e;
+        background-color: {c['card']};
+        color: {c['text']};
+        border: 1px solid {c['border']};
         border-radius: 4px;
         padding: 6px 10px;
         min-width: 110px;
@@ -115,8 +110,9 @@ class UsersWindow(QDialog):
         self._is_admin   = is_admin
         self._selected_user: Optional[User] = None
 
+        self._c = _get_theme(config)
         self.setWindowTitle("Users")
-        self.setStyleSheet(_STYLE)
+        self.setStyleSheet(_build_style(self._c))
         self.setMinimumSize(820, 540)
         self.resize(900, 580)
 
@@ -161,7 +157,7 @@ class UsersWindow(QDialog):
         f.setPointSize(18)
         f.setWeight(QFont.Weight.Bold)
         header.setFont(f)
-        header.setStyleSheet(f"color: {_ACCENT};")
+        header.setStyleSheet(f"color: {self._c['accent']};")
         layout.addWidget(header)
 
         self._user_list = QListWidget()
@@ -226,8 +222,8 @@ class UsersWindow(QDialog):
             self._camera_label.setFixedSize(280, 210)
             self._camera_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._camera_label.setStyleSheet(
-                f"background-color: {_CARD_BG}; border: 1px solid #2a2a4e; "
-                f"border-radius: 4px; color: {_MUTED};"
+                f"background-color: {self._c['card']}; border: 1px solid {self._c['border']}; "
+                f"border-radius: 4px; color: {self._c['muted']};"
             )
             self._camera_label.setText("No camera")
             cam_col.addWidget(self._camera_label)
@@ -242,7 +238,7 @@ class UsersWindow(QDialog):
             # Photo list column (admin only)
             photo_col = QVBoxLayout()
             photo_header = QLabel("Training Photos")
-            photo_header.setStyleSheet(f"color: {_MUTED}; font-size: 15px; letter-spacing: 1px;")
+            photo_header.setStyleSheet(f"color: {self._c['muted']}; font-size: 15px; letter-spacing: 1px;")
             photo_col.addWidget(photo_header)
 
             self._photo_list = QListWidget()
@@ -268,7 +264,7 @@ class UsersWindow(QDialog):
             train_row.addWidget(self._train_btn)
 
             self._lbl_train_status = QLabel("")
-            self._lbl_train_status.setStyleSheet(f"color: {_MUTED}; font-size: 16px;")
+            self._lbl_train_status.setStyleSheet(f"color: {self._c['muted']}; font-size: 16px;")
             train_row.addWidget(self._lbl_train_status)
             train_row.addStretch()
             layout.addLayout(train_row)
@@ -351,9 +347,9 @@ class UsersWindow(QDialog):
 
     def _refresh_balance(self, user: User) -> None:
         balance = self._db.balance_for_user(user.id)
-        color   = _ORANGE if balance > 0 else _GREEN
+        color   = self._c['warn'] if balance > 0 else self._c['ok']
         self._lbl_balance.setText(f"Balance owed: ${balance:.2f}")
-        self._lbl_balance.setStyleSheet(f"color: {color}; font-size: 17px; font-weight: bold;")
+        self._lbl_balance.setStyleSheet(f"color: {color}; font-size: 17px; font-weight: bold;")  # color set above
 
     # ------------------------------------------------------------------
     # Camera feed
@@ -516,19 +512,19 @@ class UsersWindow(QDialog):
 
         self._train_btn.setEnabled(False)
         self._lbl_train_status.setText("Training…")
-        self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 16px;")
+        self._lbl_train_status.setStyleSheet(f"color: {self._c['warn']}; font-size: 16px;")
         self._recognizer.train_user(self._selected_user.id)
 
     def _on_training_complete(self, user_id: int, count: int) -> None:
         if self._selected_user and self._selected_user.id == user_id:
             self._lbl_train_status.setText(f"✓  {count} encoding(s) stored")
-            self._lbl_train_status.setStyleSheet(f"color: {_GREEN}; font-size: 16px;")
+            self._lbl_train_status.setStyleSheet(f"color: {self._c['ok']}; font-size: 16px;")
             self._train_btn.setEnabled(True)
 
     def _on_training_failed(self, user_id: int, reason: str) -> None:
         if self._selected_user and self._selected_user.id == user_id:
             self._lbl_train_status.setText(f"✗  {reason}")
-            self._lbl_train_status.setStyleSheet(f"color: {_ORANGE}; font-size: 16px;")
+            self._lbl_train_status.setStyleSheet(f"color: {self._c['warn']}; font-size: 16px;")
             self._train_btn.setEnabled(True)
 
     # ------------------------------------------------------------------

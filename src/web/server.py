@@ -35,6 +35,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from data.database import Database
+from ui.theme import site_name as _site_name, css_vars as _css_vars
 
 # ---------------------------------------------------------------------------
 # Session secret — persisted in a file so sessions survive service restarts.
@@ -249,6 +250,8 @@ def ctx(request: Request, **kwargs) -> dict:
         "config":         _config,
         "is_admin":       is_admin,
         "admin_username": admin_username,
+        "site_name":      _site_name(_config),
+        "theme_vars":     _css_vars(_config),
         **kwargs,
     }
 
