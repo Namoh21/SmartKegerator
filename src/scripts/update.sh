@@ -20,10 +20,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_SRC="$(dirname "${SCRIPT_DIR}")"   # parent of scripts/ = src/
 
 # ---------------------------------------------------------------------------
-# 1. Pull latest code
+# 1. Pull latest code (hard-reset handles force-pushed history rewrites)
 # ---------------------------------------------------------------------------
 info "Pulling latest code…"
-git -C "$(dirname "${REPO_SRC}")" pull
+REPO_DIR="$(dirname "${REPO_SRC}")"
+git -C "${REPO_DIR}" fetch origin
+git -C "${REPO_DIR}" reset --hard origin/master
 
 # ---------------------------------------------------------------------------
 # 2. Sync source files to /opt (preserve config.yaml — it's gitignored)
