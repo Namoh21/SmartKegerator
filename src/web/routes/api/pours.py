@@ -33,14 +33,18 @@ class SummaryResponse(BaseModel):
 
 @router.get("/pours", response_model=SummaryResponse)
 async def list_pours(
-    period:  str = Query(default="30d"),
-    user_id: int = Query(default=0),
-    keg_id:  int = Query(default=0),
+    period:   str   = Query(default="30d"),
+    user_id:  int   = Query(default=0),
+    keg_id:   int   = Query(default=0),
+    since_ts: float = Query(default=0.0),
 ):
-    """Pour history with optional filters. period: 7d | 30d | 90d | all."""
-    db    = get_db()
-    days  = _PERIODS.get(period, 30)
-    since = (_time.time() - days * 86400) if days else 0.0
+    """Pour history with optional filters. period: 7d|30d|90d|all. since_ts overrides period."""
+    db = get_db()
+    if since_ts > 0:
+        since = since_ts
+    else:
+        days  = _PERIODS.get(period, 30)
+        since = (_time.time() - days * 86400) if days else 0.0
 
     pours = db.get_pours_since(since)
     if user_id:

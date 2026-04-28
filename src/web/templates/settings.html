@@ -34,13 +34,12 @@
     <!-- ── Tab navigation ────────────────────────────────────────────── -->
     <ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
       {% for tab_id, tab_icon, tab_label in [
-          ('appearance',    'bi-palette',       'Appearance'),
-          ('taps',          'bi-diagram-3',     'Taps'),
-          ('camera',        'bi-camera',        'Camera'),
-          ('sensors',       'bi-thermometer',   'Sensors'),
-          ('untappd',       'bi-cup-straw',     'Untappd'),
-          ('notifications', 'bi-bell',          'Notifications'),
-          ('admins',        'bi-shield-lock',   'Administrators'),
+          ('appearance', 'bi-palette',     'Appearance'),
+          ('taps',       'bi-diagram-3',   'Taps'),
+          ('camera',     'bi-camera',      'Camera'),
+          ('sensors',    'bi-thermometer', 'Sensors'),
+          ('untappd',    'bi-cup-straw',   'Untappd'),
+          ('admins',     'bi-shield-lock', 'Administrators'),
       ] %}
       {% if tab_id != 'admins' or is_admin %}
       <li class="nav-item" role="presentation">
@@ -458,91 +457,6 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
-           TAB: NOTIFICATIONS
-           ══════════════════════════════════════════════════════════════ -->
-      <div class="tab-pane fade {% if active_tab == 'notifications' %}show active{% endif %}" id="pane-notifications">
-        <div class="card mb-3">
-          <div class="card-header"><i class="bi bi-bell me-2"></i><strong>Pour Push Notifications</strong></div>
-          <div class="card-body">
-            {% if is_admin %}
-            <p class="text-muted small">
-              When a pour is detected, the SmartKegerator app on registered Android devices
-              will receive an instant push notification via Firebase Cloud Messaging (FCM).<br>
-              <strong>Setup:</strong>
-              <a href="https://console.firebase.google.com" target="_blank" class="text-accent">console.firebase.google.com</a>
-              → Project → Project settings → Service accounts → Generate new private key.
-              Paste the downloaded JSON below.
-            </p>
-
-            <form method="post" action="/settings/notifications">
-              <div class="mb-3">
-                <div class="form-check form-switch mb-3">
-                  <input class="form-check-input" type="checkbox" id="notifEnabled"
-                         name="notifications_enabled" value="1"
-                         {% if settings.get('fcm_notifications_enabled') == '1' %}checked{% endif %}>
-                  <label class="form-check-label" for="notifEnabled">
-                    Enable pour push notifications
-                  </label>
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label fw-semibold">Firebase Service Account JSON</label>
-                {% set _sa_set = settings.get('fcm_service_account_json', '') != '' %}
-                <textarea class="form-control font-monospace" name="service_account_json"
-                          rows="6" placeholder='{"type":"service_account","project_id":"...","private_key":"...",...}'
-                          style="font-size:.75rem;">{% if not _sa_set %}{% endif %}</textarea>
-                {% if _sa_set %}
-                <div class="form-text text-success">
-                  <i class="bi bi-check-circle me-1"></i>Service account is configured.
-                  Leave blank to keep the existing key.
-                </div>
-                {% else %}
-                <div class="form-text text-muted">
-                  Paste the full JSON from Firebase console. Stored only in the local database.
-                </div>
-                {% endif %}
-              </div>
-
-              <div class="d-flex gap-2 align-items-center">
-                <button type="submit" class="btn btn-accent">
-                  <i class="bi bi-save me-1"></i>Save
-                </button>
-                {% if _sa_set %}
-                <button type="submit" name="clear_sa" value="1" class="btn btn-outline-danger btn-sm">
-                  <i class="bi bi-trash me-1"></i>Clear service account
-                </button>
-                {% endif %}
-              </div>
-            </form>
-
-            {% if settings.get('fcm_notifications_enabled') == '1' and _sa_set %}
-            <hr class="border-secondary mt-4">
-            <div class="d-flex align-items-center gap-3">
-              <div>
-                <strong>Registered Devices</strong>
-                <div class="text-muted small" id="device-count">Loading…</div>
-              </div>
-            </div>
-            <script>
-            fetch('/api/v1/devices', {headers:{Authorization:'Bearer ' + (document.cookie.match(/sk_token=([^;]+)/)||[])[1]||''}})
-              .then(r=>r.json()).then(d=>{
-                document.getElementById('device-count').textContent =
-                  (d.tokens?.length || 0) + ' device(s) registered';
-              }).catch(()=>{document.getElementById('device-count').textContent='Sign in to API to view';});
-            </script>
-            {% endif %}
-
-            {% else %}
-            <p class="text-muted small mb-0">
-              <i class="bi bi-lock me-1"></i>Push notification settings are managed by administrators.
-            </p>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <!-- ══════════════════════════════════════════════════════════════
            TAB: ADMINISTRATORS (admin-only)
            ══════════════════════════════════════════════════════════════ -->
       {% if is_admin %}
@@ -607,73 +521,11 @@
               </div>
             </div>
 
-            <hr class="border-secondary">
-
-            <!-- Notification triggers -->
-            <div class="mb-2 fw-semibold"><i class="bi bi-bell me-1"></i>Push Notification Triggers</div>
-            <p class="text-muted small">
-              Configure which events send a push notification to registered Android devices.
-              Firebase must be set up in the <strong>Notifications</strong> tab first.
-            </p>
-            <form method="post" action="/settings/notification-triggers">
-
-              <!-- Pour detected -->
-              <div class="form-check form-switch mb-3">
-                <input class="form-check-input" type="checkbox" id="notifPour"
-                       name="notif_pour_enabled" value="1"
-                       {% if settings.get('notif_pour_enabled') == '1' %}checked{% endif %}>
-                <label class="form-check-label" for="notifPour">
-                  <strong>Pour detected</strong>
-                  <span class="text-muted small d-block">Notify whenever a pour is recorded.</span>
-                </label>
-              </div>
-
-              <!-- Keg running low -->
-              <div class="d-flex align-items-start gap-3 mb-3">
-                <div class="form-check form-switch mt-1 flex-shrink-0">
-                  <input class="form-check-input" type="checkbox" id="notifKeg"
-                         name="notif_keg_threshold_enabled" value="1"
-                         {% if settings.get('notif_keg_threshold_enabled') == '1' %}checked{% endif %}>
-                  <label class="form-check-label" for="notifKeg"></label>
-                </div>
-                <div>
-                  <label class="fw-semibold mb-1" for="notifKeg">Keg running low</label>
-                  <div class="input-group" style="max-width:140px;">
-                    <input type="number" class="form-control form-control-sm"
-                           name="notif_keg_threshold_pct"
-                           value="{{ settings.get('notif_keg_threshold_pct', '20') }}"
-                           min="1" max="99">
-                    <span class="input-group-text">%</span>
-                  </div>
-                  <div class="form-text text-muted">Notify when any keg drops below this percentage.</div>
-                </div>
-              </div>
-
-              <!-- Temperature alert -->
-              <div class="d-flex align-items-start gap-3 mb-4">
-                <div class="form-check form-switch mt-1 flex-shrink-0">
-                  <input class="form-check-input" type="checkbox" id="notifTemp"
-                         name="notif_temp_enabled" value="1"
-                         {% if settings.get('notif_temp_enabled') == '1' %}checked{% endif %}>
-                  <label class="form-check-label" for="notifTemp"></label>
-                </div>
-                <div>
-                  <label class="fw-semibold mb-1" for="notifTemp">Temperature alert</label>
-                  <div class="input-group" style="max-width:140px;">
-                    <input type="number" class="form-control form-control-sm"
-                           name="notif_temp_threshold_f"
-                           value="{{ settings.get('notif_temp_threshold_f', '45') }}"
-                           min="32" max="100">
-                    <span class="input-group-text">°F</span>
-                  </div>
-                  <div class="form-text text-muted">Notify when kegerator temp exceeds this value. Resets when temp returns to normal.</div>
-                </div>
-              </div>
-
-              <button type="submit" class="btn btn-accent btn-sm">
-                <i class="bi bi-save me-1"></i>Save Notification Triggers
-              </button>
-            </form>
+            <div class="alert alert-secondary small mb-0 mt-3 py-2">
+              <i class="bi bi-phone me-1"></i>
+              Notification preferences (pour alerts, keg level, temperature) are configured
+              per-device in the <strong>SmartKegerator Android app</strong> under the bell icon.
+            </div>
           </div>
         </div>
 

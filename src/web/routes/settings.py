@@ -244,31 +244,6 @@ async def detect_sensors():
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Push notification settings
-# ---------------------------------------------------------------------------
-
-@router.post("/notifications", response_class=RedirectResponse)
-async def settings_save_notifications(
-    notifications_enabled: Optional[str] = Form(None),
-    service_account_json:  str           = Form(""),
-    clear_sa:              Optional[str]  = Form(None),
-):
-    db = get_db()
-    db.set_setting("fcm_notifications_enabled", "1" if notifications_enabled else "0")
-    if clear_sa:
-        db.set_setting("fcm_service_account_json", "")
-    elif service_account_json.strip():
-        # Validate it's parseable JSON before storing
-        import json as _json
-        try:
-            _json.loads(service_account_json.strip())
-            db.set_setting("fcm_service_account_json", service_account_json.strip())
-        except ValueError:
-            return RedirectResponse("/settings/?error=invalid_json&tab=notifications", status_code=303)
-    return RedirectResponse("/settings/?saved=1&tab=notifications", status_code=303)
-
-
-# ---------------------------------------------------------------------------
 # Admin session timeout
 # ---------------------------------------------------------------------------
 
@@ -301,35 +276,6 @@ async def settings_save_server_port(
     cfg.setdefault("web", {})
     cfg["web"]["port"] = max(1024, min(65535, port))
     _write_yaml(cfg)
-    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
-
-
-# ---------------------------------------------------------------------------
-# Notification triggers
-# ---------------------------------------------------------------------------
-
-@router.post("/notification-triggers", response_class=RedirectResponse)
-async def settings_save_notification_triggers(
-    notif_pour_enabled:          Optional[str] = Form(None),
-    notif_keg_threshold_enabled: Optional[str] = Form(None),
-    notif_keg_threshold_pct:     str           = Form("20"),
-    notif_temp_enabled:          Optional[str] = Form(None),
-    notif_temp_threshold_f:      str           = Form("45"),
-):
-    db = get_db()
-    db.set_setting("notif_pour_enabled",          "1" if notif_pour_enabled          else "0")
-    db.set_setting("notif_keg_threshold_enabled", "1" if notif_keg_threshold_enabled else "0")
-    try:
-        pct = max(1, min(99, int(notif_keg_threshold_pct)))
-    except ValueError:
-        pct = 20
-    db.set_setting("notif_keg_threshold_pct", str(pct))
-    db.set_setting("notif_temp_enabled", "1" if notif_temp_enabled else "0")
-    try:
-        temp_f = max(32, min(100, int(notif_temp_threshold_f)))
-    except ValueError:
-        temp_f = 45
-    db.set_setting("notif_temp_threshold_f", str(temp_f))
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 

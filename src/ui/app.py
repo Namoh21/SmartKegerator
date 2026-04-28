@@ -86,7 +86,6 @@ class App(QObject):
         self._current_user_id:   Optional[int] = None
         self._current_user_name: str            = ""
         self._is_admin:          bool           = False
-        self._temp_alert_armed:  bool           = True  # cleared after sending, reset when temp recovers
 
         # 20 s after pour ends, log out (unless the user interacts first)
         self._post_pour_timer = QTimer()
@@ -351,17 +350,10 @@ class App(QObject):
                 price=price,
             )
             self._db.add_pour(pour)
-            keg_updated = self._db.get_keg(keg.id)  # reload to get updated liters_poured
             log.info(
                 "Pour saved: tap=%s ticks=%d %.1f oz $%.2f user=%s",
                 tap, ticks, ounces, price, user_id,
             )
-            import threading
-            threading.Thread(
-                target=self._send_notifications_after_pour,
-                args=(pour, keg_updated, user_id),
-                daemon=True,
-            ).start()
         else:
             log.info("Pour finished with no ticks or no keg — nothing saved")
 
@@ -375,83 +367,20 @@ class App(QObject):
         self._main_window.refresh()
 
     # ------------------------------------------------------------------
-    # Push notifications
+    # Sensor data — stored to DB so the REST API can serve it
     # ------------------------------------------------------------------
 
-    def _send_notifications_after_pour(self, pour, keg, user_id) -> None:
-        try:
-            service_json = self._db.get_setting("fcm_service_account_json", "")
-            fcm_enabled  = self._db.get_setting("fcm_notifications_enabled", "0")
-            if not service_json or fcm_enabled != "1":
-                return
-            tokens = self._db.get_device_tokens()
-            if not tokens:
-                return
-
-            from notifications.fcm import send_pour_notification, send_keg_low_notification
-
-            if self._db.get_setting("notif_pour_enabled", "0") == "1":
-                user      = self._db.get_user(user_id) if user_id else None
-                beer      = self._db.get_beer(keg.beer_id) if keg else None
-                user_name = user.name if user else "Unknown"
-                beer_name = beer.name if beer else "Unknown Beer"
-                send_pour_notification(
-                    tokens=tokens, user_name=user_name, beer_name=beer_name,
-                    ounces=pour.ounces, price=pour.price,
-                    service_account_json=service_json,
-                )
-
-            if keg and self._db.get_setting("notif_keg_threshold_enabled", "0") == "1":
-                try:
-                    threshold = float(self._db.get_setting("notif_keg_threshold_pct", "20"))
-                except ValueError:
-                    threshold = 20.0
-                if keg.liters_capacity > 0 and keg.percent_remaining <= threshold:
-                    beer = self._db.get_beer(keg.beer_id) if keg else None
-                    send_keg_low_notification(
-                        tokens=tokens,
-                        beer_name=beer.name if beer else "Unknown Beer",
-                        pct_remaining=keg.percent_remaining,
-                        service_account_json=service_json,
-                    )
-        except Exception as exc:
-            log.warning("Push notification error: %s", exc)
-
     def _on_temp_readings(self, ambient_f, humidity_pct, liquid_f) -> None:
-        if liquid_f is None:
-            return
         try:
-            enabled   = self._db.get_setting("notif_temp_enabled", "0") == "1"
-            fcm_on    = self._db.get_setting("fcm_notifications_enabled", "0") == "1"
-            threshold = float(self._db.get_setting("notif_temp_threshold_f", "45"))
-        except Exception:
-            return
-        if not enabled or not fcm_on:
-            self._temp_alert_armed = True
-            return
-        if liquid_f > threshold:
-            if self._temp_alert_armed:
-                self._temp_alert_armed = False
-                import threading
-                threading.Thread(
-                    target=self._send_temp_alert, args=(liquid_f, threshold), daemon=True
-                ).start()
-        else:
-            self._temp_alert_armed = True
-
-    def _send_temp_alert(self, liquid_f: float, threshold_f: float) -> None:
-        try:
-            service_json = self._db.get_setting("fcm_service_account_json", "")
-            tokens = self._db.get_device_tokens()
-            if not service_json or not tokens:
-                return
-            from notifications.fcm import send_temp_alert_notification
-            send_temp_alert_notification(
-                tokens=tokens, temp_f=liquid_f, threshold_f=threshold_f,
-                service_account_json=service_json,
-            )
+            if ambient_f  is not None:
+                self._db.set_setting("latest_ambient_temp_f", f"{ambient_f:.1f}")
+            if humidity_pct is not None:
+                self._db.set_setting("latest_humidity_pct",   f"{humidity_pct:.1f}")
+            if liquid_f   is not None:
+                self._db.set_setting("latest_liquid_temp_f",  f"{liquid_f:.1f}")
+            self._db.set_setting("latest_temp_ts", f"{time.time():.0f}")
         except Exception as exc:
-            log.warning("Temp alert notification error: %s", exc)
+            log.debug("Temp DB store error: %s", exc)
 
     # ------------------------------------------------------------------
     # Navigation
