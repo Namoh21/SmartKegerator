@@ -250,6 +250,25 @@ async def settings_save_admin_timeout(
 
 
 # ---------------------------------------------------------------------------
+# Mobile app access mode
+# ---------------------------------------------------------------------------
+
+@router.post("/mobile-access", response_class=RedirectResponse)
+async def settings_save_mobile_access(
+    mobile_access: str = Form("internal"),
+    internal_url:  str = Form(""),
+    external_url:  str = Form(""),
+):
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    cfg["web"]["mobile_access"] = mobile_access if mobile_access in ("internal", "both") else "internal"
+    cfg["web"]["internal_url"]  = internal_url.strip().rstrip("/")
+    cfg["web"]["external_url"]  = external_url.strip().rstrip("/") if mobile_access == "both" else cfg["web"].get("external_url", "")
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Admin account management (admin-only; middleware enforces POST auth)
 # ---------------------------------------------------------------------------
 

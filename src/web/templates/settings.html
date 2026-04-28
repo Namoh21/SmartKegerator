@@ -494,6 +494,87 @@
           </div>
         </div>
 
+        <!-- Mobile app access -->
+        {% set _mob = yaml_config.get('web', {}) %}
+        {% set _mob_mode = _mob.get('mobile_access', 'internal') %}
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-phone me-2"></i><strong>Mobile App Access</strong></div>
+          <div class="card-body">
+            <form method="post" action="/settings/mobile-access" id="mobileAccessForm">
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Access mode</label>
+                <div class="d-flex flex-column gap-2">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="mobile_access"
+                           id="modeInternal" value="internal"
+                           {% if _mob_mode == 'internal' %}checked{% endif %}
+                           onchange="toggleExternalUrl()">
+                    <label class="form-check-label" for="modeInternal">
+                      <strong>Internal network only</strong>
+                      <span class="text-muted small d-block">Android app connects over your local Wi-Fi network.</span>
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="mobile_access"
+                           id="modeBoth" value="both"
+                           {% if _mob_mode == 'both' %}checked{% endif %}
+                           onchange="toggleExternalUrl()">
+                    <label class="form-check-label" for="modeBoth">
+                      <strong>Internal + External (Cloudflare)</strong>
+                      <span class="text-muted small d-block">Android app can connect both on your local network and remotely over the internet.</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Internal URL
+                  <span class="text-muted fw-normal small ms-1">— LAN address of this Pi</span>
+                </label>
+                <input type="url" class="form-control font-monospace" name="internal_url"
+                       value="{{ _mob.get('internal_url', '') }}"
+                       placeholder="http://192.168.1.100:8080">
+                <div class="form-text text-muted">Used when the phone is on the same Wi-Fi network.</div>
+              </div>
+
+              <div class="mb-3" id="externalUrlRow"
+                   style="{% if _mob_mode != 'both' %}display:none;{% endif %}">
+                <label class="form-label fw-semibold">External URL
+                  <span class="text-muted fw-normal small ms-1">— public Cloudflare address</span>
+                </label>
+                <input type="url" class="form-control font-monospace" name="external_url"
+                       value="{{ _mob.get('external_url', '') }}"
+                       placeholder="https://smartkegerator.peapatchbrewing.com">
+                <div class="form-text text-muted">Used when the phone is away from home.</div>
+              </div>
+
+              <button type="submit" class="btn btn-accent">
+                <i class="bi bi-save me-1"></i>Save
+              </button>
+            </form>
+
+            {% if _mob.get('internal_url') %}
+            <hr class="border-secondary mt-4">
+            <p class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>
+              These URLs will be used by the Android app to connect to this kegerator.
+            </p>
+            <div class="row g-2 small font-monospace">
+              <div class="col-auto">
+                <span class="badge bg-secondary me-1">Internal</span>
+                {{ _mob.get('internal_url', '—') }}
+              </div>
+              {% if _mob_mode == 'both' and _mob.get('external_url') %}
+              <div class="col-auto">
+                <span class="badge bg-secondary me-1">External</span>
+                {{ _mob.get('external_url', '—') }}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
         <!-- Current admins -->
         <div class="card mb-3">
           <div class="card-header"><i class="bi bi-shield-lock me-2"></i><strong>Administrator Accounts</strong></div>
@@ -663,6 +744,12 @@ document.addEventListener('click', function (e) {
     if (inp) inp.value = btn.dataset.id;
   }
 });
+
+function toggleExternalUrl() {
+  const both = document.getElementById('modeBoth');
+  const row  = document.getElementById('externalUrlRow');
+  if (both && row) row.style.display = both.checked ? '' : 'none';
+}
 
 function toggleSecret() {
   const inp  = document.getElementById('secretInput');
