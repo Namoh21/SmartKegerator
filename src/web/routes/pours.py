@@ -4,13 +4,20 @@ import time
 from datetime import datetime
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from web.server import get_db, templates, ctx
 
 router = APIRouter(prefix="/pours")
 
 _PERIODS = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+
+
+@router.post("/{pour_id}/delete", response_class=RedirectResponse)
+async def pour_delete(pour_id: int, request: Request):
+    get_db().delete_pour(pour_id)
+    referer = request.headers.get("referer", "/pours/")
+    return RedirectResponse(referer, status_code=303)
 
 
 @router.get("/", response_class=HTMLResponse)

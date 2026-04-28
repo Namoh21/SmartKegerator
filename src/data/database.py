@@ -271,7 +271,16 @@ class Database:
         return beer
 
     def delete_beer(self, beer_id: int) -> None:
+        """Cascade: clears tap assignments, deletes pours, kegs, then the beer."""
         with self._cursor() as cur:
+            cur.execute("SELECT id FROM kegs WHERE beer_id = ?", (beer_id,))
+            keg_ids = [r["id"] for r in cur.fetchall()]
+            for kid in keg_ids:
+                cur.execute("UPDATE tap_assignments SET keg_id = NULL WHERE keg_id = ?", (kid,))
+                cur.execute("DELETE FROM pours WHERE keg_id = ?", (kid,))
+            if keg_ids:
+                placeholders = ",".join("?" * len(keg_ids))
+                cur.execute(f"DELETE FROM kegs WHERE id IN ({placeholders})", keg_ids)
             cur.execute("DELETE FROM beers WHERE id = ?", (beer_id,))
 
     # ------------------------------------------------------------------
@@ -345,7 +354,10 @@ class Database:
         return keg
 
     def delete_keg(self, keg_id: int) -> None:
+        """Cascade: clears tap assignment and deletes pours before removing keg."""
         with self._cursor() as cur:
+            cur.execute("UPDATE tap_assignments SET keg_id = NULL WHERE keg_id = ?", (keg_id,))
+            cur.execute("DELETE FROM pours WHERE keg_id = ?", (keg_id,))
             cur.execute("DELETE FROM kegs WHERE id = ?", (keg_id,))
 
     # ------------------------------------------------------------------

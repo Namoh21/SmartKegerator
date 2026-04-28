@@ -63,14 +63,14 @@
                       data-bs-toggle="modal" data-bs-target="#editBeer{{ beer.id }}">
                 <i class="bi bi-pencil"></i>
               </button>
-              {% if keg_counts.get(beer.id, 0) == 0 %}
+              {% set _kegs = keg_counts.get(beer.id, 0) %}
               <form method="post" action="/beers/{{ beer.id }}/delete" class="d-inline"
-                    onsubmit="return confirm('Delete {{ beer.name }}?')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    onsubmit="return confirm('Delete {{ beer.name }}?{% if _kegs > 0 %} This will also delete {{ _kegs }} keg(s) and all their pour records.{% endif %}')">
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        title="{% if _kegs > 0 %}Deletes {{ _kegs }} keg(s) and all pours{% else %}Delete beer{% endif %}">
                   <i class="bi bi-trash"></i>
                 </button>
               </form>
-              {% endif %}
               {% endif %}
             </td>
           </tr>

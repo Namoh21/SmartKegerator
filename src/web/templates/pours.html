@@ -92,6 +92,7 @@
             <th>Beer</th>
             <th class="text-end">Amount</th>
             <th class="text-end">Price</th>
+            {% if is_admin %}<th></th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -106,6 +107,16 @@
             <td>{{ row.beer_name }}</td>
             <td class="text-end">{{ row.pour.ounces | oz }}</td>
             <td class="text-end">{{ row.pour.price | usd }}</td>
+            {% if is_admin %}
+            <td class="text-end">
+              <form method="post" action="/pours/{{ row.pour.id }}/delete" class="d-inline"
+                    onsubmit="return confirm('Delete this pour entry?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
