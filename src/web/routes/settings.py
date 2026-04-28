@@ -47,6 +47,18 @@ GPIO_PINS: list[tuple[int, str]] = [
 ]
 
 
+def _get_local_ip() -> str:
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "localhost"
+
+
 def _read_yaml() -> dict:
     path = get_config_path()
     if not path:
@@ -74,11 +86,14 @@ async def settings_page(request: Request):
     settings = db.get_all_settings()
     cfg      = _read_yaml()
     admins   = db.get_all_admins() if request.session.get("admin_username") else []
+    server_ip   = _get_local_ip()
+    server_port = int(cfg.get("web", {}).get("port", 8080))
     return templates.TemplateResponse(
         request,
         "settings.html",
         ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS,
-            admins=admins, themes=THEMES),
+            admins=admins, themes=THEMES,
+            server_ip=server_ip, server_port=server_port),
     )
 
 
@@ -275,21 +290,46 @@ async def settings_save_admin_timeout(
 
 
 # ---------------------------------------------------------------------------
-# Mobile app access mode
+# Web server port
 # ---------------------------------------------------------------------------
 
-@router.post("/mobile-access", response_class=RedirectResponse)
-async def settings_save_mobile_access(
-    mobile_access: str = Form("internal"),
-    internal_url:  str = Form(""),
-    external_url:  str = Form(""),
+@router.post("/server-port", response_class=RedirectResponse)
+async def settings_save_server_port(
+    port: int = Form(8080),
 ):
     cfg = _read_yaml()
     cfg.setdefault("web", {})
-    cfg["web"]["mobile_access"] = mobile_access if mobile_access in ("internal", "both") else "internal"
-    cfg["web"]["internal_url"]  = internal_url.strip().rstrip("/")
-    cfg["web"]["external_url"]  = external_url.strip().rstrip("/") if mobile_access == "both" else cfg["web"].get("external_url", "")
+    cfg["web"]["port"] = max(1024, min(65535, port))
     _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Notification triggers
+# ---------------------------------------------------------------------------
+
+@router.post("/notification-triggers", response_class=RedirectResponse)
+async def settings_save_notification_triggers(
+    notif_pour_enabled:          Optional[str] = Form(None),
+    notif_keg_threshold_enabled: Optional[str] = Form(None),
+    notif_keg_threshold_pct:     str           = Form("20"),
+    notif_temp_enabled:          Optional[str] = Form(None),
+    notif_temp_threshold_f:      str           = Form("45"),
+):
+    db = get_db()
+    db.set_setting("notif_pour_enabled",          "1" if notif_pour_enabled          else "0")
+    db.set_setting("notif_keg_threshold_enabled", "1" if notif_keg_threshold_enabled else "0")
+    try:
+        pct = max(1, min(99, int(notif_keg_threshold_pct)))
+    except ValueError:
+        pct = 20
+    db.set_setting("notif_keg_threshold_pct", str(pct))
+    db.set_setting("notif_temp_enabled", "1" if notif_temp_enabled else "0")
+    try:
+        temp_f = max(32, min(100, int(notif_temp_threshold_f)))
+    except ValueError:
+        temp_f = 45
+    db.set_setting("notif_temp_threshold_f", str(temp_f))
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 

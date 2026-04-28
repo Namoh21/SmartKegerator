@@ -581,83 +581,99 @@
         </div>
 
         <!-- Mobile app access -->
-        {% set _mob = yaml_config.get('web', {}) %}
-        {% set _mob_mode = _mob.get('mobile_access', 'internal') %}
         <div class="card mb-3">
           <div class="card-header"><i class="bi bi-phone me-2"></i><strong>Mobile App Access</strong></div>
           <div class="card-body">
-            <form method="post" action="/settings/mobile-access" id="mobileAccessForm">
 
-              <div class="mb-3">
-                <label class="form-label fw-semibold">Access mode</label>
-                <div class="d-flex flex-column gap-2">
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio" name="mobile_access"
-                           id="modeInternal" value="internal"
-                           {% if _mob_mode == 'internal' %}checked{% endif %}
-                           onchange="toggleExternalUrl()">
-                    <label class="form-check-label" for="modeInternal">
-                      <strong>Internal network only</strong>
-                      <span class="text-muted small d-block">Android app connects over your local Wi-Fi network.</span>
-                    </label>
+            <!-- Server address -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Server address</label>
+              <div class="p-2 rounded border font-monospace mb-2"
+                   style="background:var(--sk-bg); border-color:var(--sk-border) !important;">
+                <span class="text-muted">http://</span><strong>{{ server_ip }}</strong><span class="text-muted">:</span><strong>{{ server_port }}</strong>
+              </div>
+              <form method="post" action="/settings/server-port" class="d-flex align-items-center gap-2">
+                <label class="text-muted small mb-0 text-nowrap">Change port:</label>
+                <input type="number" class="form-control form-control-sm font-monospace"
+                       name="port" value="{{ server_port }}" min="1024" max="65535"
+                       style="width:100px;">
+                <button type="submit" class="btn btn-accent btn-sm text-nowrap">
+                  <i class="bi bi-save me-1"></i>Save Port
+                </button>
+              </form>
+              <div class="form-text text-muted mt-1">
+                Enter <code>http://{{ server_ip }}:{{ server_port }}</code> in the Android app setup screen.
+                Changing the port requires a service restart.
+              </div>
+            </div>
+
+            <hr class="border-secondary">
+
+            <!-- Notification triggers -->
+            <div class="mb-2 fw-semibold"><i class="bi bi-bell me-1"></i>Push Notification Triggers</div>
+            <p class="text-muted small">
+              Configure which events send a push notification to registered Android devices.
+              Firebase must be set up in the <strong>Notifications</strong> tab first.
+            </p>
+            <form method="post" action="/settings/notification-triggers">
+
+              <!-- Pour detected -->
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="notifPour"
+                       name="notif_pour_enabled" value="1"
+                       {% if settings.get('notif_pour_enabled') == '1' %}checked{% endif %}>
+                <label class="form-check-label" for="notifPour">
+                  <strong>Pour detected</strong>
+                  <span class="text-muted small d-block">Notify whenever a pour is recorded.</span>
+                </label>
+              </div>
+
+              <!-- Keg running low -->
+              <div class="d-flex align-items-start gap-3 mb-3">
+                <div class="form-check form-switch mt-1 flex-shrink-0">
+                  <input class="form-check-input" type="checkbox" id="notifKeg"
+                         name="notif_keg_threshold_enabled" value="1"
+                         {% if settings.get('notif_keg_threshold_enabled') == '1' %}checked{% endif %}>
+                  <label class="form-check-label" for="notifKeg"></label>
+                </div>
+                <div>
+                  <label class="fw-semibold mb-1" for="notifKeg">Keg running low</label>
+                  <div class="input-group" style="max-width:140px;">
+                    <input type="number" class="form-control form-control-sm"
+                           name="notif_keg_threshold_pct"
+                           value="{{ settings.get('notif_keg_threshold_pct', '20') }}"
+                           min="1" max="99">
+                    <span class="input-group-text">%</span>
                   </div>
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio" name="mobile_access"
-                           id="modeBoth" value="both"
-                           {% if _mob_mode == 'both' %}checked{% endif %}
-                           onchange="toggleExternalUrl()">
-                    <label class="form-check-label" for="modeBoth">
-                      <strong>Internal + External (Cloudflare)</strong>
-                      <span class="text-muted small d-block">Android app can connect both on your local network and remotely over the internet.</span>
-                    </label>
-                  </div>
+                  <div class="form-text text-muted">Notify when any keg drops below this percentage.</div>
                 </div>
               </div>
 
-              <div class="mb-3">
-                <label class="form-label fw-semibold">Internal URL
-                  <span class="text-muted fw-normal small ms-1">— LAN address of this Pi</span>
-                </label>
-                <input type="url" class="form-control font-monospace" name="internal_url"
-                       value="{{ _mob.get('internal_url', '') }}"
-                       placeholder="http://192.168.1.100:8080">
-                <div class="form-text text-muted">Used when the phone is on the same Wi-Fi network.</div>
+              <!-- Temperature alert -->
+              <div class="d-flex align-items-start gap-3 mb-4">
+                <div class="form-check form-switch mt-1 flex-shrink-0">
+                  <input class="form-check-input" type="checkbox" id="notifTemp"
+                         name="notif_temp_enabled" value="1"
+                         {% if settings.get('notif_temp_enabled') == '1' %}checked{% endif %}>
+                  <label class="form-check-label" for="notifTemp"></label>
+                </div>
+                <div>
+                  <label class="fw-semibold mb-1" for="notifTemp">Temperature alert</label>
+                  <div class="input-group" style="max-width:140px;">
+                    <input type="number" class="form-control form-control-sm"
+                           name="notif_temp_threshold_f"
+                           value="{{ settings.get('notif_temp_threshold_f', '45') }}"
+                           min="32" max="100">
+                    <span class="input-group-text">°F</span>
+                  </div>
+                  <div class="form-text text-muted">Notify when kegerator temp exceeds this value. Resets when temp returns to normal.</div>
+                </div>
               </div>
 
-              <div class="mb-3" id="externalUrlRow"
-                   style="{% if _mob_mode != 'both' %}display:none;{% endif %}">
-                <label class="form-label fw-semibold">External URL
-                  <span class="text-muted fw-normal small ms-1">— public Cloudflare address</span>
-                </label>
-                <input type="url" class="form-control font-monospace" name="external_url"
-                       value="{{ _mob.get('external_url', '') }}"
-                       placeholder="https://smartkegerator.peapatchbrewing.com">
-                <div class="form-text text-muted">Used when the phone is away from home.</div>
-              </div>
-
-              <button type="submit" class="btn btn-accent">
-                <i class="bi bi-save me-1"></i>Save
+              <button type="submit" class="btn btn-accent btn-sm">
+                <i class="bi bi-save me-1"></i>Save Notification Triggers
               </button>
             </form>
-
-            {% if _mob.get('internal_url') %}
-            <hr class="border-secondary mt-4">
-            <p class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>
-              These URLs will be used by the Android app to connect to this kegerator.
-            </p>
-            <div class="row g-2 small font-monospace">
-              <div class="col-auto">
-                <span class="badge bg-secondary me-1">Internal</span>
-                {{ _mob.get('internal_url', '—') }}
-              </div>
-              {% if _mob_mode == 'both' and _mob.get('external_url') %}
-              <div class="col-auto">
-                <span class="badge bg-secondary me-1">External</span>
-                {{ _mob.get('external_url', '—') }}
-              </div>
-              {% endif %}
-            </div>
-            {% endif %}
           </div>
         </div>
 
@@ -830,12 +846,6 @@ document.addEventListener('click', function (e) {
     if (inp) inp.value = btn.dataset.id;
   }
 });
-
-function toggleExternalUrl() {
-  const both = document.getElementById('modeBoth');
-  const row  = document.getElementById('externalUrlRow');
-  if (both && row) row.style.display = both.checked ? '' : 'none';
-}
 
 function toggleSecret() {
   const inp  = document.getElementById('secretInput');

@@ -101,3 +101,87 @@ def send_pour_notification(
 
     log.info("fcm: notified %d/%d device(s) — pour by %s", sent, len(tokens), user_name)
     return sent
+
+
+def send_keg_low_notification(
+    *,
+    tokens:               list[str],
+    beer_name:            str,
+    pct_remaining:        float,
+    service_account_json: str,
+) -> int:
+    if not tokens or not service_account_json.strip():
+        return 0
+    result = _access_token(service_account_json)
+    if result is None:
+        return 0
+    bearer, project_id = result
+
+    import httpx
+    url     = _FCM_URL.format(project_id=project_id)
+    headers = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+    body    = f"{beer_name} is running low — {pct_remaining:.0f}% remaining."
+
+    sent = 0
+    for token in tokens:
+        payload = {
+            "message": {
+                "token": token,
+                "notification": {"title": "⚠️ Keg Running Low", "body": body},
+                "data": {"beer_name": beer_name, "pct_remaining": f"{pct_remaining:.1f}"},
+                "android": {"priority": "high", "notification": {"sound": "default", "channel_id": "pours"}},
+            }
+        }
+        try:
+            r = httpx.post(url, json=payload, headers=headers, timeout=10.0)
+            if r.status_code == 200:
+                sent += 1
+            else:
+                log.warning("fcm: keg-low send failed (status %d): %s", r.status_code, r.text[:200])
+        except Exception as exc:
+            log.warning("fcm: keg-low send error: %s", exc)
+
+    log.info("fcm: keg-low — notified %d/%d device(s)", sent, len(tokens))
+    return sent
+
+
+def send_temp_alert_notification(
+    *,
+    tokens:               list[str],
+    temp_f:               float,
+    threshold_f:          float,
+    service_account_json: str,
+) -> int:
+    if not tokens or not service_account_json.strip():
+        return 0
+    result = _access_token(service_account_json)
+    if result is None:
+        return 0
+    bearer, project_id = result
+
+    import httpx
+    url     = _FCM_URL.format(project_id=project_id)
+    headers = {"Authorization": f"Bearer {bearer}", "Content-Type": "application/json"}
+    body    = f"Kegerator temp is {temp_f:.1f}°F — above your {threshold_f:.0f}°F alert threshold."
+
+    sent = 0
+    for token in tokens:
+        payload = {
+            "message": {
+                "token": token,
+                "notification": {"title": "🌡️ Temperature Alert", "body": body},
+                "data": {"temp_f": f"{temp_f:.1f}", "threshold_f": f"{threshold_f:.1f}"},
+                "android": {"priority": "high", "notification": {"sound": "default", "channel_id": "pours"}},
+            }
+        }
+        try:
+            r = httpx.post(url, json=payload, headers=headers, timeout=10.0)
+            if r.status_code == 200:
+                sent += 1
+            else:
+                log.warning("fcm: temp-alert send failed (status %d): %s", r.status_code, r.text[:200])
+        except Exception as exc:
+            log.warning("fcm: temp-alert send error: %s", exc)
+
+    log.info("fcm: temp-alert %.1f°F — notified %d/%d device(s)", temp_f, sent, len(tokens))
+    return sent

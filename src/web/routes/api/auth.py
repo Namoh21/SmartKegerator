@@ -27,11 +27,9 @@ class TokenResponse(BaseModel):
 
 
 class ConfigResponse(BaseModel):
-    site_name:     str
-    theme:         str
-    mobile_access: str
-    internal_url:  str
-    external_url:  str
+    site_name:   str
+    theme:       str
+    server_url:  str   # http://{lan_ip}:{port} — for Android setup screen display
 
 
 # ---------------------------------------------------------------------------
@@ -59,13 +57,19 @@ async def me(payload: dict = Depends(require_admin)):
 @router.get("/config", response_model=ConfigResponse)
 async def get_app_config():
     """Return site-level settings the Android app needs at startup."""
-    cfg = get_config()
-    ui  = cfg.get("ui",  {})
-    web = cfg.get("web", {})
+    import socket
+    cfg  = get_config()
+    ui   = cfg.get("ui",  {})
+    port = int(cfg.get("web", {}).get("port", 8080))
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        ip = "localhost"
     return ConfigResponse(
-        site_name     = ui.get("name",           "SmartKegerator"),
-        theme         = ui.get("theme",          "dark_blue"),
-        mobile_access = web.get("mobile_access", "internal"),
-        internal_url  = web.get("internal_url",  ""),
-        external_url  = web.get("external_url",  ""),
+        site_name  = ui.get("name",  "SmartKegerator"),
+        theme      = ui.get("theme", "dark_blue"),
+        server_url = f"http://{ip}:{port}",
     )
