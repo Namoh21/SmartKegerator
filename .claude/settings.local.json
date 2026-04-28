@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(curl -si http://<pi-ip>:8080/kegs/assign-tap -X POST -H 'Content-Type: application/x-www-form-urlencoded' -H 'Origin: http://evil.example.com' -H 'Referer: http://evil.example.com/' --data 'tap=tap1&keg_id=none' --max-time 5)"
+    ]
+  }
+}

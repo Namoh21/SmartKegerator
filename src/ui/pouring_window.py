@@ -111,7 +111,7 @@ class PouringWindow(QWidget):
         font.setPointSize(20)
         font.setWeight(QFont.Weight.Bold)
         self._lbl_title.setFont(font)
-        self._lbl_title.setStyleSheet(f"color: {_ACCENT};")
+        self._lbl_title.setStyleSheet(f"color: {self._c['accent']};")
         row.addWidget(self._lbl_title)
 
         row.addStretch()

@@ -49,7 +49,7 @@ def _build_style(c: dict) -> str:
         font-family: 'DejaVu Sans', Arial, sans-serif;
     }}
     QTableWidget {{
-        background-color: {_CARD_BG};
+        background-color: {c['card']};
         alternate-background-color: #1e1e3a;
         gridline-color: #2a2a4e;
         border: 1px solid {c['border']};

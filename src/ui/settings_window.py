@@ -117,7 +117,7 @@ class SettingsWindow(QDialog):
         f.setPointSize(16)
         f.setWeight(QFont.Weight.Bold)
         title.setFont(f)
-        title.setStyleSheet(f"color: {_ACCENT};")
+        title.setStyleSheet(f"color: {self._c['accent']};")
         row.addWidget(title)
 
         row.addStretch()
@@ -246,7 +246,7 @@ class SettingsWindow(QDialog):
 
         if self._config_path:
             path_lbl = QLabel(f"Config: {self._config_path}")
-            path_lbl.setStyleSheet(f"color: {_MUTED}; font-size: 11px;")
+            path_lbl.setStyleSheet(f"color: {self._c['muted']}; font-size: 11px;")
             row.addWidget(path_lbl)
         row.addStretch()
 

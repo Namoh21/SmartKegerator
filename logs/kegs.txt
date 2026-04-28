@@ -1,0 +1,269 @@
+{
+    LeftKegId:-1
+    RightKegId:-1
+    CenterKegId:-1
+}
+{
+    BeerId:0
+    DateBought:2/15/14
+    Id:0
+    LitersCapacity:18.92700
+    Price:93.00000
+    WarmestTemp:72.00000
+}
+{
+    BeerId:1
+    DateBought:3/9/14
+    Id:1
+    LitersCapacity:18.92705
+    Price:105.00000
+    WarmestTemp:72.00000
+}
+{
+    BeerId:0
+    DateBought:3/9/14
+    Id:2
+    LitersCapacity:18.92700
+    Price:93.00000
+    WarmestTemp:72.00000
+}
+{
+    BeerId:0
+    DateBought:4/9/14
+    Id:3
+    LitersCapacity:18.92705
+    Price:93.00000
+    WarmestTemp:72.00000
+}
+{
+    BeerId:2
+    DateBought:7/12/14
+    Id:4
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:72.00000
+}
+{
+    BeerId:0
+    DateBought:7/13/14
+    Id:5
+    LitersCapacity:18.92700
+    Price:90.00000
+    WarmestTemp:72.00000
+}
+{
+    BeerId:0
+    DateBought:3/9/15
+    Id:6
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:0
+    DateBought:9/12/15
+    Id:7
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:3
+    DateBought:9/13/15
+    Id:8
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:3
+    DateBought:9/13/15
+    Id:9
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:3
+    DateBought:9/13/15
+    Id:10
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:3
+    DateBought:9/13/15
+    Id:11
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:3
+    DateBought:9/13/15
+    Id:12
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/13/15
+    Id:13
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/13/15
+    Id:14
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/13/15
+    Id:15
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:0
+    DateBought:9/13/15
+    Id:16
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/13/15
+    Id:17
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:0
+    DateBought:9/13/15
+    Id:18
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/13/15
+    Id:19
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:0
+    DateBought:9/18/15
+    Id:20
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:1
+    DateBought:9/18/15
+    Id:21
+    LitersCapacity:18.92705
+    Price:105.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:1
+    DateBought:9/18/15
+    Id:22
+    LitersCapacity:18.92705
+    Price:105.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:0
+    DateBought:9/18/15
+    Id:23
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:0
+    DateBought:9/19/15
+    Id:24
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:1
+    DateBought:9/19/15
+    Id:25
+    LitersCapacity:18.92705
+    Price:105.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/19/15
+    Id:26
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:1
+    DateBought:9/19/15
+    Id:27
+    LitersCapacity:18.92705
+    Price:105.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:1
+    DateBought:9/19/15
+    Id:28
+    LitersCapacity:18.92705
+    Price:105.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:0
+    DateBought:9/19/15
+    Id:29
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:1
+    DateBought:9/19/15
+    Id:30
+    LitersCapacity:18.92705
+    Price:105.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/19/15
+    Id:31
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}
+{
+    BeerId:2
+    DateBought:9/19/15
+    Id:32
+    LitersCapacity:18.92705
+    Price:90.00000
+    WarmestTemp:0.00000
+}

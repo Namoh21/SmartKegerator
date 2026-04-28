@@ -60,6 +60,32 @@ THEMES: dict[str, dict] = {
         "border": "#333333",
         "deep":   "#000000",
     },
+    "fc_cincinnati": {
+        "label":  "FC Cincinnati",
+        "bg":     "#000e1f",
+        "card":   "#001a38",
+        "accent": "#f26522",
+        "text":   "#ffffff",
+        "muted":  "#7a99cc",
+        "ok":     "#2ecc71",
+        "warn":   "#f26522",
+        "err":    "#e74c3c",
+        "border": "#002855",
+        "deep":   "#000a14",
+    },
+    "dark_orange": {
+        "label":  "Dark Orange",
+        "bg":     "#1a0f00",
+        "card":   "#261500",
+        "accent": "#ff7b00",
+        "text":   "#fff4e6",
+        "muted":  "#aa8866",
+        "ok":     "#2ecc71",
+        "warn":   "#ff7b00",
+        "err":    "#e74c3c",
+        "border": "#3d2200",
+        "deep":   "#0d0700",
+    },
 }
 
 _DEFAULT = "dark_blue"
