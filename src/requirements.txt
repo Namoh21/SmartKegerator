@@ -35,3 +35,4 @@ aiofiles>=23.0.0           # static file serving
 httpx>=0.27.0              # async HTTP client for Untappd API proxy
 itsdangerous>=2.1.0        # required by SessionMiddleware (optional dep of starlette)
 PyJWT>=2.8.0               # JWT tokens for the mobile REST API
+google-auth>=2.29.0        # FCM push notifications (OAuth2 for service account)

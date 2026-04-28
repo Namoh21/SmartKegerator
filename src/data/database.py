@@ -104,6 +104,14 @@ CREATE TABLE IF NOT EXISTS admins (
     user_id       INTEGER REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS device_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    token      TEXT    NOT NULL UNIQUE,
+    platform   TEXT    NOT NULL DEFAULT 'android',
+    label      TEXT    NOT NULL DEFAULT '',
+    created_at REAL    NOT NULL DEFAULT 0.0
+);
+
 CREATE INDEX IF NOT EXISTS idx_pours_time    ON pours(time);
 CREATE INDEX IF NOT EXISTS idx_pours_keg     ON pours(keg_id);
 CREATE INDEX IF NOT EXISTS idx_pours_user    ON pours(user_id);
@@ -656,6 +664,27 @@ class Database:
     def delete_face_encodings_for_user(self, user_id: int) -> None:
         with self._cursor() as cur:
             cur.execute("DELETE FROM face_encodings WHERE user_id = ?", (user_id,))
+
+    # ------------------------------------------------------------------
+    # Device tokens (FCM push notifications)
+    # ------------------------------------------------------------------
+
+    def add_device_token(self, token: str, platform: str = "android", label: str = "") -> None:
+        with self._cursor() as cur:
+            cur.execute(
+                "INSERT INTO device_tokens (token, platform, label, created_at) VALUES (?, ?, ?, ?)"
+                " ON CONFLICT(token) DO UPDATE SET label = excluded.label, created_at = excluded.created_at",
+                (token, platform, label, time.time()),
+            )
+
+    def remove_device_token(self, token: str) -> None:
+        with self._cursor() as cur:
+            cur.execute("DELETE FROM device_tokens WHERE token = ?", (token,))
+
+    def get_device_tokens(self) -> list[str]:
+        with self._cursor() as cur:
+            cur.execute("SELECT token FROM device_tokens ORDER BY created_at")
+            return [r["token"] for r in cur.fetchall()]
 
 
 # ---------------------------------------------------------------------------

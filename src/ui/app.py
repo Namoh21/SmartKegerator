@@ -353,6 +353,13 @@ class App(QObject):
                 "Pour saved: tap=%s ticks=%d %.1f oz $%.2f user=%s",
                 tap, ticks, ounces, price, user_id,
             )
+            # Push notification — runs in a daemon thread so it never blocks the UI
+            import threading
+            threading.Thread(
+                target=self._send_pour_notification,
+                args=(pour, beer, user_id),
+                daemon=True,
+            ).start()
         else:
             log.info("Pour finished with no ticks or no keg — nothing saved")
 
@@ -364,6 +371,34 @@ class App(QObject):
         self._pouring_window.hide()
         self._main_window.show()
         self._main_window.refresh()
+
+    # ------------------------------------------------------------------
+    # Push notifications
+    # ------------------------------------------------------------------
+
+    def _send_pour_notification(self, pour, beer, user_id) -> None:
+        try:
+            service_json = self._db.get_setting("fcm_service_account_json", "")
+            notifications_enabled = self._db.get_setting("fcm_notifications_enabled", "0")
+            if not service_json or notifications_enabled != "1":
+                return
+            tokens = self._db.get_device_tokens()
+            if not tokens:
+                return
+            user      = self._db.get_user(user_id) if user_id else None
+            user_name = user.name if user else "Unknown"
+            beer_name = beer.name if beer else "Unknown Beer"
+            from notifications.fcm import send_pour_notification
+            send_pour_notification(
+                tokens               = tokens,
+                user_name            = user_name,
+                beer_name            = beer_name,
+                ounces               = pour.ounces,
+                price                = pour.price,
+                service_account_json = service_json,
+            )
+        except Exception as exc:
+            log.warning("Push notification error: %s", exc)
 
     # ------------------------------------------------------------------
     # Navigation

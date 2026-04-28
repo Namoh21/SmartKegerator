@@ -229,6 +229,31 @@ async def detect_sensors():
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Push notification settings
+# ---------------------------------------------------------------------------
+
+@router.post("/notifications", response_class=RedirectResponse)
+async def settings_save_notifications(
+    notifications_enabled: Optional[str] = Form(None),
+    service_account_json:  str           = Form(""),
+    clear_sa:              Optional[str]  = Form(None),
+):
+    db = get_db()
+    db.set_setting("fcm_notifications_enabled", "1" if notifications_enabled else "0")
+    if clear_sa:
+        db.set_setting("fcm_service_account_json", "")
+    elif service_account_json.strip():
+        # Validate it's parseable JSON before storing
+        import json as _json
+        try:
+            _json.loads(service_account_json.strip())
+            db.set_setting("fcm_service_account_json", service_account_json.strip())
+        except ValueError:
+            return RedirectResponse("/settings/?error=invalid_json&tab=notifications", status_code=303)
+    return RedirectResponse("/settings/?saved=1&tab=notifications", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Admin session timeout
 # ---------------------------------------------------------------------------
 
