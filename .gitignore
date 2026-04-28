@@ -19,6 +19,9 @@ env/
 *.db-shm
 *.db-wal
 
+# Runtime logs and exported data
+logs/
+
 # User photos and media (large binary data — store separately)
 photos/
 videos/
