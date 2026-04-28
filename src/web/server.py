@@ -34,6 +34,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from data.database import Database
 from ui.theme import site_name as _site_name, css_vars as _css_vars
 
@@ -187,7 +189,7 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
     - POST/PUT/DELETE/PATCH: require an active admin session.
     - GET requests and static files: always public.
     """
-    _SKIP_PREFIXES = ("/photos/",)
+    _SKIP_PREFIXES = ("/photos/", "/api/")
     _PUBLIC_POSTS  = {"/admin/login", "/admin/setup", "/admin/logout",
                       "/register", "/logout"}
 
@@ -235,6 +237,14 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# CORS — allows the Android app and any external API consumers to reach /api/v1/*
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
 # Order matters: last add_middleware = outermost = runs first on requests
 app.add_middleware(_SecurityHeaders)
 app.add_middleware(_AdminAuthMiddleware)
@@ -270,6 +280,7 @@ def ctx(request: Request, **kwargs) -> dict:
 # Register routers — imported after ctx/templates are defined to avoid circular import
 from web.routes import dashboard, beers, kegs, users, pours, settings, untappd  # noqa: E402
 from web.routes import admin, auth                                                # noqa: E402
+from web.routes.api import router as api_router                                   # noqa: E402
 
 app.include_router(dashboard.router)
 app.include_router(beers.router)
@@ -280,6 +291,7 @@ app.include_router(settings.router)
 app.include_router(untappd.router)
 app.include_router(admin.router)
 app.include_router(auth.router)
+app.include_router(api_router)
 
 
 # ---------------------------------------------------------------------------
