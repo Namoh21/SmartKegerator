@@ -33,6 +33,9 @@ src/config.yaml
 # Session secret — auto-generated on first run, must not be in version control
 src/web/.session_secret
 
+# Claude Code local settings (tool-specific, may contain local paths/IPs)
+.claude/settings.local.json
+
 # IDE
 .vscode/
 .idea/
