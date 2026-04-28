@@ -462,6 +462,38 @@
       {% if is_admin %}
       <div class="tab-pane fade {% if active_tab == 'admins' %}show active{% endif %}" id="pane-admins">
 
+        <!-- Session timeout -->
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-clock-history me-2"></i><strong>Admin Session Timeout</strong></div>
+          <div class="card-body">
+            <form method="post" action="/settings/admin-timeout">
+              <div class="row align-items-end g-3">
+                <div class="col-auto">
+                  <label class="form-label fw-semibold mb-1">Auto log out after</label>
+                  {% set _timeout = yaml_config.get('web', {}).get('admin_timeout_minutes') %}
+                  <select class="form-select" name="admin_timeout_minutes" style="min-width:160px;">
+                    <option value="" {% if not _timeout %}selected{% endif %}>No timeout</option>
+                    {% for mins, label in [(2,'2 minutes'),(5,'5 minutes'),(15,'15 minutes'),(30,'30 minutes'),(60,'1 hour')] %}
+                    <option value="{{ mins }}" {% if _timeout == mins %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <button type="submit" class="btn btn-accent">
+                    <i class="bi bi-save me-1"></i>Save
+                  </button>
+                </div>
+                <div class="col">
+                  <p class="text-muted small mb-0">
+                    Inactive admin sessions are logged out automatically.
+                    The timer resets on each page visit.
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <!-- Current admins -->
         <div class="card mb-3">
           <div class="card-header"><i class="bi bi-shield-lock me-2"></i><strong>Administrator Accounts</strong></div>

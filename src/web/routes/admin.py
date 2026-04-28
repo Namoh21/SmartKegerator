@@ -18,7 +18,8 @@ _SETUP_ERRORS = {
 }
 
 _LOGIN_ERRORS = {
-    "1": "Invalid username or password.",
+    "1":       "Invalid username or password.",
+    "expired": "Your session has timed out. Please log in again.",
 }
 
 
@@ -99,8 +100,10 @@ async def login_submit(
 
     admin = db.get_admin_by_username(username)
     if admin and verify_password(password, admin["password_hash"]):
+        import time as _time
         request.session["admin_username"] = admin["username"]
         request.session["admin_id"]       = admin["id"]
+        request.session["login_time"]     = _time.time()
         if admin.get("user_id"):
             linked = db.get_user(admin["user_id"])
             if linked:

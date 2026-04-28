@@ -206,6 +206,17 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
         except Exception:
             pass  # DB not ready yet during startup
 
+        # Admin session timeout — sliding window
+        if request.session.get("admin_username"):
+            timeout_mins = _config.get("web", {}).get("admin_timeout_minutes")
+            if timeout_mins:
+                login_time = request.session.get("login_time", 0)
+                if time.time() - login_time > timeout_mins * 60:
+                    request.session.clear()
+                    return RedirectResponse("/admin/login?expired=1", status_code=303)
+                else:
+                    request.session["login_time"] = time.time()
+
         # Protect all mutation requests
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
             if path not in self._PUBLIC_POSTS:

@@ -229,6 +229,27 @@ async def detect_sensors():
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
+# Admin session timeout
+# ---------------------------------------------------------------------------
+
+@router.post("/admin-timeout", response_class=RedirectResponse)
+async def settings_save_admin_timeout(
+    admin_timeout_minutes: str = Form(""),
+):
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    if admin_timeout_minutes.strip():
+        try:
+            cfg["web"]["admin_timeout_minutes"] = int(admin_timeout_minutes)
+        except ValueError:
+            cfg["web"]["admin_timeout_minutes"] = None
+    else:
+        cfg["web"]["admin_timeout_minutes"] = None
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Admin account management (admin-only; middleware enforces POST auth)
 # ---------------------------------------------------------------------------
 
