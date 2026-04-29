@@ -271,7 +271,7 @@ else
     # The wheel filename encodes the dlib version, Python ABI tag, and CPU
     # architecture — so the same URL works on any 64-bit Pi OS image without
     # any configuration.  Falls back to building from source if unavailable.
-    DLIB_VERSION="19.24.6"
+    DLIB_VERSION="20.0.1"
     PY_TAG=$(${PYTHON} -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
     ARCH=$(uname -m)   # aarch64 on 64-bit Pi OS
     WHEEL_NAME="dlib-${DLIB_VERSION}-${PY_TAG}-${PY_TAG}-linux_${ARCH}.whl"
