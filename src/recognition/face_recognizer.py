@@ -95,6 +95,14 @@ class FaceRecognizer(QObject):
             target=self._recognition_loop, name="face-rec", daemon=True
         )
         self._thread.start()
+
+        # Reload encodings every 60 s to pick up photos added via the web UI
+        from PyQt6.QtCore import QTimer
+        self._reload_timer = QTimer(self)
+        self._reload_timer.setInterval(60_000)
+        self._reload_timer.timeout.connect(self._load_encodings)
+        self._reload_timer.start()
+
         log.info(
             "FaceRecognizer started — %d known face encoding(s), model=%s, threshold=%.2f",
             len(self._known_encodings), self._model, self._threshold,
@@ -267,3 +275,52 @@ class FaceRecognizer(QObject):
     @property
     def known_user_count(self) -> int:
         return len(set(self._known_user_ids))
+
+
+# ---------------------------------------------------------------------------
+# Standalone helper — callable from the web server (no Qt event loop needed)
+# ---------------------------------------------------------------------------
+
+def train_user_sync(db, config: dict, user_id: int) -> tuple[int, str]:
+    """
+    Encode all photos for *user_id* and persist them to the database.
+    Returns (num_encodings, error_message).  error_message is "" on success.
+
+    Safe to call from any thread or async context — does not require Qt.
+    The live FaceRecognizer picks up the new encodings within 60 seconds
+    via its periodic reload timer.
+    """
+    if not _FR_AVAILABLE:
+        return 0, "face_recognition library not available on this system"
+
+    user = db.get_user(user_id)
+    if not user:
+        return 0, "user not found"
+
+    model   = config.get("recognition", {}).get("detection_model", "hog")
+    results: list[tuple[str, np.ndarray]] = []
+
+    for img_path in user.image_paths:
+        p = Path(img_path)
+        if not p.exists():
+            log.warning("train_user_sync: image not found: %s", img_path)
+            continue
+        try:
+            img       = _fr.load_image_file(str(p))
+            locations = _fr.face_locations(img, model=model)
+            if not locations:
+                log.warning("train_user_sync: no face in %s", img_path)
+                continue
+            largest = max(locations, key=lambda loc: (loc[2] - loc[0]) * (loc[1] - loc[3]))
+            encs    = _fr.face_encodings(img, [largest])
+            if encs:
+                results.append((img_path, encs[0]))
+        except Exception as exc:
+            log.warning("train_user_sync: failed to encode %s: %s", img_path, exc)
+
+    if not results:
+        return 0, f"no usable faces found in {len(user.image_paths)} photo(s)"
+
+    db.save_face_encodings(user_id, results)
+    log.info("train_user_sync: stored %d encoding(s) for user %d", len(results), user_id)
+    return len(results), ""

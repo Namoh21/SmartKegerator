@@ -153,6 +153,78 @@
 </div>
 
 {% if is_admin %}
+<!-- ── Face Recognition Photos ───────────────────────────────────────── -->
+<div class="card mt-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-person-bounding-box me-1"></i>
+    <strong>Face Recognition Photos</strong>
+    <span id="train-result" class="ms-auto small"></span>
+  </div>
+  <div class="card-body">
+
+    {% if photo_items %}
+    <!-- Thumbnail grid -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      {% for path, url in photo_items %}
+      <div class="position-relative">
+        <img src="{{ url }}" alt="Photo"
+             class="rounded border"
+             style="width:110px;height:110px;object-fit:cover;object-position:top;">
+        <form method="post" action="/users/{{ user.id }}/photos/delete"
+              style="position:absolute;top:4px;right:4px;"
+              onsubmit="return confirm('Delete this photo?')">
+          <input type="hidden" name="photo_path" value="{{ path }}">
+          <button type="submit"
+                  class="btn btn-danger btn-sm p-0 d-flex align-items-center justify-content-center"
+                  style="width:24px;height:24px;font-size:12px;">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
+      <button type="button" class="btn btn-accent btn-sm"
+              hx-post="/users/{{ user.id }}/photos/train"
+              hx-target="#train-result"
+              hx-swap="innerHTML"
+              hx-indicator="#train-spinner">
+        <i class="bi bi-cpu me-1"></i>Train Recognition
+      </button>
+      <span id="train-spinner" class="htmx-indicator spinner-border spinner-border-sm text-accent"></span>
+      <span class="text-muted small">
+        {{ photo_items | length }} photo(s) — more photos from different angles improve accuracy.
+      </span>
+    </div>
+
+    {% else %}
+    <p class="text-muted small mb-3">
+      No photos yet. Upload at least 3–5 well-lit photos of {{ user.name }}'s face from
+      slightly different angles, then click <strong>Train Recognition</strong>.
+    </p>
+    {% endif %}
+
+    <!-- Upload -->
+    <form method="post" action="/users/{{ user.id }}/photos/upload"
+          enctype="multipart/form-data">
+      <div class="input-group" style="max-width:420px;">
+        <input type="file" class="form-control form-control-sm"
+               name="photos" accept="image/*" multiple required>
+        <button type="submit" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-upload me-1"></i>Upload
+        </button>
+      </div>
+      <div class="form-text text-muted">
+        Accepts JPG or PNG. Select multiple files at once for faster setup.
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endif %}{# is_admin — face photos #}
+
+{% if is_admin %}
 <!-- ── Rename Modal ───────────────────────────────────────────────────── -->
 <div class="modal fade" id="renameModal" tabindex="-1">
   <div class="modal-dialog modal-sm">

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, Request
+import shutil
+from pathlib import Path
+
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from data.models import User, UNKNOWN_USER_ID
-from web.server import get_db, templates, ctx
+from web.server import get_config, get_db, templates, ctx
 from web.helpers import user_stats
 
 router = APIRouter(prefix="/users")
@@ -52,10 +55,18 @@ async def user_detail(user_id: int, request: Request):
 
     enriched = [{"pour": p, "beer_name": beer_for_keg(p.keg_id)} for p in pours]
 
+    # Build (path, url) pairs for the template
+    photos_dir = Path(get_config()["data"]["user_photos_dir"])
+    photo_items = [
+        (p, f"/photos/{user_id}/{Path(p).name}")
+        for p in user.image_paths
+    ]
+
     return templates.TemplateResponse(
         request,
         "user_detail.html",
-        ctx(request, user=user, stats=stats, enriched_pours=enriched, payments=pays),
+        ctx(request, user=user, stats=stats, enriched_pours=enriched,
+            payments=pays, photo_items=photo_items),
     )
 
 
@@ -92,3 +103,62 @@ async def add_payment(user_id: int, amount: float = Form(...)):
     if db.get_user(user_id):
         db.add_payment(user_id, amount)
     return RedirectResponse(f"/users/{user_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Face recognition photos
+# ---------------------------------------------------------------------------
+
+@router.post("/{user_id}/photos/upload", response_class=RedirectResponse)
+async def photo_upload(user_id: int, photos: list[UploadFile] = File(...)):
+    db     = get_db()
+    config = get_config()
+    user   = db.get_user(user_id)
+    if not user or user_id == UNKNOWN_USER_ID:
+        return RedirectResponse(f"/users/{user_id}", status_code=303)
+
+    user_dir = Path(config["data"]["user_photos_dir"]) / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+
+    existing = len(list(user_dir.glob("*.jpg"))) + len(list(user_dir.glob("*.png")))
+    for i, upload in enumerate(photos):
+        suffix = Path(upload.filename or "").suffix.lower() or ".jpg"
+        dest   = user_dir / f"pic{existing + i}{suffix}"
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(upload.file, f)
+        db.add_user_image(user_id, str(dest))
+
+    return RedirectResponse(f"/users/{user_id}", status_code=303)
+
+
+@router.post("/{user_id}/photos/delete", response_class=RedirectResponse)
+async def photo_delete(user_id: int, photo_path: str = Form(...)):
+    db   = get_db()
+    user = db.get_user(user_id)
+    if user:
+        user.image_paths = [p for p in user.image_paths if p != photo_path]
+        db.save_user(user)
+        try:
+            Path(photo_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+    return RedirectResponse(f"/users/{user_id}", status_code=303)
+
+
+@router.post("/{user_id}/photos/train", response_class=HTMLResponse)
+async def photo_train(user_id: int):
+    import asyncio
+    from recognition.face_recognizer import train_user_sync
+    db     = get_db()
+    config = get_config()
+    num, err = await asyncio.get_event_loop().run_in_executor(
+        None, train_user_sync, db, config, user_id
+    )
+    if err:
+        return HTMLResponse(
+            f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>{err}</span>'
+        )
+    return HTMLResponse(
+        f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
+        f'Trained on {num} encoding(s). Live recognition updates within 60 s.</span>'
+    )
