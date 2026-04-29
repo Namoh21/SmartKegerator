@@ -232,6 +232,13 @@ class Database:
         except sqlite3.OperationalError:
             pass  # column already exists
 
+        # Add pin_hash for touchscreen PIN login (backup to face recognition)
+        try:
+            with self._cursor() as cur:
+                cur.execute("ALTER TABLE admins ADD COLUMN pin_hash TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
         # For existing admins with no linked user, create a user record for each
         with self._cursor() as cur:
             cur.execute("SELECT id, username FROM admins WHERE user_id IS NULL")
@@ -566,12 +573,21 @@ class Database:
         with self._cursor() as cur:
             cur.execute("""
                 SELECT a.id, a.username, a.created_at, a.user_id,
+                       a.pin_hash,
                        u.name AS display_name
                 FROM admins a
                 LEFT JOIN users u ON u.id = a.user_id
                 ORDER BY a.created_at
             """)
             return [dict(r) for r in cur.fetchall()]
+
+    def set_admin_pin(self, admin_id: int, pin_hash: str) -> None:
+        """Store a bcrypt-hashed PIN for touchscreen login."""
+        with self._cursor() as cur:
+            cur.execute(
+                "UPDATE admins SET pin_hash = ? WHERE id = ?",
+                (pin_hash, admin_id),
+            )
 
     def get_admin_user_ids(self) -> set:
         """Return set of user_ids that have admin accounts."""

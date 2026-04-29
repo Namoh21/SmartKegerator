@@ -11,6 +11,7 @@
     'mismatch': 'Passwords do not match.',
     'last':     'Cannot delete the last administrator account.',
     'self':     'You cannot delete your own account.',
+    'badpin':   'PIN must be 4–6 digits.',
 } %}
 
 <div class="row justify-content-center">
@@ -565,6 +566,7 @@
                 <tr>
                   <th class="ps-3">Username</th>
                   <th>Created</th>
+                  <th>Touchscreen PIN</th>
                   <th class="text-end pe-3">Actions</th>
                 </tr>
               </thead>
@@ -582,6 +584,18 @@
                     {% endif %}
                   </td>
                   <td class="text-muted">{{ a.created_at | datetime }}</td>
+                  <td>
+                    {% if a.pin_hash %}
+                    <span class="badge bg-success me-1"><i class="bi bi-check-lg"></i> Set</span>
+                    {% else %}
+                    <span class="badge bg-secondary me-1">Not set</span>
+                    {% endif %}
+                    <button class="btn btn-sm btn-outline-secondary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#pinModal{{ a.id }}">
+                      <i class="bi bi-123"></i> {{ 'Change' if a.pin_hash else 'Set' }} PIN
+                    </button>
+                  </td>
                   <td class="text-end pe-3">
                     <button class="btn btn-sm btn-outline-secondary me-1"
                             data-bs-toggle="modal"
@@ -599,6 +613,34 @@
                     {% endif %}
                   </td>
                 </tr>
+
+                <!-- Set PIN modal -->
+                <div class="modal fade" id="pinModal{{ a.id }}" tabindex="-1">
+                  <div class="modal-dialog modal-sm">
+                    <div class="modal-content" style="background:var(--sk-card);">
+                      <form method="post" action="/settings/admins/{{ a.id }}/pin">
+                        <div class="modal-header border-secondary">
+                          <h6 class="modal-title">Touchscreen PIN — {{ a.username }}</h6>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                          <label class="form-label small">PIN (4–6 digits)</label>
+                          <input type="password" class="form-control font-monospace"
+                                 name="pin" required pattern="\d{4,6}"
+                                 inputmode="numeric" maxlength="6"
+                                 placeholder="e.g. 1234" autocomplete="off">
+                          <div class="form-text text-muted mt-1">
+                            Used on the touchscreen as a backup to face recognition.
+                          </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-accent btn-sm">Save PIN</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
 
                 <!-- Change password modal -->
                 <div class="modal fade" id="pwModal{{ a.id }}" tabindex="-1">

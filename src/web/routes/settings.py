@@ -364,6 +364,18 @@ async def admin_change_password(
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
+@router.post("/admins/{admin_id}/pin", response_class=RedirectResponse)
+async def admin_set_pin(
+    admin_id: int,
+    pin:      str = Form(...),
+):
+    pin = pin.strip()
+    if not pin.isdigit() or not (4 <= len(pin) <= 6):
+        return RedirectResponse("/settings/?error=badpin&tab=admins", status_code=303)
+    get_db().set_admin_pin(admin_id, hash_password(pin))
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
 # ---------------------------------------------------------------------------
 # Service restart
 # ---------------------------------------------------------------------------

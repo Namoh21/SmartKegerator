@@ -166,6 +166,7 @@ class App(QObject):
 
         # Main window navigation
         self._main_window.settings_requested.connect(self._open_settings)
+        self._main_window.login_requested.connect(self._open_pin_login)
 
     # ------------------------------------------------------------------
     # Hardware startup
@@ -404,6 +405,16 @@ class App(QObject):
         if self._fullscreen:
             w.showFullScreen()
         w.exec()
+
+    def _open_pin_login(self) -> None:
+        from PyQt6.QtWidgets import QDialog
+        from ui.pin_login_dialog import PinLoginDialog
+        dlg = PinLoginDialog(self._config, self._db, self._main_window)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            admin   = dlg.authenticated_admin()
+            user_id = dlg.authenticated_user_id()
+            if admin and user_id is not None:
+                self._on_user_identified(user_id)
 
     def _open_settings(self) -> None:
         if not self._is_admin:
