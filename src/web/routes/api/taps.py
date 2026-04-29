@@ -30,7 +30,7 @@ class TapResponse(BaseModel):
 
 class AssignRequest(BaseModel):
     tap_id: str
-    keg_id: Optional[int]
+    keg_id: Optional[int] = None
 
 
 @router.get("/taps", response_model=list[TapResponse])
