@@ -219,13 +219,37 @@ elif ls "${WHEEL_CACHE}"/dlib-*.whl &>/dev/null; then
     sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
     info "dlib installed from cache."
 else
-    info "Building dlib from source (~10-15 min on Pi 5, ~25-30 min on Pi 4)..."
-    info "The wheel will be saved to ${WHEEL_CACHE} — back it up to skip this next time."
-    sudo -u "${REAL_USER}" ${PYTHON} -m pip wheel --no-deps --quiet \
-        -w "${WHEEL_CACHE}" dlib
-    chown -R "${REAL_USER}:${REAL_USER}" "${WHEEL_CACHE}"
-    sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
-    info "dlib built and cached."
+    # Attempt to download a pre-built wheel from GitHub Releases.
+    # The wheel filename encodes the dlib version, Python ABI tag, and CPU
+    # architecture — so the same URL works on any 64-bit Pi OS image without
+    # any configuration.  Falls back to building from source if unavailable.
+    DLIB_VERSION="19.24.6"
+    PY_TAG=$(${PYTHON} -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+    ARCH=$(uname -m)   # aarch64 on 64-bit Pi OS
+    WHEEL_NAME="dlib-${DLIB_VERSION}-${PY_TAG}-${PY_TAG}-linux_${ARCH}.whl"
+    WHEEL_URL="https://github.com/Namoh21/SmartKegerator/releases/download/dlib-wheels/${WHEEL_NAME}"
+    WHEEL_PATH="${WHEEL_CACHE}/${WHEEL_NAME}"
+
+    info "Trying to download pre-built dlib wheel..."
+    info "  ${WHEEL_URL}"
+    if curl -fsSL --connect-timeout 10 -o "${WHEEL_PATH}" "${WHEEL_URL}" 2>/dev/null; then
+        chown "${REAL_USER}:${REAL_USER}" "${WHEEL_PATH}"
+        info "Downloaded ${WHEEL_NAME} — installing..."
+        sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
+        info "dlib installed from pre-built wheel (~30 seconds)."
+    else
+        rm -f "${WHEEL_PATH}"   # remove partial download
+        warn "Pre-built wheel not available — building dlib from source."
+        info "This takes ~10-15 min on Pi 5, ~25-30 min on Pi 4."
+        info "The wheel will be cached at ${WHEEL_CACHE} — back it up to skip next time."
+        sudo -u "${REAL_USER}" ${PYTHON} -m pip wheel --no-deps --quiet \
+            -w "${WHEEL_CACHE}" dlib
+        chown -R "${REAL_USER}:${REAL_USER}" "${WHEEL_CACHE}"
+        sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
+        info "dlib built and cached at ${WHEEL_CACHE}/${WHEEL_NAME}"
+        info "Upload it to GitHub Releases to skip this build for everyone:"
+        info "  gh release upload dlib-wheels '${WHEEL_CACHE}/${WHEEL_NAME}'"
+    fi
 fi
 
 # face-recognition (pure Python wrapper — fast)
