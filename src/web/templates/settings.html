@@ -716,7 +716,7 @@
 
     </div>{# end tab-content #}
 
-    <!-- ── Restart services (admin only) ────────────────────────────── -->
+    <!-- ── Restart services / reboot (admin only) ───────────────────── -->
     {% if is_admin %}
     <div class="card mt-4 border-secondary">
       <div class="card-body d-flex flex-wrap align-items-center gap-3">
@@ -730,8 +730,37 @@
                   hx-post="/settings/restart"
                   hx-target="#restart-result"
                   hx-swap="innerHTML">
-            Restart
+            Restart Services
           </button>
+          <button type="button" class="btn btn-outline-danger"
+                  data-bs-toggle="modal" data-bs-target="#rebootModal">
+            <i class="bi bi-power me-1"></i>Reboot System
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reboot confirmation modal -->
+    <div class="modal fade" id="rebootModal" tabindex="-1">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content" style="background:var(--sk-card);">
+          <div class="modal-header border-secondary">
+            <h6 class="modal-title"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Reboot System?</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-muted small">
+            The kegerator touchscreen and web interface will be unavailable for about 30 seconds while the Pi reboots.
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">No, Cancel</button>
+            <button type="button" class="btn btn-danger btn-sm"
+                    data-bs-dismiss="modal"
+                    hx-post="/settings/reboot"
+                    hx-target="#restart-result"
+                    hx-swap="innerHTML">
+              Yes, Reboot
+            </button>
+          </div>
         </div>
       </div>
     </div>

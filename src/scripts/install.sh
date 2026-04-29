@@ -587,6 +587,22 @@ fi
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Sudoers rule — allow the web service to reboot the Pi without a password.
+# The rule is scoped to exactly /sbin/reboot so no broader privilege is granted.
+# ---------------------------------------------------------------------------
+section "Sudoers rule for web-initiated reboot"
+
+SUDOERS_FILE="/etc/sudoers.d/smartkegerator-reboot"
+SUDOERS_LINE="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
+if [[ -f "${SUDOERS_FILE}" ]] && grep -qF "${SUDOERS_LINE}" "${SUDOERS_FILE}"; then
+    info "Sudoers rule already present."
+else
+    echo "${SUDOERS_LINE}" > "${SUDOERS_FILE}"
+    chmod 440 "${SUDOERS_FILE}"
+    info "Sudoers rule written: ${REAL_USER} may run sudo reboot without password."
+fi
+
 section "Installation complete"
 
 echo ""

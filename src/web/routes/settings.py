@@ -392,3 +392,16 @@ async def restart_services():
     return HTMLResponse(
         '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Restarting in 2 s…</span>'
     )
+
+
+@router.post("/reboot", response_class=HTMLResponse)
+async def reboot_system():
+    """Schedule a full system reboot 3 seconds after responding."""
+    async def _delayed_reboot():
+        await asyncio.sleep(3)
+        subprocess.run(["sudo", "reboot"], check=False)
+
+    asyncio.create_task(_delayed_reboot())
+    return HTMLResponse(
+        '<span class="text-warning"><i class="bi bi-power me-1"></i>Rebooting in 3 s…</span>'
+    )

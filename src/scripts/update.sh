@@ -41,6 +41,17 @@ fi
 info "Source files updated."
 
 # ---------------------------------------------------------------------------
+# 2b. Ensure sudoers rule exists for web-initiated reboot
+# ---------------------------------------------------------------------------
+SUDOERS_FILE="/etc/sudoers.d/smartkegerator-reboot"
+SUDOERS_LINE="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
+if [[ ! -f "${SUDOERS_FILE}" ]] || ! grep -qF "${SUDOERS_LINE}" "${SUDOERS_FILE}"; then
+    echo "${SUDOERS_LINE}" | sudo tee "${SUDOERS_FILE}" > /dev/null
+    sudo chmod 440 "${SUDOERS_FILE}"
+    info "Sudoers rule added: ${REAL_USER} may run sudo reboot without password."
+fi
+
+# ---------------------------------------------------------------------------
 # 3. Restart services
 # ---------------------------------------------------------------------------
 info "Restarting services…"
