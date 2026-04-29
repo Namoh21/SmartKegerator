@@ -43,8 +43,8 @@ data:
   beer_logos_dir: /opt/smartkegerator/logos
 
 display:
-  rotate: 1          # 1=90°CW (portrait), 0=normal landscape, 2=180°, 3=270°
-                     # Applied by scripts/install.sh — reboot required
+  rotation: 90       # degrees: 0=landscape, 90=portrait-CW, 180=flipped, 270=portrait-CCW
+                     # Configurable in web Settings → Appearance. Reboot required.
 
 ui:
   fullscreen: true   # set false only for desktop development/testing

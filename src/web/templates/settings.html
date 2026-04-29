@@ -103,6 +103,33 @@
                 <i class="bi bi-save me-1"></i>Save Appearance
               </button>
             </form>
+
+            <hr class="border-secondary mt-4">
+
+            <form method="post" action="/settings/display-rotation">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Display rotation</label>
+                {% set cur_rot = yaml_config.get('display', {}).get('rotation', 90) %}
+                <div class="d-flex gap-3 flex-wrap mt-1">
+                  {% for deg, label in [(0,'0° — Landscape'),(90,'90°'),(180,'180°'),(270,'270°')] %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="rotation"
+                           id="rot{{ deg }}" value="{{ deg }}"
+                           {% if cur_rot == deg %}checked{% endif %}>
+                    <label class="form-check-label" for="rot{{ deg }}">{{ label }}</label>
+                  </div>
+                  {% endfor %}
+                </div>
+                <div class="form-text text-muted">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Updates the compositor config immediately — takes effect after the display
+                  session restarts (<code>sudo reboot</code>).
+                </div>
+              </div>
+              <button type="submit" class="btn btn-accent btn-sm">
+                <i class="bi bi-save me-1"></i>Save Rotation
+              </button>
+            </form>
             {% else %}
             <dl class="row mb-0">
               <dt class="col-sm-3">Name</dt>

@@ -59,6 +59,32 @@ def _get_local_ip() -> str:
         return "localhost"
 
 
+def _apply_display_rotation(degrees: int) -> None:
+    """Write the new rotation into the active compositor config (live update)."""
+    import os, re
+    home = Path(os.path.expanduser("~"))
+    t    = str(degrees)
+
+    labwc = home / ".config/labwc/autostart"
+    if labwc.exists():
+        text = labwc.read_text()
+        new  = re.sub(r'wlr-randr --output DSI-1 --transform \S+',
+                      f'wlr-randr --output DSI-1 --transform {t}', text)
+        if new == text:  # entry missing — append it
+            new = new.rstrip("\n") + f'\nwlr-randr --output DSI-1 --transform {t} &\n'
+        labwc.write_text(new)
+        return
+
+    wayfire = home / ".config/wayfire.ini"
+    if wayfire.exists():
+        text = wayfire.read_text()
+        new  = re.sub(r'(?m)(^\[output:DSI-1\][^\[]*?transform\s*=\s*)\S+',
+                      rf'\g<1>{t}', text)
+        if new == text:
+            new = new.rstrip("\n") + f'\n[output:DSI-1]\ntransform = {t}\n'
+        wayfire.write_text(new)
+
+
 def _read_yaml() -> dict:
     path = get_config_path()
     if not path:
@@ -112,6 +138,18 @@ async def settings_save_appearance(
     cfg["ui"]["name"]  = site_name.strip() or "SmartKegerator"
     cfg["ui"]["theme"] = theme if theme in _THEMES else "dark_blue"
     _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=appearance", status_code=303)
+
+
+@router.post("/display-rotation", response_class=RedirectResponse)
+async def settings_save_display_rotation(rotation: int = Form(90)):
+    if rotation not in (0, 90, 180, 270):
+        rotation = 90
+    cfg = _read_yaml()
+    cfg.setdefault("display", {})
+    cfg["display"]["rotation"] = rotation
+    _write_yaml(cfg)
+    _apply_display_rotation(rotation)
     return RedirectResponse("/settings/?saved=1&tab=appearance", status_code=303)
 
 
