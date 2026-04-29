@@ -194,31 +194,32 @@
       </button>
       <span id="train-spinner" class="htmx-indicator spinner-border spinner-border-sm text-accent"></span>
       <span class="text-muted small">
-        {{ photo_items | length }} photo(s) — more photos from different angles improve accuracy.
+        {{ photo_items | length }} photo(s) — use different angles for best accuracy.
       </span>
     </div>
 
     {% else %}
     <p class="text-muted small mb-3">
-      No photos yet. Upload at least 3–5 well-lit photos of {{ user.name }}'s face from
-      slightly different angles, then click <strong>Train Recognition</strong>.
+      No photos yet. Have {{ user.name }} stand in front of the kegerator camera
+      and click <strong>📷 Capture Photo</strong> several times from slightly different
+      angles, then click <strong>Train Recognition</strong>.
     </p>
     {% endif %}
 
-    <!-- Upload -->
-    <form method="post" action="/users/{{ user.id }}/photos/upload"
-          enctype="multipart/form-data">
-      <div class="input-group" style="max-width:420px;">
-        <input type="file" class="form-control form-control-sm"
-               name="photos" accept="image/*" multiple required>
-        <button type="submit" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-upload me-1"></i>Upload
-        </button>
-      </div>
-      <div class="form-text text-muted">
-        Accepts JPG or PNG. Select multiple files at once for faster setup.
-      </div>
-    </form>
+    <!-- Capture from Pi camera -->
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <button type="button" class="btn btn-outline-secondary btn-sm"
+              hx-post="/users/{{ user.id }}/photos/capture"
+              hx-target="#capture-status"
+              hx-swap="outerHTML">
+        <i class="bi bi-camera me-1"></i>📷 Capture Photo
+      </button>
+      <span id="capture-status"></span>
+    </div>
+    <div class="form-text text-muted mt-1">
+      Captures a frame from the kegerator's Pi camera. Have the person stand in
+      front of the camera before clicking. Capture 5+ photos for best results.
+    </div>
 
   </div>
 </div>

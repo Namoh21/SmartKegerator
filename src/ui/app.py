@@ -168,6 +168,12 @@ class App(QObject):
         self._main_window.settings_requested.connect(self._open_settings)
         self._main_window.login_requested.connect(self._open_pin_login)
 
+        # Web-initiated camera capture (DB polling IPC)
+        self._capture_timer = QTimer(self)
+        self._capture_timer.setInterval(2000)
+        self._capture_timer.timeout.connect(self._check_web_capture_request)
+        self._capture_timer.start()
+
     # ------------------------------------------------------------------
     # Hardware startup
     # ------------------------------------------------------------------
@@ -405,6 +411,33 @@ class App(QObject):
         if self._fullscreen:
             w.showFullScreen()
         w.exec()
+
+    def _check_web_capture_request(self) -> None:
+        """Poll DB for a photo capture request from the web UI."""
+        request = self._db.get_setting("capture_request", "")
+        if not request:
+            return
+        self._db.set_setting("capture_request", "")  # consume immediately
+
+        try:
+            user_id_str, req_id = request.split(":", 1)
+            user_id = int(user_id_str)
+        except ValueError:
+            return
+
+        from pathlib import Path as _Path
+        photos_dir = _Path(self._config["data"]["user_photos_dir"]) / str(user_id)
+        photos_dir.mkdir(parents=True, exist_ok=True)
+        existing = len(list(photos_dir.glob("*.jpg")))
+        dest     = str(photos_dir / f"pic{existing}.jpg")
+
+        if self._camera.capture_photo(dest):
+            self._db.add_user_image(user_id, dest)
+            self._db.set_setting("capture_result", f"{req_id}:{dest}")
+            log.info("Web capture: saved %s for user %d", dest, user_id)
+        else:
+            self._db.set_setting("capture_result", f"{req_id}:ERROR")
+            log.warning("Web capture: camera returned no frame for user %d", user_id)
 
     def _open_pin_login(self) -> None:
         from PyQt6.QtWidgets import QDialog

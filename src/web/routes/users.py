@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import shutil
+import time
+import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from data.models import User, UNKNOWN_USER_ID
@@ -106,29 +107,68 @@ async def add_payment(user_id: int, amount: float = Form(...)):
 
 
 # ---------------------------------------------------------------------------
-# Face recognition photos
+# Face recognition photos — camera capture only (no file upload)
 # ---------------------------------------------------------------------------
 
-@router.post("/{user_id}/photos/upload", response_class=RedirectResponse)
-async def photo_upload(user_id: int, photos: list[UploadFile] = File(...)):
+_CAPTURE_TIMEOUT = 20  # seconds before giving up on the Qt app
+
+
+@router.post("/{user_id}/photos/capture", response_class=HTMLResponse)
+async def capture_start(user_id: int):
+    """Ask the Qt touchscreen app to snap a photo from its camera."""
     db     = get_db()
-    config = get_config()
-    user   = db.get_user(user_id)
-    if not user or user_id == UNKNOWN_USER_ID:
-        return RedirectResponse(f"/users/{user_id}", status_code=303)
+    req_id = uuid.uuid4().hex[:12]
+    db.set_setting("capture_request", f"{user_id}:{req_id}")
+    db.set_setting("capture_result",  "")
+    db.set_setting("capture_ts",      str(time.time()))
+    return HTMLResponse(_capture_waiting_html(user_id, req_id))
 
-    user_dir = Path(config["data"]["user_photos_dir"]) / str(user_id)
-    user_dir.mkdir(parents=True, exist_ok=True)
 
-    existing = len(list(user_dir.glob("*.jpg"))) + len(list(user_dir.glob("*.png")))
-    for i, upload in enumerate(photos):
-        suffix = Path(upload.filename or "").suffix.lower() or ".jpg"
-        dest   = user_dir / f"pic{existing + i}{suffix}"
-        with open(dest, "wb") as f:
-            shutil.copyfileobj(upload.file, f)
-        db.add_user_image(user_id, str(dest))
+@router.get("/{user_id}/photos/capture/{req_id}", response_class=HTMLResponse)
+async def capture_poll(user_id: int, req_id: str, response: Response):
+    """HTMX polling endpoint — returns success (triggers page refresh) or keeps polling."""
+    db     = get_db()
+    result = db.get_setting("capture_result", "")
+    ts     = float(db.get_setting("capture_ts", "0") or 0)
 
-    return RedirectResponse(f"/users/{user_id}", status_code=303)
+    if result.startswith(f"{req_id}:"):
+        db.set_setting("capture_result", "")
+        db.set_setting("capture_ts",     "")
+        payload = result[len(req_id) + 1:]
+        if payload == "ERROR":
+            return HTMLResponse(
+                '<span class="text-danger">'
+                '<i class="bi bi-x-circle me-1"></i>'
+                'Camera not ready — is the touchscreen app running?'
+                '</span>'
+            )
+        # Success — tell HTMX to do a full page refresh so the new photo appears
+        response.headers["HX-Refresh"] = "true"
+        return HTMLResponse('<span class="text-success">Captured!</span>')
+
+    if time.time() - ts > _CAPTURE_TIMEOUT:
+        db.set_setting("capture_request", "")
+        return HTMLResponse(
+            '<span class="text-warning">'
+            '<i class="bi bi-clock me-1"></i>'
+            'Timed out — make sure the kegerator touchscreen app is running.'
+            '</span>'
+        )
+
+    return HTMLResponse(_capture_waiting_html(user_id, req_id))
+
+
+def _capture_waiting_html(user_id: int, req_id: str) -> str:
+    return (
+        f'<div id="capture-status" class="d-inline-flex align-items-center gap-2"'
+        f' hx-get="/users/{user_id}/photos/capture/{req_id}"'
+        f' hx-trigger="every 1s"'
+        f' hx-target="#capture-status"'
+        f' hx-swap="outerHTML">'
+        f'<span class="spinner-border spinner-border-sm text-accent"></span>'
+        f'Waiting for camera…'
+        f'</div>'
+    )
 
 
 @router.post("/{user_id}/photos/delete", response_class=RedirectResponse)
