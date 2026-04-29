@@ -2,15 +2,22 @@
 # =============================================================================
 # SmartKegerator installer — Raspberry Pi OS Bookworm / Trixie (64-bit)
 #
+# Tested on:
+#   • Raspberry Pi 5  (4 GB / 8 GB)  — Pi OS Bookworm or Trixie
+#   • Raspberry Pi 4  (2 GB / 4 GB)  — Pi OS Bookworm or Trixie
+#   • Raspberry Pi 3B / 3B+  (1 GB)  — Pi OS Bookworm or Trixie  ← low-mem path
+#
 # Run once on a fresh Pi:
 #   chmod +x install.sh && sudo ./install.sh
 #
 # What this does:
-#   1. Installs system packages via apt (OpenCV, PyQt6, gpiod, etc.)
-#   2. Creates a Python venv and installs pip packages into it
-#   3. Creates the data/photo/video directory tree
-#   4. Installs systemd user services and compositor autostart entry
-#   5. Runs hardware setup (1-Wire, GPIO, screen blanking, rotation)
+#   1. Detects available RAM and creates a temporary swap file if < 1.5 GB
+#      (required to compile dlib without OOM on Pi 3 / 1 GB models)
+#   2. Installs system packages via apt (OpenCV, PyQt6, gpiod, etc.)
+#   3. Creates a Python venv and installs pip packages into it
+#   4. Creates the data/photo/video directory tree
+#   5. Installs systemd user services and compositor autostart entry
+#   6. Runs hardware setup (1-Wire, GPIO, screen blanking, rotation)
 #
 # Supports both Wayfire (Bookworm default) and labwc (Trixie default).
 # =============================================================================
@@ -32,6 +39,24 @@ section() { echo -e "\n${GREEN}── $* ──${NC}"; }
 REAL_USER="${SUDO_USER:-pi}"
 REAL_HOME=$(getent passwd "${REAL_USER}" | cut -d: -f6)
 info "Installing for user: ${REAL_USER}  (home: ${REAL_HOME})"
+
+# ---------------------------------------------------------------------------
+# Detect available RAM — drives swap and build parallelism decisions
+# ---------------------------------------------------------------------------
+MEM_MB=$(awk '/MemTotal/ { printf "%d", $2/1024 }' /proc/meminfo)
+PI_MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "Unknown")
+info "Hardware: ${PI_MODEL}"
+info "RAM: ${MEM_MB} MB"
+
+# Threshold: anything ≤ 1.5 GB (covers Pi 3 / 1 GB and Pi Zero 2 W / 512 MB)
+if [[ ${MEM_MB} -lt 1536 ]]; then
+    LOW_MEM=true
+    warn "Low-memory system detected (${MEM_MB} MB)."
+    warn "A temporary swap file will be created for the dlib build and removed afterwards."
+    warn "Face recognition will work but will be slower than on Pi 4/5."
+else
+    LOW_MEM=false
+fi
 
 # ---------------------------------------------------------------------------
 # Configurable paths — edit these if you put things elsewhere
@@ -164,6 +189,29 @@ apt-get install -y python3-yaml
 info "System packages installed."
 
 # ---------------------------------------------------------------------------
+# Low-memory swap — created before the dlib build, removed afterwards.
+# fallocate is fastest; fall back to dd on filesystems that don't support it.
+# ---------------------------------------------------------------------------
+BUILD_SWAP="${INSTALL_DIR}/build-swap"
+
+if [[ "${LOW_MEM}" == "true" ]]; then
+    section "Temporary swap file for low-memory build"
+    if swapon --show | grep -qF "${BUILD_SWAP}"; then
+        info "Build swap already active."
+    else
+        if [[ ! -f "${BUILD_SWAP}" ]]; then
+            info "Allocating 2 GB swap file at ${BUILD_SWAP}..."
+            fallocate -l 2G "${BUILD_SWAP}" 2>/dev/null || \
+                dd if=/dev/zero of="${BUILD_SWAP}" bs=1M count=2048 status=progress
+            chmod 600 "${BUILD_SWAP}"
+            mkswap "${BUILD_SWAP}" -q
+        fi
+        swapon "${BUILD_SWAP}"
+        info "Swap active: $(free -h | awk '/Swap/{print $2}') total."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # 2. Python virtual environment
 # ---------------------------------------------------------------------------
 section "Python virtual environment"
@@ -240,9 +288,17 @@ else
     else
         rm -f "${WHEEL_PATH}"   # remove partial download
         warn "Pre-built wheel not available — building dlib from source."
-        info "This takes ~10-15 min on Pi 5, ~25-30 min on Pi 4."
+        if [[ "${LOW_MEM}" == "true" ]]; then
+            info "Low-memory mode: single-threaded build (~60-90 min on Pi 3)."
+            BUILD_JOBS=1
+        else
+            info "This takes ~10-15 min on Pi 5, ~25-30 min on Pi 4."
+            BUILD_JOBS=$(nproc)
+        fi
         info "The wheel will be cached at ${WHEEL_CACHE} — back it up to skip next time."
-        sudo -u "${REAL_USER}" ${PYTHON} -m pip wheel --no-deps --quiet \
+        sudo -u "${REAL_USER}" \
+            CMAKE_BUILD_PARALLEL_LEVEL=${BUILD_JOBS} \
+            ${PYTHON} -m pip wheel --no-deps --quiet \
             -w "${WHEEL_CACHE}" dlib
         chown -R "${REAL_USER}:${REAL_USER}" "${WHEEL_CACHE}"
         sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
@@ -250,6 +306,13 @@ else
         info "Upload it to GitHub Releases to skip this build for everyone:"
         info "  gh release upload dlib-wheels '${WHEEL_CACHE}/${WHEEL_NAME}'"
     fi
+fi
+
+# Remove the temporary build swap now that dlib is compiled
+if [[ "${LOW_MEM}" == "true" ]] && swapon --show | grep -qF "${BUILD_SWAP}"; then
+    swapoff "${BUILD_SWAP}"
+    rm -f "${BUILD_SWAP}"
+    info "Build swap removed."
 fi
 
 # face-recognition (pure Python wrapper — fast)
@@ -555,3 +618,16 @@ echo ""
 echo "  4. Open the web interface from any device on the same network:"
 echo "     http://$(hostname -I | awk '{print $1}'):8080"
 echo ""
+
+if [[ "${LOW_MEM}" == "true" ]]; then
+    echo -e "${YELLOW}Pi 3 / low-memory notes:${NC}"
+    echo "  • Face recognition runs ~3-5× slower than on Pi 4/5 — identification"
+    echo "    may take a few seconds per frame. This is normal."
+    echo "  • If the GUI or web server become unresponsive under load, reduce the"
+    echo "    camera resolution in config.yaml (camera_width / camera_height)."
+    echo "  • To disable face recognition and free ~200 MB of RAM, set:"
+    echo "        recognition:"
+    echo "          enabled: false"
+    echo "    in ${CONFIG}"
+    echo ""
+fi

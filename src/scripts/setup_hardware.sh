@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# SmartKegerator hardware setup — Raspberry Pi 4, Pi OS Bookworm
+# SmartKegerator hardware setup — Raspberry Pi 3 / 4 / 5, Pi OS Bookworm / Trixie
 #
 # Enables kernel interfaces needed by SmartKegerator:
 #   • 1-Wire         (DS18B20 liquid temp sensor)
@@ -23,6 +23,12 @@ CONFIG="/boot/firmware/config.txt"   # Bookworm path
 [[ -f "${CONFIG}" ]] || CONFIG="/boot/config.txt"   # fallback for older Pi OS
 
 REBOOT_NEEDED=false
+
+# Detect available RAM for Pi 3 / low-memory tuning
+MEM_MB=$(awk '/MemTotal/ { printf "%d", $2/1024 }' /proc/meminfo)
+PI_MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "Unknown")
+LOW_MEM=false
+[[ ${MEM_MB} -lt 1536 ]] && LOW_MEM=true
 
 # ---------------------------------------------------------------------------
 # Helper: add a line to config.txt if it isn't already present
@@ -56,6 +62,30 @@ if modinfo w1-therm &>/dev/null; then
     ok "w1-therm module loaded"
 else
     warn "w1-therm module not found — may need 'sudo apt install raspberrypi-kernel'"
+fi
+
+# ---------------------------------------------------------------------------
+# 1b. GPU memory split — Pi 3 / 1 GB systems need gpu_mem bumped from the
+#     default 64 MB to 128 MB so the camera has enough VRAM.  Pi 4/5 have
+#     dedicated VRAM and ignore this setting.
+# ---------------------------------------------------------------------------
+if [[ "${LOW_MEM}" == "true" ]]; then
+    echo ""
+    echo "── GPU memory (Pi 3 / low-memory) ──"
+    if grep -q "^gpu_mem=" "${CONFIG}"; then
+        CURRENT_GPU=$(grep "^gpu_mem=" "${CONFIG}" | cut -d= -f2)
+        if [[ "${CURRENT_GPU}" -lt 128 ]]; then
+            sed -i "s/^gpu_mem=.*/gpu_mem=128/" "${CONFIG}"
+            info "gpu_mem raised from ${CURRENT_GPU} to 128 MB (camera requires ≥ 128 MB)."
+            REBOOT_NEEDED=true
+        else
+            ok "gpu_mem already set to ${CURRENT_GPU} MB."
+        fi
+    else
+        echo "gpu_mem=128" >> "${CONFIG}"
+        info "Set gpu_mem=128 in ${CONFIG} (camera requires ≥ 128 MB on 1 GB Pi)."
+        REBOOT_NEEDED=true
+    fi
 fi
 
 # ---------------------------------------------------------------------------
