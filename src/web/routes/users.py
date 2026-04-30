@@ -209,35 +209,67 @@ async def photo_delete(user_id: int, photo_path: str = Form(...)):
 
 @router.post("/{user_id}/photos/train", response_class=HTMLResponse)
 async def photo_train(user_id: int):
-    import asyncio
+    """
+    Start training in a background thread and return immediately with a
+    polling div.  On Pi 3, encoding each photo takes 5-15 s, so holding
+    the HTTP connection open for the full duration causes the browser to
+    time out and the HTMX spinner never resolves.
+    """
+    import threading
     import logging
     from recognition.face_recognizer import train_user_sync
-    log    = logging.getLogger(__name__)
+    log = logging.getLogger(__name__)
+    db  = get_db()
+
+    db.set_setting(f"train_status_{user_id}", "pending")
+
+    def _run():
+        try:
+            config = get_config()
+            num, err = train_user_sync(db, config, user_id)
+            if err:
+                db.set_setting(f"train_status_{user_id}", f"error:{err}")
+            else:
+                db.set_setting(f"train_status_{user_id}", f"done:{num}")
+        except Exception as exc:
+            log.error("Training thread crashed for user %d: %s", user_id, exc, exc_info=True)
+            db.set_setting(f"train_status_{user_id}", f"error:{exc}")
+
+    threading.Thread(target=_run, name=f"train-web-{user_id}", daemon=True).start()
+    return HTMLResponse(_train_polling_html(user_id))
+
+
+@router.get("/{user_id}/photos/train/poll", response_class=HTMLResponse)
+async def photo_train_poll(user_id: int):
+    """HTMX polling endpoint — returns spinner while training, result when done."""
     db     = get_db()
-    config = get_config()
-    try:
-        loop = asyncio.get_event_loop()
-        num, err = await asyncio.wait_for(
-            loop.run_in_executor(None, train_user_sync, db, config, user_id),
-            timeout=300,   # 5-minute ceiling — Pi 3 encodes slowly
-        )
-    except asyncio.TimeoutError:
-        log.error("Training timed out for user %d", user_id)
+    status = db.get_setting(f"train_status_{user_id}", "")
+
+    if not status or status == "pending":
+        return HTMLResponse(_train_polling_html(user_id))
+
+    db.set_setting(f"train_status_{user_id}", "")
+
+    if status.startswith("done:"):
+        n = status[5:]
         return HTMLResponse(
-            '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
-            'Training timed out (too many photos or low memory). Try fewer photos.</span>'
+            f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
+            f'Trained on {n} encoding(s). Recognition updates within 60 s.</span>'
         )
-    except Exception as exc:
-        log.error("Training crashed for user %d: %s", user_id, exc, exc_info=True)
-        return HTMLResponse(
-            f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
-            f'Training error: {exc}</span>'
-        )
-    if err:
-        return HTMLResponse(
-            f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>{err}</span>'
-        )
+    msg = status[6:] if status.startswith("error:") else status
     return HTMLResponse(
-        f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
-        f'Trained on {num} encoding(s). Live recognition updates within 60 s.</span>'
+        f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>{msg}</span>'
+    )
+
+
+def _train_polling_html(user_id: int) -> str:
+    return (
+        f'<span id="train-result-inner"'
+        f' hx-get="/users/{user_id}/photos/train/poll"'
+        f' hx-trigger="every 3s"'
+        f' hx-target="#train-result-inner"'
+        f' hx-swap="outerHTML">'
+        f'<span class="spinner-border spinner-border-sm text-accent me-1"></span>'
+        f'Training… (may take 1–3 min on Pi 3)'
+        f'</span>'
     )

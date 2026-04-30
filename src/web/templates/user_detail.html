@@ -204,11 +204,9 @@
                   {% if not photo_items %}disabled title="Capture photos first"{% endif %}
                   hx-post="/users/{{ user.id }}/photos/train"
                   hx-target="#train-result"
-                  hx-swap="innerHTML"
-                  hx-indicator="#train-spinner">
+                  hx-swap="innerHTML">
             <i class="bi bi-cpu me-1"></i>Train
           </button>
-          <span id="train-spinner" class="htmx-indicator spinner-border spinner-border-sm text-accent"></span>
         </div>
       </div>
 
