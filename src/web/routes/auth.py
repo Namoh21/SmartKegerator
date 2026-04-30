@@ -22,7 +22,8 @@ _ERRORS = {
 async def register_page(request: Request):
     error = _ERRORS.get(request.query_params.get("error", ""))
     return templates.TemplateResponse(
-        request, "register.html", {"request": request, "error": error}
+        request, "register.html",
+        {"request": request, "error": error, "csp_nonce": getattr(request.state, "csp_nonce", "")},
     )
 
 

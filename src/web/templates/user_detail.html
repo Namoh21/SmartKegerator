@@ -172,7 +172,7 @@
              style="width:110px;height:110px;object-fit:cover;object-position:top;">
         <form method="post" action="/users/{{ user.id }}/photos/delete"
               style="position:absolute;top:4px;right:4px;"
-              onsubmit="return confirm('Delete this photo?')">
+              class="js-confirm" data-confirm="Delete this photo?">
           <input type="hidden" name="photo_path" value="{{ path }}">
           <button type="submit"
                   class="btn btn-danger btn-sm p-0 d-flex align-items-center justify-content-center"
@@ -286,16 +286,17 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-// Refresh the camera preview every 500 ms so it shows a near-live feed.
-// Cache-busting via timestamp query param prevents the browser from
-// serving a stale image.
+<script nonce="{{ csp_nonce }}">
 (function () {
   const img = document.getElementById('cam-preview');
   if (!img) return;
   setInterval(() => {
     img.src = '/users/camera/preview?t=' + Date.now();
   }, 500);
+  document.addEventListener('click', function(e) {
+    const form = e.target.closest('form.js-confirm');
+    if (form && !confirm(form.dataset.confirm)) e.preventDefault();
+  });
 })();
 </script>
 {% endblock %}

@@ -123,8 +123,8 @@
                 data-bs-toggle="modal" data-bs-target="#editKeg{{ s.keg.id }}">
           <i class="bi bi-pencil"></i> Edit
         </button>
-        <form method="post" action="/kegs/{{ s.keg.id }}/delete" class="d-inline"
-              onsubmit="return confirm('Delete keg #{{ s.keg.id }}? This cannot be undone.')">
+        <form method="post" action="/kegs/{{ s.keg.id }}/delete" class="d-inline js-confirm"
+              data-confirm="Delete keg #{{ s.keg.id }}? This cannot be undone.">
           <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
         </form>
       </div>
@@ -184,8 +184,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function updateKegBeerPreview(sel) {
+<script nonce="{{ csp_nonce }}">
+function _updateKegBeerPreview(sel) {
   const opt     = sel.options[sel.selectedIndex];
   const preview = document.getElementById('keg-beer-preview');
   const img     = document.getElementById('keg-beer-label');
@@ -201,5 +201,12 @@ function updateKegBeerPreview(sel) {
   document.getElementById('keg-beer-rating').textContent = rating ? '★ ' + rating : '';
   preview.classList.remove('d-none');
 }
+document.addEventListener('change', function(e) {
+  if (e.target.matches('.js-keg-beer-select')) _updateKegBeerPreview(e.target);
+});
+document.addEventListener('click', function(e) {
+  const form = e.target.closest('form.js-confirm');
+  if (form && !confirm(form.dataset.confirm)) e.preventDefault();
+});
 </script>
 {% endblock %}

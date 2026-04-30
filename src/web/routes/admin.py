@@ -37,9 +37,9 @@ async def setup_page(request: Request):
     if db.has_any_admin():
         return RedirectResponse("/", status_code=302)
     error = _SETUP_ERRORS.get(request.query_params.get("error", ""))
-    # Standalone page — doesn't extend base.html, skip ctx() to avoid session dependency
     return templates.TemplateResponse(
-        request, "admin/setup.html", {"request": request, "error": error}
+        request, "admin/setup.html",
+        {"request": request, "error": error, "csp_nonce": getattr(request.state, "csp_nonce", "")},
     )
 
 
@@ -83,11 +83,11 @@ async def login_page(request: Request):
     error   = _LOGIN_ERRORS.get(request.query_params.get("error", ""))
     created = request.query_params.get("created") == "1"
     next_   = request.query_params.get("next", "/")
-    # Standalone page — doesn't extend base.html, skip ctx() to avoid session dependency
     return templates.TemplateResponse(
         request,
         "admin/login.html",
-        {"request": request, "error": error, "created": created, "next": next_},
+        {"request": request, "error": error, "created": created, "next": next_,
+         "csp_nonce": getattr(request.state, "csp_nonce", "")},
     )
 
 

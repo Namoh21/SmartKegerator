@@ -101,7 +101,7 @@
 
 {% endif %}{# is_admin — closes Add User Modal #}
 
-<style>
+<style nonce="{{ csp_nonce }}">
 .user-card { transition: border-color .15s; border-color: var(--bs-border-color); }
 .user-card:hover { border-color: var(--sk-accent); }
 </style>

@@ -64,8 +64,8 @@
                 <i class="bi bi-pencil"></i>
               </button>
               {% set _kegs = keg_counts.get(beer.id, 0) %}
-              <form method="post" action="/beers/{{ beer.id }}/delete" class="d-inline"
-                    onsubmit="return confirm('Delete {{ beer.name }}?{% if _kegs > 0 %} This will also delete {{ _kegs }} keg(s) and all their pour records.{% endif %}')">
+              <form method="post" action="/beers/{{ beer.id }}/delete" class="d-inline js-confirm"
+                    data-confirm="Delete {{ beer.name }}?{% if _kegs > 0 %} This will also delete {{ _kegs }} keg(s) and all their pour records.{% endif %}">
                 <button type="submit" class="btn btn-sm btn-outline-danger"
                         title="{% if _kegs > 0 %}Deletes {{ _kegs }} keg(s) and all pours{% else %}Delete beer{% endif %}">
                   <i class="bi bi-trash"></i>
@@ -133,9 +133,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function fillBeerForm(btn) {
-  const prefix = btn.closest('.modal') ? '' : '';
+<script nonce="{{ csp_nonce }}">
+function _fillBeerForm(btn) {
   document.getElementById('bf-name').value         = btn.dataset.name        || '';
   document.getElementById('bf-company').value      = btn.dataset.company     || '';
   document.getElementById('bf-location').value     = btn.dataset.location    || '';
@@ -148,5 +147,11 @@ function fillBeerForm(btn) {
   document.getElementById('bf-label-url').value    = btn.dataset.labelUrl    || '';
   document.getElementById('untappd-results').innerHTML = '';
 }
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.js-fill-beer');
+  if (btn) _fillBeerForm(btn);
+  const form = e.target.closest('form.js-confirm');
+  if (form && !confirm(form.dataset.confirm)) e.preventDefault();
+});
 </script>
 {% endblock %}

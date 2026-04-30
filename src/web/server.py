@@ -159,8 +159,16 @@ app = FastAPI(
 # ── Middleware (last added = outermost = first to process requests) ─────────
 
 class _SecurityHeaders(BaseHTTPMiddleware):
-    """Attach security response headers to every reply."""
+    """Attach security response headers to every reply.
+
+    A fresh CSP nonce is generated per request and stored on request.state so
+    templates can stamp it onto every <script> and <style> tag.  The same nonce
+    is then embedded in the Content-Security-Policy header so the browser only
+    executes scripts/styles that carry the matching value.
+    """
     async def dispatch(self, request: Request, call_next) -> Response:
+        nonce = secrets.token_urlsafe(16)
+        request.state.csp_nonce = nonce        # available to route handlers / templates
         response = await call_next(request)
         response.headers["X-Frame-Options"]        = "SAMEORIGIN"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -168,13 +176,11 @@ class _SecurityHeaders(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"]     = "camera=(), microphone=(), geolocation=()"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net "
-                "https://challenges.cloudflare.com; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            f"script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
+            f"style-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net; "
             "font-src 'self' https://cdn.jsdelivr.net; "
             "img-src 'self' data: https:; "
-            "connect-src 'self' https://cloudflareinsights.com; "
-            "frame-src https://challenges.cloudflare.com; "
+            "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
         try:
@@ -269,6 +275,7 @@ def ctx(request: Request, **kwargs) -> dict:
     except Exception:
         admin_username = None
         is_admin       = False
+    nonce = getattr(request.state, "csp_nonce", "")
     return {
         "request":        request,
         "config":         _config,
@@ -276,6 +283,7 @@ def ctx(request: Request, **kwargs) -> dict:
         "admin_username": admin_username,
         "site_name":      _site_name(_config),
         "theme_vars":     _css_vars(_config),
+        "csp_nonce":      nonce,
         **kwargs,
     }
 

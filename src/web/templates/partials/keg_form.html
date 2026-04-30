@@ -2,8 +2,7 @@
 <div class="mb-3">
   <label class="form-label">Beer <span class="text-danger">*</span></label>
   <div class="d-flex gap-2 align-items-center">
-    <select class="form-select" name="beer_id" required
-            onchange="updateKegBeerPreview(this)">
+    <select class="form-select js-keg-beer-select" name="beer_id" required>
       <option value="">— Select Beer —</option>
       {% for beer in beers %}
       <option value="{{ beer.id }}"
