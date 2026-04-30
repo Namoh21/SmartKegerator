@@ -431,13 +431,19 @@ class App(QObject):
         existing = len(list(photos_dir.glob("*.jpg")))
         dest     = str(photos_dir / f"pic{existing}.jpg")
 
-        if self._camera.capture_photo(dest):
+        if not self._camera.is_running:
+            self._db.set_setting("capture_result", f"{req_id}:ERROR:Camera is not running — check the camera connection and config.")
+            log.warning("Web capture: camera not running for user %d", user_id)
+        elif self._camera.latest_frame is None:
+            self._db.set_setting("capture_result", f"{req_id}:ERROR:Camera opened but has not captured a frame yet — try again in a moment.")
+            log.warning("Web capture: no frame available yet for user %d", user_id)
+        elif self._camera.capture_photo(dest):
             self._db.add_user_image(user_id, dest)
             self._db.set_setting("capture_result", f"{req_id}:{dest}")
             log.info("Web capture: saved %s for user %d", dest, user_id)
         else:
-            self._db.set_setting("capture_result", f"{req_id}:ERROR")
-            log.warning("Web capture: camera returned no frame for user %d", user_id)
+            self._db.set_setting("capture_result", f"{req_id}:ERROR:Camera returned a frame but could not write the file — check disk space and photos directory permissions.")
+            log.warning("Web capture: imwrite failed for user %d at %s", user_id, dest)
 
     def _open_pin_login(self) -> None:
         from PyQt6.QtWidgets import QDialog

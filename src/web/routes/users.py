@@ -135,12 +135,12 @@ async def capture_poll(user_id: int, req_id: str, response: Response):
         db.set_setting("capture_result", "")
         db.set_setting("capture_ts",     "")
         payload = result[len(req_id) + 1:]
-        if payload == "ERROR":
+        if payload.startswith("ERROR"):
+            detail = payload[6:].lstrip(":") or "Camera not ready — is the touchscreen app running?"
             return HTMLResponse(
-                '<span class="text-danger">'
-                '<i class="bi bi-x-circle me-1"></i>'
-                'Camera not ready — is the touchscreen app running?'
-                '</span>'
+                f'<span class="text-danger">'
+                f'<i class="bi bi-x-circle me-1"></i>{detail}'
+                f'</span>'
             )
         # Success — tell HTMX to do a full page refresh so the new photo appears
         response.headers["HX-Refresh"] = "true"

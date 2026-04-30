@@ -102,6 +102,10 @@ class Camera(QObject):
     # ------------------------------------------------------------------
 
     @property
+    def is_running(self) -> bool:
+        return self._running and self._cap is not None
+
+    @property
     def latest_frame(self) -> Optional[np.ndarray]:
         with self._lock:
             return self._latest if self._latest is None else self._latest.copy()
