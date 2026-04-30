@@ -249,6 +249,44 @@ fi
 info "Display rotation is configured via Settings → Appearance in the web UI."
 
 # ---------------------------------------------------------------------------
+# Permanent swap — Pi 3 / 1 GB only
+#
+# dlib face encoding uses ~350-400 MB peak per image.  Combined with the
+# Qt GUI (~250 MB) and web server (~120 MB) the OOM killer fires on 1 GB
+# systems.  A 1 GB swap file on the SD card gives enough headroom without
+# noticeably affecting runtime speed (encoding is CPU-bound, not RAM-bound).
+# ---------------------------------------------------------------------------
+if [[ "${LOW_MEM}" == "true" ]]; then
+    echo ""
+    echo "── Permanent swap (Pi 3 / low-memory) ──"
+    SWAP_FILE="/opt/smartkegerator/runtime-swap"
+    SWAP_SIZE_MB=1024
+
+    if swapon --show | grep -qF "${SWAP_FILE}"; then
+        ok "Runtime swap already active at ${SWAP_FILE}."
+    else
+        if [[ ! -f "${SWAP_FILE}" ]]; then
+            info "Creating ${SWAP_SIZE_MB} MB swap at ${SWAP_FILE}..."
+            fallocate -l "${SWAP_SIZE_MB}M" "${SWAP_FILE}" 2>/dev/null || \
+                dd if=/dev/zero of="${SWAP_FILE}" bs=1M count="${SWAP_SIZE_MB}" status=none
+            chmod 600 "${SWAP_FILE}"
+            mkswap "${SWAP_FILE}" -q
+            info "Swap file created."
+        fi
+        swapon "${SWAP_FILE}"
+        ok "Swap active: $(free -h | awk '/Swap/{print $2}') total."
+    fi
+
+    # Persist across reboots via /etc/fstab
+    if ! grep -qF "${SWAP_FILE}" /etc/fstab; then
+        echo "${SWAP_FILE} none swap sw 0 0" >> /etc/fstab
+        info "Added swap to /etc/fstab (persists across reboots)."
+    else
+        ok "Swap already in /etc/fstab."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------
 echo ""

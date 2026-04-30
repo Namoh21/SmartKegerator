@@ -296,7 +296,13 @@ def train_user_sync(db, config: dict, user_id: int) -> tuple[int, str]:
     Safe to call from any thread or async context — does not require Qt.
     The live FaceRecognizer picks up the new encodings within 60 seconds
     via its periodic reload timer.
+
+    Memory note: each dlib HOG encoding pass uses ~300-400 MB peak on Pi 3.
+    Photos are processed one at a time with explicit GC between each so the
+    peak footprint is one-photo-worth rather than all photos at once.
     """
+    import gc
+
     if not _FR_AVAILABLE:
         return 0, "face_recognition library not available on this system"
 
@@ -312,6 +318,7 @@ def train_user_sync(db, config: dict, user_id: int) -> tuple[int, str]:
         if not p.exists():
             log.warning("train_user_sync: image not found: %s", img_path)
             continue
+        img = None
         try:
             img       = _fr.load_image_file(str(p))
             locations = _fr.face_locations(img, model=model)
@@ -322,8 +329,13 @@ def train_user_sync(db, config: dict, user_id: int) -> tuple[int, str]:
             encs    = _fr.face_encodings(img, [largest])
             if encs:
                 results.append((img_path, encs[0]))
+                log.debug("train_user_sync: encoded %s", Path(img_path).name)
         except Exception as exc:
             log.warning("train_user_sync: failed to encode %s: %s", img_path, exc)
+        finally:
+            # Explicitly free the large image array before loading the next one
+            del img
+            gc.collect()
 
     if not results:
         return 0, f"no usable faces found in {len(user.image_paths)} photo(s)"
