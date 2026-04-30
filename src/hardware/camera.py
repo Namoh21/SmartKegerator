@@ -60,6 +60,12 @@ class Camera(QObject):
         self._height    = hw.get("camera_height", 480)
         self._use_color = hw.get("camera_use_color", True)
 
+        # Preview JPEG written periodically for the web UI
+        import pathlib
+        data_dir = pathlib.Path(config.get("data", {}).get("user_photos_dir", "/tmp"))
+        self._preview_path = str(data_dir.parent / "camera_preview.jpg")
+        self._frame_count  = 0
+
         self._cap:    Optional[cv2.VideoCapture] = None
         self._picam:  Optional[object]           = None   # Picamera2 instance
         self._lock    = threading.Lock()
@@ -221,6 +227,11 @@ class Camera(QObject):
             self._latest = frame
         self.frame_ready.emit(_bgr_to_pixmap(frame))
         self.raw_frame_ready.emit(frame)
+
+        # Write preview JPEG every 15 frames (~2 fps) for the web UI
+        self._frame_count += 1
+        if self._frame_count % 15 == 0:
+            cv2.imwrite(self._preview_path, frame)
 
 
 # ---------------------------------------------------------------------------

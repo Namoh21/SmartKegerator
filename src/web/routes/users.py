@@ -5,7 +5,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from data.models import User, UNKNOWN_USER_ID
 from web.server import get_config, get_db, templates, ctx
@@ -104,6 +104,20 @@ async def add_payment(user_id: int, amount: float = Form(...)):
     if db.get_user(user_id):
         db.add_payment(user_id, amount)
     return RedirectResponse(f"/users/{user_id}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Camera preview (served from the JPEG the Qt app writes periodically)
+# ---------------------------------------------------------------------------
+
+@router.get("/camera/preview")
+async def camera_preview_image():
+    config = get_config()
+    path   = Path(config["data"]["user_photos_dir"]).parent / "camera_preview.jpg"
+    if not path.exists():
+        return Response(status_code=204)   # no content yet — browser shows nothing
+    return FileResponse(str(path), media_type="image/jpeg",
+                        headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------------------------

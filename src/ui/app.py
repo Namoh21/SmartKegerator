@@ -431,6 +431,8 @@ class App(QObject):
         existing = len(list(photos_dir.glob("*.jpg")))
         dest     = str(photos_dir / f"pic{existing}.jpg")
 
+        self._main_window.show_capture_banner()
+
         if not self._camera.is_running:
             self._db.set_setting("capture_result", f"{req_id}:ERROR:Camera is not running — check the camera connection and config.")
             log.warning("Web capture: camera not running for user %d", user_id)

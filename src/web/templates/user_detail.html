@@ -206,6 +206,17 @@
     </p>
     {% endif %}
 
+    <!-- Live camera preview -->
+    <div class="mb-3">
+      <div class="text-muted small mb-1"><i class="bi bi-camera-video me-1"></i>Live camera feed</div>
+      <img id="cam-preview"
+           src="/users/camera/preview"
+           alt="Camera feed"
+           class="rounded border"
+           style="width:320px;max-width:100%;height:auto;background:#111;display:block;"
+           onerror="this.style.opacity='0.3'">
+    </div>
+
     <!-- Capture from Pi camera -->
     <div class="d-flex align-items-center gap-3 flex-wrap">
       <button type="button" class="btn btn-outline-secondary btn-sm"
@@ -217,8 +228,8 @@
       <span id="capture-status"></span>
     </div>
     <div class="form-text text-muted mt-1">
-      Captures a frame from the kegerator's Pi camera. Have the person stand in
-      front of the camera before clicking. Capture 5+ photos for best results.
+      Position the person in the preview above, then click Capture. Aim for
+      5+ photos from slightly different angles.
     </div>
 
   </div>
@@ -269,4 +280,19 @@
   </div>
 </div>
 {% endif %}{# is_admin — closes Rename + Delete modals #}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Refresh the camera preview every 500 ms so it shows a near-live feed.
+// Cache-busting via timestamp query param prevents the browser from
+// serving a stale image.
+(function () {
+  const img = document.getElementById('cam-preview');
+  if (!img) return;
+  setInterval(() => {
+    img.src = '/users/camera/preview?t=' + Date.now();
+  }, 500);
+})();
+</script>
 {% endblock %}

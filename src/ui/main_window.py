@@ -96,6 +96,20 @@ class MainWindow(QWidget):
         root.addLayout(self._build_content(), stretch=1)
         root.addWidget(self._build_footer())
 
+        # Capture banner — shown briefly when a web-triggered photo is taken
+        self._capture_banner = QLabel("")
+        self._capture_banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._capture_banner.setStyleSheet(
+            f"background:{self._c['accent']}; color:{self._c['bg']};"
+            f"font-size:20px; font-weight:bold; padding:10px; border-radius:4px;"
+        )
+        self._capture_banner.setVisible(False)
+        root.addWidget(self._capture_banner)
+
+        self._capture_banner_timer = QTimer()
+        self._capture_banner_timer.setSingleShot(True)
+        self._capture_banner_timer.timeout.connect(lambda: self._capture_banner.setVisible(False))
+
         # Clock — tick every second
         self._clock = QTimer()
         self._clock.timeout.connect(self._update_clock)
@@ -216,6 +230,12 @@ class MainWindow(QWidget):
         else:
             self._settings_btn.setStyleSheet(f"color: {c['muted']};")
             self._login_btn.setVisible(user_id is None)
+
+    def show_capture_banner(self, message: str = "📷  Stand still — capturing photo…") -> None:
+        """Flash a banner at the bottom of the screen for 3 seconds."""
+        self._capture_banner.setText(message)
+        self._capture_banner.setVisible(True)
+        self._capture_banner_timer.start(3000)
 
     def refresh(self) -> None:
         taps = self._db.get_tap_assignments()
