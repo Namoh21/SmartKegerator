@@ -51,7 +51,7 @@ This lets you connect over SSH on first boot without a monitor or keyboard.
 ### 2. SSH in and clone the repo
 
 ```bash
-ssh brian@smartkegerator.local
+ssh <username>@smartkegerator.local
 
 cd ~
 git clone https://github.com/Namoh21/SmartKegerator.git

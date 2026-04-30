@@ -6,7 +6,7 @@ Layout (800 × 480):
 │  POURING — LEFT TAP · African Amber              [Stop Pour]           │
 ├─ Camera feed ──────────────┬─ Info panel ───────────────────────────── ┤
 │                            │                                           │
-│   Live camera (640×360)    │   👤  Brian Homan  (96%)                 │
+│   Live camera (640×360)    │   👤  Alice Smith  (96%)                 │
 │                            │                                           │
 │   Face detected indicator  │   🍺  African Amber                      │
 │                            │       Mac & Jack's · Amber Ale           │

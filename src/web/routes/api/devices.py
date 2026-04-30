@@ -19,7 +19,7 @@ router = APIRouter()
 class RegisterRequest(BaseModel):
     token:    str
     platform: str = "android"
-    label:    str = ""          # optional human-readable label (e.g. "Brian's phone")
+    label:    str = ""          # optional human-readable label (e.g. "Alice's phone")
 
 
 @router.post("/devices/register", dependencies=[Depends(require_admin)])

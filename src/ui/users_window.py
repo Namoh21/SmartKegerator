@@ -4,8 +4,8 @@ Users window — add/remove users, capture training photos, trigger recognition 
 Layout:
 ┌─ Users ─────────────────────────────────────────────── [Close] ─┐
 │  ┌─ User list ────┐  ┌─ Detail panel ──────────────────────────┐ │
-│  │ Unknown        │  │  Name: Brian Homan                      │ │
-│  │ Brian Homan    │  │                                         │ │
+│  │ Unknown        │  │  Name: Alice Smith                      │ │
+│  │ Alice Smith    │  │                                         │ │
 │  │ Sarah Jones    │  │  ┌─ Camera ─────────┐  ┌─ Photos ────┐ │ │
 │  │                │  │  │  Live preview    │  │ pic0.jpg    │ │ │
 │  │                │  │  │                  │  │ pic1.jpg    │ │ │
