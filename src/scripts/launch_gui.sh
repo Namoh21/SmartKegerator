@@ -12,6 +12,12 @@ CONFIG="${SRC_DIR}/config.yaml"
 
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
+# Force Qt to use the Wayland platform plugin.
+# Without this, Qt 6 may fall back to XWayland (no-op or invisible on a
+# pure Wayland compositor) when launched from the compositor autostart.
+export QT_QPA_PLATFORM=wayland
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+
 # Only one instance at a time
 if pgrep -f "main.py ${CONFIG}" >/dev/null 2>&1; then
     exit 0
