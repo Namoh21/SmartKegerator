@@ -147,15 +147,20 @@ class Camera(QObject):
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._height)
         cap.set(cv2.CAP_PROP_BUFFERSIZE,   1)
 
-        # Verify we can actually read a frame before committing
-        ret, frame = cap.read()
-        if not ret or frame is None:
-            log.warning(
-                "Camera: OpenCV opened device %d but read() failed — "
-                "trying picamera2", self._index
-            )
-            cap.release()
-            return False
+        # Read 3 consecutive frames to confirm the stream is stable.
+        # A unicam (Pi Camera raw) device can open and return one buffered
+        # frame but then fail on subsequent reads — 3 reads catches that.
+        last_frame = None
+        for attempt in range(3):
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                log.warning(
+                    "Camera: OpenCV device %d failed on read %d — trying picamera2",
+                    self._index, attempt + 1,
+                )
+                cap.release()
+                return False
+            last_frame = frame
 
         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -163,7 +168,12 @@ class Camera(QObject):
 
         self._cap     = cap
         self._running = True
-        self._thread  = threading.Thread(target=self._opencv_loop, name="camera", daemon=True)
+        # Store the last test frame immediately so latest_frame is never None
+        # from the moment start() returns
+        with self._lock:
+            self._latest = last_frame
+
+        self._thread = threading.Thread(target=self._opencv_loop, name="camera", daemon=True)
         self._thread.start()
         return True
 
@@ -190,7 +200,13 @@ class Camera(QObject):
             )
             picam.configure(cfg)
             picam.start()
-            time.sleep(0.1)   # let the sensor settle before first capture
+            time.sleep(0.5)   # let the sensor stabilise before first capture
+
+            # Grab one frame immediately so latest_frame is never None
+            # from the moment start() returns
+            first = picam.capture_array("main")
+            with self._lock:
+                self._latest = first
 
             log.info("Camera: picamera2 backend at %dx%d", self._width, self._height)
             self._picam   = picam
