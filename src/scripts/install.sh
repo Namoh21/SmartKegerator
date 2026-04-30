@@ -197,6 +197,8 @@ info "System packages installed."
 # Low-memory swap — created before the dlib build, removed afterwards.
 # fallocate is fastest; fall back to dd on filesystems that don't support it.
 # ---------------------------------------------------------------------------
+# Ensure install dir exists before we try to write the swap file into it
+mkdir -p "${INSTALL_DIR}"
 BUILD_SWAP="${INSTALL_DIR}/build-swap"
 
 if [[ "${LOW_MEM}" == "true" ]]; then
