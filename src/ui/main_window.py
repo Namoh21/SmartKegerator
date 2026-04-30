@@ -75,7 +75,6 @@ def _build_style(c: dict) -> str:
 
 class MainWindow(QWidget):
     settings_requested = pyqtSignal()
-    login_requested    = pyqtSignal()
 
     def __init__(self, config: dict, db: Database, recognizer=None, parent=None) -> None:
         super().__init__(parent)
@@ -180,10 +179,6 @@ class MainWindow(QWidget):
         self._lbl_current_user.setStyleSheet(f"color: {c['muted']}; font-size: 17px;")
         row.addWidget(self._lbl_current_user, stretch=1)
 
-        self._login_btn = QPushButton("🔑  Login")
-        self._login_btn.clicked.connect(self.login_requested.emit)
-        row.addWidget(self._login_btn)
-
         self._settings_btn = QPushButton("⚙  Settings")
         self._settings_btn.clicked.connect(self.settings_requested.emit)
         row.addWidget(self._settings_btn)
@@ -226,10 +221,8 @@ class MainWindow(QWidget):
 
         if is_admin:
             self._settings_btn.setStyleSheet("")
-            self._login_btn.setVisible(False)
         else:
             self._settings_btn.setStyleSheet(f"color: {c['muted']};")
-            self._login_btn.setVisible(user_id is None)
 
     def show_capture_banner(self, message: str = "📷  Stand still — capturing photo…") -> None:
         """Flash a banner at the bottom of the screen for 3 seconds."""

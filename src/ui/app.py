@@ -166,7 +166,6 @@ class App(QObject):
 
         # Main window navigation
         self._main_window.settings_requested.connect(self._open_settings)
-        self._main_window.login_requested.connect(self._open_pin_login)
 
         # Web-initiated camera capture (DB polling IPC)
         self._capture_timer = QTimer(self)
@@ -447,25 +446,20 @@ class App(QObject):
             self._db.set_setting("capture_result", f"{req_id}:ERROR:Camera returned a frame but could not write the file — check disk space and photos directory permissions.")
             log.warning("Web capture: imwrite failed for user %d at %s", user_id, dest)
 
-    def _open_pin_login(self) -> None:
-        from PyQt6.QtWidgets import QDialog
-        from ui.pin_login_dialog import PinLoginDialog
-        dlg = PinLoginDialog(self._config, self._db, self._main_window)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            admin   = dlg.authenticated_admin()
-            user_id = dlg.authenticated_user_id()
-            if admin and user_id is not None:
-                self._on_user_identified(user_id)
-
     def _open_settings(self) -> None:
         if not self._is_admin:
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
-                self._main_window, "Admin Access Required",
-                "Settings can only be changed by an administrator.\n\n"
-                "An admin must be identified by the camera to unlock this screen.",
-            )
-            return
+            # Prompt for PIN login before opening settings
+            from PyQt6.QtWidgets import QDialog
+            from ui.pin_login_dialog import PinLoginDialog
+            dlg = PinLoginDialog(self._config, self._db, self._main_window)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            admin   = dlg.authenticated_admin()
+            user_id = dlg.authenticated_user_id()
+            if not admin or user_id is None:
+                return
+            self._on_user_identified(user_id)
+
         from ui.settings_window import SettingsWindow
         w = SettingsWindow(self._config, self._db, self._main_window)
         w.users_requested.connect(self._open_users)
