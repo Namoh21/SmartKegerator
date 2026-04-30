@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-import bcrypt
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QGridLayout, QHBoxLayout, QLabel,
@@ -241,11 +240,8 @@ class PinLoginDialog(QDialog):
                 self._refresh_dots()
                 return
 
-            match = bcrypt.checkpw(
-                self._pin.encode("utf-8"),
-                stored.encode("utf-8"),
-            )
-            if match:
+            from web.auth import verify_password
+            if verify_password(self._pin, stored):
                 self._auth_user_id = self._selected.get("user_id")
                 self._auth_admin   = self._selected
                 self.accept()
