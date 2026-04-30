@@ -323,19 +323,40 @@ if [[ "${LOW_MEM}" == "true" ]] && swapon --show | grep -qF "${BUILD_SWAP}"; the
     info "Build swap removed."
 fi
 
-# face-recognition (pure Python wrapper — fast)
+# ---------------------------------------------------------------------------
+# pip_install_retry <label> <packages...>
+#   Runs pip install and retries up to 3 times on network failure.
+#   pip --retries only retries the initial connection; IncompleteRead
+#   (connection dropped mid-download) requires a full command retry.
+# ---------------------------------------------------------------------------
+pip_install_retry() {
+    local label="$1"; shift
+    local attempt
+    for attempt in 1 2 3; do
+        if sudo -u "${REAL_USER}" ${PIP} "$@"; then
+            return 0
+        fi
+        if [[ ${attempt} -lt 3 ]]; then
+            warn "${label}: download failed (attempt ${attempt}/3) — retrying in 10 s..."
+            sleep 10
+        fi
+    done
+    error "${label}: failed after 3 attempts. Check your network and re-run install.sh."
+}
+
+# face-recognition (~100 MB — prone to network drops on slow connections)
 if [[ "${RECOGNITION_ENABLED}" != "false" ]]; then
     info "Installing face-recognition (1-2 minutes)..."
-    sudo -u "${REAL_USER}" ${PIP} face-recognition
+    pip_install_retry "face-recognition" face-recognition
     info "face-recognition installed."
 fi
 
 # Pin NumPy < 2 — system python3-opencv is compiled against NumPy 1.x
 # and NumPy 2.x breaks its C extension (_ARRAY_API not found).
-sudo -u "${REAL_USER}" ${PIP} "numpy<2"
+pip_install_retry "numpy" "numpy<2"
 
 # Remaining packages — all pure Python, install in seconds
-sudo -u "${REAL_USER}" ${PIP} \
+pip_install_retry "web + UI packages" \
     pyqtgraph \
     adafruit-circuitpython-dht \
     "fastapi>=0.110" \
