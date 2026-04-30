@@ -12,8 +12,12 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from ui.theme import THEMES
 from web.auth import hash_password
+import logging
+
 from log_config import log_dir_for, tail_log
 from web.server import get_db, get_config, get_config_path, reload_config, templates, ctx
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings")
 
@@ -382,8 +386,11 @@ async def admin_set_pin(
 # ---------------------------------------------------------------------------
 
 @router.post("/restart", response_class=HTMLResponse)
-async def restart_services():
+async def restart_services(request: Request):
     """Schedule a service restart 2 seconds after responding."""
+    admin = request.session.get("admin_username", "unknown")
+    log.warning("Service restart requested by admin=%s from %s", admin, request.client.host if request.client else "unknown")
+
     async def _delayed_restart():
         await asyncio.sleep(2)
         subprocess.run(["systemctl", "--user", "restart", "smartkegerator"],     check=False)
@@ -396,8 +403,11 @@ async def restart_services():
 
 
 @router.post("/reboot", response_class=HTMLResponse)
-async def reboot_system():
+async def reboot_system(request: Request):
     """Schedule a full system reboot 3 seconds after responding."""
+    admin = request.session.get("admin_username", "unknown")
+    log.warning("System reboot requested by admin=%s from %s", admin, request.client.host if request.client else "unknown")
+
     async def _delayed_reboot():
         await asyncio.sleep(3)
         subprocess.run(["sudo", "reboot"], check=False)

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from web.auth import hash_password, verify_password
 from web.server import get_db, templates, ctx
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin")
 
@@ -109,8 +113,10 @@ async def login_submit(
             if linked:
                 request.session["user_id"]   = linked.id
                 request.session["user_name"] = linked.name
+        log.info("Admin login: %s from %s", username, request.client.host if request.client else "unknown")
         return RedirectResponse(dest, status_code=303)
 
+    log.warning("Failed login attempt: username=%r from %s", username, request.client.host if request.client else "unknown")
     return RedirectResponse("/admin/login?error=1", status_code=303)
 
 

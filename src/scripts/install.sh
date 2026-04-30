@@ -290,8 +290,9 @@ else
     if curl -fsSL --connect-timeout 10 -o "${WHEEL_PATH}" "${WHEEL_URL}" 2>/dev/null; then
         chown "${REAL_USER}:${REAL_USER}" "${WHEEL_PATH}"
         info "Downloaded ${WHEEL_NAME} — installing..."
-        sudo -u "${REAL_USER}" ${PIP} --find-links "${WHEEL_CACHE}" dlib
-        info "dlib installed from pre-built wheel (~30 seconds)."
+        info "Unpacking and linking dlib wheel — this can take 5-10 minutes on Pi 3/4, please wait..."
+        sudo -u "${REAL_USER}" ${PYTHON} -m pip install --find-links "${WHEEL_CACHE}" --no-index dlib
+        info "dlib installed from pre-built wheel."
     else
         rm -f "${WHEEL_PATH}"   # remove partial download
         warn "Pre-built wheel not available — building dlib from source."
@@ -324,7 +325,9 @@ fi
 
 # face-recognition (pure Python wrapper — fast)
 if [[ "${RECOGNITION_ENABLED}" != "false" ]]; then
+    info "Installing face-recognition (1-2 minutes)..."
     sudo -u "${REAL_USER}" ${PIP} face-recognition
+    info "face-recognition installed."
 fi
 
 # Pin NumPy < 2 — system python3-opencv is compiled against NumPy 1.x

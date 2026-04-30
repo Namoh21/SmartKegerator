@@ -190,10 +190,17 @@ async def photo_delete(user_id: int, photo_path: str = Form(...)):
     db   = get_db()
     user = db.get_user(user_id)
     if user:
+        photos_root = Path(get_config()["data"]["user_photos_dir"]).resolve()
+        try:
+            target = Path(photo_path).resolve()
+            # Ensure the path is inside the user photos directory
+            target.relative_to(photos_root)
+        except (ValueError, Exception):
+            return RedirectResponse(f"/users/{user_id}", status_code=303)
         user.image_paths = [p for p in user.image_paths if p != photo_path]
         db.save_user(user)
         try:
-            Path(photo_path).unlink(missing_ok=True)
+            target.unlink(missing_ok=True)
         except Exception:
             pass
     return RedirectResponse(f"/users/{user_id}", status_code=303)
