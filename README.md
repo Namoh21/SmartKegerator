@@ -16,7 +16,7 @@ Original concept by [PhilsProjects](https://philsprojects.wordpress.com/2015/07/
 - **REST API** — Android app support with JWT authentication
 - **Push notifications** — pour alerts, keg-low warnings, temperature alerts (polling-based, no Firebase required)
 - **Multi-tap** — up to 4 taps with configurable GPIO pins
-- **Temperature monitoring** — DS18B20 liquid sensor + DHT22 ambient sensor
+- **Temperature monitoring** — DHT22 ambient temperature + humidity sensor
 - **Admin PIN login** — touchscreen fallback when face recognition isn't set up yet
 
 ---
@@ -73,7 +73,7 @@ The installer runs unattended and handles everything:
 - Creates the data, photos, and logs directory tree
 - Installs and enables two systemd services (`smartkegerator` and `smartkegerator-web`)
 - Configures the Wayland compositor autostart (labwc on Trixie, Wayfire on Bookworm)
-- Runs hardware setup — 1-Wire, GPIO permissions, permanent swap (Pi 3), screen blanking
+- Runs hardware setup — GPIO permissions, permanent swap (Pi 3), screen blanking
 
 **Expected install time:**
 | Model | Time | Notes |
@@ -113,11 +113,10 @@ taps:
 
 hardware:
   camera_index: 0
-  liquid_temp_sensor_id: "28-xxxxxxxxxxxx"   # from raspi-config → 1-Wire
   temp_sensor_power_pin: 17
 ```
 
-Run hardware setup to enable 1-Wire, set GPIO permissions, and (on Pi 3) create the
+Run hardware setup to set GPIO permissions and (on Pi 3) create the
 permanent runtime swap that prevents OOM crashes during face recognition training:
 
 ```bash
@@ -336,7 +335,7 @@ src/
 ├── hardware/
 │   ├── camera.py            # OpenCV / picamera2 capture (auto-detected)
 │   ├── flow_meter.py        # GPIO pulse counting
-│   └── temp_sensor.py       # DS18B20 + DHT22
+│   └── temp_sensor.py       # DHT22 ambient sensor
 ├── recognition/
 │   └── face_recognizer.py   # dlib ResNet face detection + encoding
 ├── ui/

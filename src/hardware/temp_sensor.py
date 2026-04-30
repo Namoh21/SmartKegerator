@@ -1,12 +1,8 @@
 """
 Temperature and humidity sensor manager.
 
-Reads two sensors:
-  • DHT22  — ambient temperature + humidity (GPIO pin, via adafruit-circuitpython-dht)
-  • DS18B20 — liquid temperature in the keg line (1-Wire sysfs interface)
-
-Replaces the original approach of spawning loldht/loldht22 as subprocesses
-and parsing their stdout. Both sensors are now read directly in Python.
+Reads the DHT22 ambient temperature + humidity sensor via GPIO
+using the adafruit-circuitpython-dht library.
 
 Emits a Qt signal on every successful reading so the UI can update in real time.
 All sensor I/O happens in a daemon thread; signals are emitted from that thread
@@ -18,7 +14,6 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -33,7 +28,6 @@ except ImportError:
     _DHT_AVAILABLE = False
     log.warning("adafruit_dht not available — DHT22 readings will be stubbed (dev/non-Pi mode)")
 
-_W1_BASE = Path("/sys/bus/w1/devices")
 _READ_INTERVAL_SECONDS = 30.0
 _MAX_DELTA_F = 20.0      # ignore readings that jump more than this between samples
 _RETRY_LIMIT  = 3        # attempts per reading cycle before giving up
@@ -41,35 +35,31 @@ _RETRY_LIMIT  = 3        # attempts per reading cycle before giving up
 
 class TempSensorManager(QObject):
     """
-    Polls DHT22 and DS18B20 sensors on a background thread and exposes
-    the latest readings via properties and a Qt signal.
+    Polls the DHT22 sensor on a background thread and exposes the latest
+    readings via properties and a Qt signal.
 
     Readings are in Fahrenheit to match the original application.
 
     Signals:
-        readings_updated(ambient_f, humidity_pct, liquid_f)
+        readings_updated(ambient_f, humidity_pct)
             Emitted whenever a successful reading cycle completes.
-            Any value may be None if that sensor failed.
+            Either value may be None if the sensor failed.
     """
 
-    readings_updated = pyqtSignal(object, object, object)  # (float|None) × 3
+    readings_updated = pyqtSignal(object, object)  # (float|None) × 2
 
     def __init__(self, config: dict, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
 
         hw = config.get("hardware", {})
-        self._dht_pin_num     = hw.get("temp_sensor_dht_pin", 22)
-        self._ds18b20_id      = hw.get("liquid_temp_sensor_id", "")
-        self._power_pin       = hw.get("temp_sensor_power_pin", 17)
-        self._interval        = _READ_INTERVAL_SECONDS
+        self._dht_pin_num = hw.get("temp_sensor_dht_pin", 22)
+        self._power_pin   = hw.get("temp_sensor_power_pin", 17)
+        self._interval    = _READ_INTERVAL_SECONDS
 
-        # Latest readings (None until first successful read)
-        self.ambient_f:  Optional[float] = None
-        self.humidity:   Optional[float] = None
-        self.liquid_f:   Optional[float] = None
+        self.ambient_f: Optional[float] = None
+        self.humidity:  Optional[float] = None
 
         self._prev_ambient_f: Optional[float] = None
-        self._prev_liquid_f:  Optional[float] = None
 
         self._dht_device = None
         self._running    = False
@@ -80,10 +70,6 @@ class TempSensorManager(QObject):
     # ------------------------------------------------------------------
 
     def start(self, gpio_manager=None) -> None:
-        """
-        Begin polling. Pass the shared GPIOManager if the DHT22 power pin
-        needs to be toggled during sensor resets.
-        """
         self._gpio = gpio_manager
         self._init_dht()
         self._running = True
@@ -91,8 +77,7 @@ class TempSensorManager(QObject):
             target=self._poll_loop, name="temp-sensor", daemon=True
         )
         self._thread.start()
-        log.info("TempSensorManager started (DHT22 pin %d, DS18B20 %s)",
-                 self._dht_pin_num, self._ds18b20_id or "not configured")
+        log.info("TempSensorManager started (DHT22 pin %d)", self._dht_pin_num)
 
     def stop(self) -> None:
         self._running = False
@@ -123,8 +108,7 @@ class TempSensorManager(QObject):
     def _poll_loop(self) -> None:
         while self._running:
             self._read_dht22()
-            self._read_ds18b20()
-            self.readings_updated.emit(self.ambient_f, self.humidity, self.liquid_f)
+            self.readings_updated.emit(self.ambient_f, self.humidity)
             time.sleep(self._interval)
 
     # ------------------------------------------------------------------
@@ -137,8 +121,8 @@ class TempSensorManager(QObject):
 
         for attempt in range(_RETRY_LIMIT):
             try:
-                temp_c    = self._dht_device.temperature
-                humidity  = self._dht_device.humidity
+                temp_c   = self._dht_device.temperature
+                humidity = self._dht_device.humidity
 
                 if temp_c is None or humidity is None:
                     raise RuntimeError("Sensor returned None")
@@ -153,9 +137,9 @@ class TempSensorManager(QObject):
                         )
                         return
 
-                self.ambient_f        = temp_f
-                self.humidity         = humidity
-                self._prev_ambient_f  = temp_f
+                self.ambient_f       = temp_f
+                self.humidity        = humidity
+                self._prev_ambient_f = temp_f
                 log.debug("DHT22: %.1f°F, %.1f%%", temp_f, humidity)
                 return
 
@@ -184,48 +168,6 @@ class TempSensorManager(QObject):
             except Exception:
                 pass
         self._init_dht()
-
-    # ------------------------------------------------------------------
-    # DS18B20 (liquid temperature via 1-Wire sysfs)
-    # ------------------------------------------------------------------
-
-    def _read_ds18b20(self) -> None:
-        if not self._ds18b20_id:
-            return
-
-        sensor_path = _W1_BASE / self._ds18b20_id / "w1_slave"
-        if not sensor_path.exists():
-            log.warning("DS18B20: sysfs path not found: %s", sensor_path)
-            return
-
-        try:
-            lines = sensor_path.read_text().splitlines()
-            if len(lines) < 2 or "YES" not in lines[0]:
-                log.warning("DS18B20: CRC check failed")
-                return
-
-            t_part = lines[1].split("t=")
-            if len(t_part) < 2:
-                log.warning("DS18B20: unexpected format: %s", lines[1])
-                return
-
-            temp_c = int(t_part[1]) / 1000.0
-            temp_f = _c_to_f(temp_c)
-
-            if self._prev_liquid_f is not None:
-                if abs(temp_f - self._prev_liquid_f) > _MAX_DELTA_F:
-                    log.warning(
-                        "DS18B20: ignoring suspicious reading %.1f°F (prev %.1f°F)",
-                        temp_f, self._prev_liquid_f,
-                    )
-                    return
-
-            self.liquid_f        = temp_f
-            self._prev_liquid_f  = temp_f
-            log.debug("DS18B20: %.1f°F", temp_f)
-
-        except Exception as exc:
-            log.error("DS18B20 read failed: %s", exc)
 
 
 # ---------------------------------------------------------------------------

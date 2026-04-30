@@ -11,7 +11,6 @@ router = APIRouter()
 
 
 class StatusResponse(BaseModel):
-    liquid_temp_f:  Optional[float]
     ambient_temp_f: Optional[float]
     humidity_pct:   Optional[float]
     temp_ts:        Optional[float]   # unix timestamp of last reading
@@ -30,7 +29,6 @@ async def get_status():
             return None
 
     return StatusResponse(
-        liquid_temp_f  = _f("latest_liquid_temp_f"),
         ambient_temp_f = _f("latest_ambient_temp_f"),
         humidity_pct   = _f("latest_humidity_pct"),
         temp_ts        = _f("latest_temp_ts"),

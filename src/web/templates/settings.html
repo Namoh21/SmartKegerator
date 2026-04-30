@@ -334,31 +334,6 @@
             <form method="post" action="/settings/sensors">
             {% endif %}
 
-              <div class="mb-4">
-                <label class="form-label fw-semibold">DS18B20 liquid temperature sensor ID</label>
-                {% if is_admin %}
-                <div class="input-group" style="max-width:420px;">
-                  <input type="text" class="form-control font-monospace"
-                         name="liquid_temp_sensor_id" id="sensorIdInput"
-                         value="{{ hw.get('liquid_temp_sensor_id', '') }}"
-                         placeholder="28-xxxxxxxxxxxx">
-                  <button type="button" class="btn btn-outline-secondary"
-                          hx-get="/settings/detect/sensors"
-                          hx-target="#sensor-detect-result"
-                          hx-swap="innerHTML">
-                    <i class="bi bi-search me-1"></i>Detect
-                  </button>
-                </div>
-                <div id="sensor-detect-result" class="mt-2"></div>
-                {% else %}
-                <p class="form-control-plaintext font-monospace">
-                  {{ hw.get('liquid_temp_sensor_id', '—') or '—' }}
-                </p>
-                {% endif %}
-                <div class="form-text text-muted">
-                  Enable 1-Wire in <code>raspi-config</code> → Interface Options → 1-Wire, then reboot.
-                </div>
-              </div>
 
               <div class="mb-4">
                 <label class="form-label fw-semibold">Sensor power GPIO pin (BCM)</label>
@@ -830,12 +805,6 @@ document.addEventListener('change', function(e) {
 });
 
 document.addEventListener('click', function(e) {
-  // Sensor ID copy buttons
-  const sensorBtn = e.target.closest('.sensor-id-btn');
-  if (sensorBtn) {
-    const inp = document.getElementById('sensorIdInput');
-    if (inp) inp.value = sensorBtn.dataset.id;
-  }
   // Log toggle buttons
   const logBtn = e.target.closest('.js-log-btn');
   if (logBtn) {

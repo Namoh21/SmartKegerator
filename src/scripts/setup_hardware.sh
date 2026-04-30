@@ -50,22 +50,7 @@ echo "Config file: ${CONFIG}"
 echo ""
 
 # ---------------------------------------------------------------------------
-# 1. 1-Wire (DS18B20 liquid temperature sensor)
-#    Default GPIO: pin 4.  Set w1-gpio,gpiopin=X to change.
-# ---------------------------------------------------------------------------
-echo "── 1-Wire (DS18B20) ──"
-add_overlay "dtoverlay=w1-gpio"
-
-# Confirm the w1-therm kernel module is available
-if modinfo w1-therm &>/dev/null; then
-    modprobe w1-therm 2>/dev/null || true
-    ok "w1-therm module loaded"
-else
-    warn "w1-therm module not found — may need 'sudo apt install raspberrypi-kernel'"
-fi
-
-# ---------------------------------------------------------------------------
-# 1b. GPU memory split — Pi 3 / 1 GB systems need gpu_mem bumped from the
+# 1. GPU memory split — Pi 3 / 1 GB systems need gpu_mem bumped from the
 #     default 64 MB to 128 MB so the camera has enough VRAM.  Pi 4/5 have
 #     dedicated VRAM and ignore this setting.
 # ---------------------------------------------------------------------------
@@ -130,37 +115,6 @@ fi
 if ! groups "${REAL_USER}" | grep -q dialout; then
     usermod -aG dialout "${REAL_USER}"
     info "Added ${REAL_USER} to the dialout group"
-fi
-
-# ---------------------------------------------------------------------------
-# 4. SPI (not needed by default — uncomment if you add SPI peripherals)
-# ---------------------------------------------------------------------------
-# add_overlay "dtparam=spi=on"
-
-# ---------------------------------------------------------------------------
-# 5. I2C (not needed by default — uncomment if you add I2C peripherals)
-# ---------------------------------------------------------------------------
-# add_overlay "dtparam=i2c_arm=on"
-
-# ---------------------------------------------------------------------------
-# 6. Verify DS18B20 sensor ID (helps populate config.yaml)
-# ---------------------------------------------------------------------------
-echo ""
-echo "── DS18B20 sensor check ──"
-W1_DIR="/sys/bus/w1/devices"
-if [[ -d "${W1_DIR}" ]]; then
-    SENSORS=$(ls "${W1_DIR}" | grep "^28-" || true)
-    if [[ -n "${SENSORS}" ]]; then
-        for s in ${SENSORS}; do
-            ok "Found DS18B20: ${s}"
-            echo "    Add to config.yaml:  liquid_temp_sensor_id: \"${s}\""
-        done
-    else
-        warn "No DS18B20 sensor found in ${W1_DIR}"
-        warn "Check wiring: DATA pin → GPIO 4 (BCM), with 4.7kΩ pull-up to 3.3V"
-    fi
-else
-    info "1-Wire sysfs not yet loaded (reboot required before sensor appears)"
 fi
 
 # ---------------------------------------------------------------------------

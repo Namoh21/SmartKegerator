@@ -246,15 +246,12 @@ class MainWindow(QWidget):
         self,
         ambient_f: Optional[float],
         humidity:  Optional[float],
-        liquid_f:  Optional[float],
     ) -> None:
         parts: list[str] = []
         if ambient_f is not None:
             parts.append(f"{ambient_f:.0f}°F")
         if humidity is not None:
             parts.append(f"{humidity:.0f}% Hum")
-        if liquid_f is not None:
-            parts.append(f"Liq {liquid_f:.0f}°F")
         self._lbl_env.setText("  ·  ".join(parts) if parts else "—")
 
 

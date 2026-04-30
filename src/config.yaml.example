@@ -26,10 +26,9 @@ hardware:
   tick_threshold: 3          # ticks required before a pour is registered
   end_pour_seconds: 5.0      # seconds of no ticks before pour ends
 
-  # Temperature sensors
-  temp_sensor_power_pin: 17
-  temp_sensor_dht_pin: 22
-  liquid_temp_sensor_id: "28-0000058cffde"   # DS18B20 1-Wire device ID
+  # Temperature sensors (DHT22 ambient sensor)
+  temp_sensor_power_pin: 17   # GPIO pin used to power-cycle the DHT22 on reset
+  temp_sensor_dht_pin: 22     # GPIO data pin for the DHT22
 
 recognition:
   enabled: true

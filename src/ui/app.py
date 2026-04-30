@@ -376,14 +376,12 @@ class App(QObject):
     # Sensor data — stored to DB so the REST API can serve it
     # ------------------------------------------------------------------
 
-    def _on_temp_readings(self, ambient_f, humidity_pct, liquid_f) -> None:
+    def _on_temp_readings(self, ambient_f, humidity_pct) -> None:
         try:
-            if ambient_f  is not None:
+            if ambient_f is not None:
                 self._db.set_setting("latest_ambient_temp_f", f"{ambient_f:.1f}")
             if humidity_pct is not None:
                 self._db.set_setting("latest_humidity_pct",   f"{humidity_pct:.1f}")
-            if liquid_f   is not None:
-                self._db.set_setting("latest_liquid_temp_f",  f"{liquid_f:.1f}")
             self._db.set_setting("latest_temp_ts", f"{time.time():.0f}")
         except Exception as exc:
             log.debug("Temp DB store error: %s", exc)

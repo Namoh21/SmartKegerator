@@ -265,13 +265,11 @@ async def settings_save_camera(
 async def settings_save_sensors(
     temp_sensor_power_pin: int = Form(17),
     temp_sensor_dht_pin:   int = Form(22),
-    liquid_temp_sensor_id: str = Form(""),
 ):
     cfg = _read_yaml()
     cfg.setdefault("hardware", {})
     cfg["hardware"]["temp_sensor_power_pin"] = temp_sensor_power_pin
     cfg["hardware"]["temp_sensor_dht_pin"]   = temp_sensor_dht_pin
-    cfg["hardware"]["liquid_temp_sensor_id"] = liquid_temp_sensor_id.strip()
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=sensors", status_code=303)
 
@@ -310,25 +308,6 @@ async def detect_cameras():
     ))
 
 
-@router.get("/detect/sensors", response_class=HTMLResponse)
-async def detect_sensors():
-    """Scan DS18B20 1-Wire devices and return clickable buttons."""
-    devices = sorted(glob.glob("/sys/bus/w1/devices/28-*"))
-    if not devices:
-        return HTMLResponse(
-            '<p class="text-warning small mb-0">'
-            '<i class="bi bi-exclamation-triangle me-1"></i>'
-            'No DS18B20 sensors found. Enable 1-Wire in raspi-config → Interface Options, then reboot.</p>'
-        )
-    buttons = "".join(
-        f'<button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1 sensor-id-btn"'
-        f' data-id="{Path(d).name}">{Path(d).name}</button>'
-        for d in devices
-    )
-    return HTMLResponse(
-        f'<div class="mb-1">{buttons}</div>'
-        '<p class="text-muted small mb-0">Click a sensor ID to copy it to the field above.</p>'
-    )
 
 
 # ---------------------------------------------------------------------------
