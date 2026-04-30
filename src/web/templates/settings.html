@@ -213,6 +213,50 @@
               </div>
               {% endfor %}
 
+              <!-- Flow meter calibration -->
+              {% set hw = yaml_config.get('hardware', {}) %}
+              <hr class="my-4">
+              <h6 class="fw-semibold mb-3"><i class="bi bi-speedometer me-2"></i>Flow Meter Calibration</h6>
+              <div class="row g-3 mb-3">
+                <div class="col-sm-4">
+                  <label class="form-label small fw-semibold">Ticks per liter</label>
+                  {% if is_admin %}
+                  <input type="number" class="form-control" name="ticks_per_liter"
+                         value="{{ hw.get('ticks_per_liter', 700) }}" min="1" step="1">
+                  {% else %}
+                  <p class="form-control-plaintext">{{ hw.get('ticks_per_liter', 700) }}</p>
+                  {% endif %}
+                  <div class="form-text text-muted">
+                    Pulses your sensor emits per liter. SwissFlow SF-800 ≈ 700.
+                    Calibrate by pouring a measured volume and counting ticks in the logs.
+                  </div>
+                </div>
+                <div class="col-sm-4">
+                  <label class="form-label small fw-semibold">Tick threshold</label>
+                  {% if is_admin %}
+                  <input type="number" class="form-control" name="tick_threshold"
+                         value="{{ hw.get('tick_threshold', 3) }}" min="1" step="1">
+                  {% else %}
+                  <p class="form-control-plaintext">{{ hw.get('tick_threshold', 3) }}</p>
+                  {% endif %}
+                  <div class="form-text text-muted">
+                    Minimum pulses before a pour is registered. Filters out vibration noise.
+                  </div>
+                </div>
+                <div class="col-sm-4">
+                  <label class="form-label small fw-semibold">End pour after (seconds)</label>
+                  {% if is_admin %}
+                  <input type="number" class="form-control" name="end_pour_seconds"
+                         value="{{ hw.get('end_pour_seconds', 5.0) }}" min="1" step="0.5">
+                  {% else %}
+                  <p class="form-control-plaintext">{{ hw.get('end_pour_seconds', 5.0) }} s</p>
+                  {% endif %}
+                  <div class="form-text text-muted">
+                    Seconds of no flow before the pour is closed and recorded.
+                  </div>
+                </div>
+              </div>
+
               {% if is_admin %}
               <button type="submit" class="btn btn-accent mt-2">
                 <i class="bi bi-save me-1"></i>Save Taps

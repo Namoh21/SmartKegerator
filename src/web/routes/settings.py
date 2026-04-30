@@ -213,15 +213,18 @@ async def settings_save_display_rotation(rotation: int = Form(90)):
 
 @router.post("/taps", response_class=RedirectResponse)
 async def settings_save_taps(
-    tap_count: int = Form(...),
-    tap1_name: str = Form("Left"),
-    tap1_pin:  int = Form(23),
-    tap2_name: str = Form("Center"),
-    tap2_pin:  int = Form(24),
-    tap3_name: str = Form("Right"),
-    tap3_pin:  int = Form(25),
-    tap4_name: str = Form("Tap 4"),
-    tap4_pin:  int = Form(26),
+    tap_count:        int   = Form(...),
+    tap1_name:        str   = Form("Left"),
+    tap1_pin:         int   = Form(23),
+    tap2_name:        str   = Form("Center"),
+    tap2_pin:         int   = Form(24),
+    tap3_name:        str   = Form("Right"),
+    tap3_pin:         int   = Form(25),
+    tap4_name:        str   = Form("Tap 4"),
+    tap4_pin:         int   = Form(26),
+    ticks_per_liter:  int   = Form(700),
+    tick_threshold:   int   = Form(3),
+    end_pour_seconds: float = Form(5.0),
 ):
     cfg = _read_yaml()
     cfg.setdefault("taps", {})
@@ -230,6 +233,10 @@ async def settings_save_taps(
     cfg["taps"]["tap2"]  = {"name": tap2_name, "pin": tap2_pin}
     cfg["taps"]["tap3"]  = {"name": tap3_name, "pin": tap3_pin}
     cfg["taps"]["tap4"]  = {"name": tap4_name, "pin": tap4_pin}
+    cfg.setdefault("hardware", {})
+    cfg["hardware"]["ticks_per_liter"]  = max(1, ticks_per_liter)
+    cfg["hardware"]["tick_threshold"]   = max(1, tick_threshold)
+    cfg["hardware"]["end_pour_seconds"] = max(1.0, end_pour_seconds)
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=taps", status_code=303)
 
