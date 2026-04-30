@@ -186,6 +186,11 @@ apt-get install -y \
 # YAML
 apt-get install -y python3-yaml
 
+# picamera2 — Pi Camera Module support on Trixie / Bookworm
+# (system package; the venv inherits it via --system-site-packages)
+apt-get install -y python3-picamera2 2>/dev/null || \
+    warn "python3-picamera2 not available — Pi Camera will fall back to OpenCV only"
+
 info "System packages installed."
 
 # ---------------------------------------------------------------------------
