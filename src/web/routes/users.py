@@ -67,7 +67,8 @@ async def user_detail(user_id: int, request: Request):
         request,
         "user_detail.html",
         ctx(request, user=user, stats=stats, enriched_pours=enriched,
-            payments=pays, photo_items=photo_items),
+            payments=pays, photo_items=photo_items,
+            is_unknown_user=(user_id == UNKNOWN_USER_ID)),
     )
 
 
@@ -209,12 +210,29 @@ async def photo_delete(user_id: int, photo_path: str = Form(...)):
 @router.post("/{user_id}/photos/train", response_class=HTMLResponse)
 async def photo_train(user_id: int):
     import asyncio
+    import logging
     from recognition.face_recognizer import train_user_sync
+    log    = logging.getLogger(__name__)
     db     = get_db()
     config = get_config()
-    num, err = await asyncio.get_event_loop().run_in_executor(
-        None, train_user_sync, db, config, user_id
-    )
+    try:
+        loop = asyncio.get_event_loop()
+        num, err = await asyncio.wait_for(
+            loop.run_in_executor(None, train_user_sync, db, config, user_id),
+            timeout=300,   # 5-minute ceiling — Pi 3 encodes slowly
+        )
+    except asyncio.TimeoutError:
+        log.error("Training timed out for user %d", user_id)
+        return HTMLResponse(
+            '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+            'Training timed out (too many photos or low memory). Try fewer photos.</span>'
+        )
+    except Exception as exc:
+        log.error("Training crashed for user %d: %s", user_id, exc, exc_info=True)
+        return HTMLResponse(
+            f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+            f'Training error: {exc}</span>'
+        )
     if err:
         return HTMLResponse(
             f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>{err}</span>'

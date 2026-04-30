@@ -152,7 +152,7 @@
   </div>
 </div>
 
-{% if is_admin %}
+{% if is_admin and not is_unknown_user %}
 <!-- ── Face Recognition Photos ───────────────────────────────────────── -->
 <div class="card mt-4">
   <div class="card-header d-flex align-items-center gap-2">
@@ -162,82 +162,86 @@
   </div>
   <div class="card-body">
 
-    {% if photo_items %}
-    <!-- Thumbnail grid -->
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      {% for path, url in photo_items %}
-      <div class="position-relative">
-        <img src="{{ url }}" alt="Photo"
-             class="rounded border"
-             style="width:110px;height:110px;object-fit:cover;object-position:top;">
-        <form method="post" action="/users/{{ user.id }}/photos/delete"
-              style="position:absolute;top:4px;right:4px;"
-              class="js-confirm" data-confirm="Delete this photo?">
-          <input type="hidden" name="photo_path" value="{{ path }}">
-          <button type="submit"
-                  class="btn btn-danger btn-sm p-0 d-flex align-items-center justify-content-center"
-                  style="width:24px;height:24px;font-size:12px;">
-            <i class="bi bi-x-lg"></i>
+    <!-- Two-column layout: photo strip left, camera right -->
+    <div class="d-flex gap-3 align-items-start flex-wrap mb-3">
+
+      <!-- Left: scrollable photo strip -->
+      <div style="flex:1;min-width:140px;">
+        {% if photo_items %}
+        <div class="d-flex flex-wrap gap-2 overflow-auto pe-1"
+             style="max-height:220px;">
+          {% for path, url in photo_items %}
+          <div class="position-relative flex-shrink-0">
+            <img src="{{ url }}" alt="Photo"
+                 class="rounded border"
+                 style="width:80px;height:80px;object-fit:cover;object-position:top;">
+            <form method="post" action="/users/{{ user.id }}/photos/delete"
+                  style="position:absolute;top:2px;right:2px;"
+                  class="js-confirm" data-confirm="Delete this photo?">
+              <input type="hidden" name="photo_path" value="{{ path }}">
+              <button type="submit"
+                      class="btn btn-danger btn-sm p-0 d-flex align-items-center justify-content-center"
+                      style="width:20px;height:20px;font-size:10px;">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="text-muted small mt-1">
+          {{ photo_items | length }} photo(s) · different angles = better accuracy
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">
+          No photos yet. Click <strong>Capture</strong> several times from
+          slightly different angles, then <strong>Train</strong>.
+        </p>
+        {% endif %}
+
+        <!-- Train button -->
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <button type="button" class="btn btn-accent btn-sm"
+                  {% if not photo_items %}disabled title="Capture photos first"{% endif %}
+                  hx-post="/users/{{ user.id }}/photos/train"
+                  hx-target="#train-result"
+                  hx-swap="innerHTML"
+                  hx-indicator="#train-spinner">
+            <i class="bi bi-cpu me-1"></i>Train
           </button>
-        </form>
+          <span id="train-spinner" class="htmx-indicator spinner-border spinner-border-sm text-accent"></span>
+        </div>
       </div>
-      {% endfor %}
+
+      <!-- Right: mirrored live camera preview + capture -->
+      <div style="flex:0 0 auto;">
+        <div class="text-muted small mb-1">
+          <i class="bi bi-camera-video me-1"></i>Live camera feed
+        </div>
+        <img id="cam-preview"
+             src="/users/camera/preview"
+             alt="Camera feed"
+             class="rounded border"
+             style="width:240px;max-width:100%;height:auto;background:#111;display:block;
+                    transform:scaleX(-1);"
+             onerror="this.style.opacity='0.3'">
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  hx-post="/users/{{ user.id }}/photos/capture"
+                  hx-target="#capture-status"
+                  hx-swap="outerHTML">
+            <i class="bi bi-camera me-1"></i>Capture Photo
+          </button>
+          <span id="capture-status"></span>
+        </div>
+        <div class="form-text text-muted mt-1">
+          Face the camera, then click Capture. Aim for 5+ photos.
+        </div>
+      </div>
+
     </div>
-
-    <span class="text-muted small">
-      {{ photo_items | length }} photo(s) — use different angles for best accuracy.
-    </span>
-
-    {% else %}
-    <p class="text-muted small mb-3">
-      No photos yet. Have {{ user.name }} stand in front of the kegerator camera
-      and click <strong>📷 Capture Photo</strong> several times from slightly different
-      angles, then click <strong>Train Recognition</strong>.
-    </p>
-    {% endif %}
-
-    <!-- Train always visible — enabled only when photos exist -->
-    <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
-      <button type="button" class="btn btn-accent btn-sm"
-              {% if not photo_items %}disabled title="Capture photos first"{% endif %}
-              hx-post="/users/{{ user.id }}/photos/train"
-              hx-target="#train-result"
-              hx-swap="innerHTML"
-              hx-indicator="#train-spinner">
-        <i class="bi bi-cpu me-1"></i>Train Recognition
-      </button>
-      <span id="train-spinner" class="htmx-indicator spinner-border spinner-border-sm text-accent"></span>
-    </div>
-
-    <!-- Live camera preview -->
-    <div class="mb-3">
-      <div class="text-muted small mb-1"><i class="bi bi-camera-video me-1"></i>Live camera feed</div>
-      <img id="cam-preview"
-           src="/users/camera/preview"
-           alt="Camera feed"
-           class="rounded border"
-           style="width:320px;max-width:100%;height:auto;background:#111;display:block;"
-           onerror="this.style.opacity='0.3'">
-    </div>
-
-    <!-- Capture from Pi camera -->
-    <div class="d-flex align-items-center gap-3 flex-wrap">
-      <button type="button" class="btn btn-outline-secondary btn-sm"
-              hx-post="/users/{{ user.id }}/photos/capture"
-              hx-target="#capture-status"
-              hx-swap="outerHTML">
-        <i class="bi bi-camera me-1"></i>📷 Capture Photo
-      </button>
-      <span id="capture-status"></span>
-    </div>
-    <div class="form-text text-muted mt-1">
-      Position the person in the preview above, then click Capture. Aim for
-      5+ photos from slightly different angles.
-    </div>
-
   </div>
 </div>
-{% endif %}{# is_admin — face photos #}
+{% endif %}{# is_admin and not is_unknown_user — face photos #}
 
 {% if is_admin %}
 <!-- ── Rename Modal ───────────────────────────────────────────────────── -->
