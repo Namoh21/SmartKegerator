@@ -237,7 +237,7 @@ else
     info "Virtual environment already exists — skipping creation."
 fi
 
-PIP="${PYTHON} -m pip install --quiet"
+PIP="${PYTHON} -m pip install --quiet --retries 5 --timeout 60"
 
 # Upgrade pip inside the venv first
 sudo -u "${REAL_USER}" ${PIP} --upgrade pip
