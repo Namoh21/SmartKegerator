@@ -64,29 +64,78 @@ def _get_local_ip() -> str:
         return "localhost"
 
 
-def _apply_display_rotation(degrees: int) -> None:
-    """Write the new rotation into the active compositor config (live update)."""
-    import os, re
-    home = Path(os.path.expanduser("~"))
-    t    = str(degrees)
+def _wayland_env() -> dict:
+    """Build a subprocess environment that can reach the Wayland compositor."""
+    import os
+    env = os.environ.copy()
+    env.setdefault("WAYLAND_DISPLAY", "wayland-0")
+    env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    return env
 
+
+def _detect_display_output() -> str:
+    """
+    Ask wlr-randr which outputs are connected and return the first one found.
+    Falls back to 'DSI-1' (official touchscreen) if wlr-randr isn't available
+    or the compositor isn't running.
+    """
+    try:
+        result = subprocess.run(
+            ["wlr-randr"], env=_wayland_env(),
+            capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            # Output names are the first token on non-indented lines
+            if line and not line[0].isspace():
+                name = line.split()[0]
+                if name:
+                    return name
+    except Exception:
+        pass
+    return "DSI-1"
+
+
+def _apply_display_rotation(degrees: int) -> None:
+    """
+    Apply a display rotation immediately via wlr-randr and persist it to the
+    active compositor config so it survives a reboot.
+    """
+    import os, re
+    home   = Path(os.path.expanduser("~"))
+    t      = str(degrees)
+    output = _detect_display_output()
+    env    = _wayland_env()
+
+    # Apply live — wlr-randr works for both labwc and wayfire
+    try:
+        subprocess.run(
+            ["wlr-randr", "--output", output, "--transform", t],
+            env=env, timeout=5, check=False
+        )
+        log.info("Applied display rotation %s° on output %s", degrees, output)
+    except Exception as exc:
+        log.warning("wlr-randr live rotation failed: %s", exc)
+
+    # Persist to labwc autostart
     labwc = home / ".config/labwc/autostart"
     if labwc.exists():
         text = labwc.read_text()
-        new  = re.sub(r'wlr-randr --output DSI-1 --transform \S+',
-                      f'wlr-randr --output DSI-1 --transform {t}', text)
+        new  = re.sub(r'wlr-randr --output \S+ --transform \S+',
+                      f'wlr-randr --output {output} --transform {t}', text)
         if new == text:  # entry missing — append it
-            new = new.rstrip("\n") + f'\nwlr-randr --output DSI-1 --transform {t} &\n'
+            new = new.rstrip("\n") + f'\nwlr-randr --output {output} --transform {t} &\n'
         labwc.write_text(new)
         return
 
+    # Persist to wayfire.ini
     wayfire = home / ".config/wayfire.ini"
     if wayfire.exists():
         text = wayfire.read_text()
-        new  = re.sub(r'(?m)(^\[output:DSI-1\][^\[]*?transform\s*=\s*)\S+',
+        # Update existing [output:*] transform line regardless of output name
+        new  = re.sub(r'(?m)(^\[output:[^\]]+\][^\[]*?transform\s*=\s*)\S+',
                       rf'\g<1>{t}', text)
         if new == text:
-            new = new.rstrip("\n") + f'\n[output:DSI-1]\ntransform = {t}\n'
+            new = new.rstrip("\n") + f'\n[output:{output}]\ntransform = {t}\n'
         wayfire.write_text(new)
 
 

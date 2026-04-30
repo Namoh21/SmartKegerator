@@ -506,18 +506,31 @@ case "${COMPOSITOR}" in
         WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
         mkdir -p "$(dirname "${WAYFIRE_INI}")"
         chown "${REAL_USER}:${REAL_USER}" "$(dirname "${WAYFIRE_INI}")"
+
+        # Build a block: kill the desktop panel, then launch the kiosk
+        WAYFIRE_BLOCK="autostart_kill_panel = pkill -x wf-panel-pi 2>/dev/null || true
+smartkegerator = ${LAUNCH_SCRIPT}"
+
         if ! grep -q "smartkegerator" "${WAYFIRE_INI}" 2>/dev/null; then
             if grep -q "^\[autostart\]" "${WAYFIRE_INI}" 2>/dev/null; then
-                sed -i "/^\[autostart\]/a smartkegerator = ${LAUNCH_SCRIPT}" "${WAYFIRE_INI}"
+                # Insert both lines right after [autostart]
+                sed -i "/^\[autostart\]/a ${WAYFIRE_BLOCK}" "${WAYFIRE_INI}"
             else
-                printf '\n[autostart]\nsmartkegerator = %s\n' "${LAUNCH_SCRIPT}" >> "${WAYFIRE_INI}"
+                printf '\n[autostart]\n%s\n' "${WAYFIRE_BLOCK}" >> "${WAYFIRE_INI}"
             fi
             chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
-            info "Added SmartKegerator to Wayfire [autostart] in wayfire.ini."
+            info "Added kiosk launch (+ panel kill) to Wayfire [autostart]."
         else
-            info "wayfire.ini already has SmartKegerator autostart entry."
+            # Ensure the panel-kill line is also present
+            if ! grep -q "autostart_kill_panel" "${WAYFIRE_INI}" 2>/dev/null; then
+                sed -i "/^\[autostart\]/a autostart_kill_panel = pkill -x wf-panel-pi 2>/dev/null || true" \
+                    "${WAYFIRE_INI}"
+                info "Added panel-kill entry to Wayfire [autostart]."
+            else
+                info "wayfire.ini already has SmartKegerator autostart entry."
+            fi
         fi
-        # Autohide the desktop panel for kiosk mode
+        # Autohide the desktop panel for kiosk mode (belt-and-suspenders)
         WFSHELL="${REAL_HOME}/.config/wf-shell.ini"
         if [[ -f "${WFSHELL}" ]]; then
             sed -i 's/autohide\s*=\s*false/autohide = true/' "${WFSHELL}" 2>/dev/null || true

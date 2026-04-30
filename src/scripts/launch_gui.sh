@@ -17,8 +17,8 @@ if pgrep -f "main.py ${CONFIG}" >/dev/null 2>&1; then
     exit 0
 fi
 
-# Wait up to 15 s for any Wayland socket (wayland-0 or wayland-1)
-for i in $(seq 1 30); do
+# Wait up to 30 s for any Wayland socket (wayland-0 or wayland-1)
+for i in $(seq 1 60); do
     for socket in wayland-0 wayland-1; do
         if [[ -S "${XDG_RUNTIME_DIR}/${socket}" ]]; then
             export WAYLAND_DISPLAY="${socket}"
@@ -29,7 +29,7 @@ for i in $(seq 1 30); do
 done
 
 if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
-    echo "SmartKegerator: no Wayland socket found after 15 s — aborting" >&2
+    echo "SmartKegerator: no Wayland socket found after 30 s — aborting" >&2
     exit 1
 fi
 
