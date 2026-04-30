@@ -347,6 +347,7 @@ sudo -u "${REAL_USER}" ${PIP} \
     PyYAML
 
 info "Pip packages installed."
+info "(Any 'dependency conflict' warnings above are from system packages like types-seaborn and are harmless.)"
 
 # ---------------------------------------------------------------------------
 # 4. Directory tree
