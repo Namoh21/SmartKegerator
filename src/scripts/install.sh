@@ -344,11 +344,69 @@ pip_install_retry() {
     error "${label}: failed after 3 attempts. Check your network and re-run install.sh."
 }
 
-# face-recognition (~100 MB — prone to network drops on slow connections)
+# ---------------------------------------------------------------------------
+# wget_resume <url> <dest>
+#   Downloads a file with HTTP resume support (-c flag).
+#   Far more robust than pip on flaky Wi-Fi — retries up to 10 times
+#   and continues from the byte it stopped at rather than restarting.
+# ---------------------------------------------------------------------------
+wget_resume() {
+    local url="$1" dest="$2"
+    wget -c --tries=10 --waitretry=30 --timeout=60 \
+         --progress=dot:mega -O "${dest}" "${url}"
+}
+
+# ---------------------------------------------------------------------------
+# face-recognition
+#   face_recognition_models (~100 MB of neural-net model data) is the large
+#   dependency.  On Pi 3 Wi-Fi the connection reliably drops mid-download.
+#   Strategy: download face_recognition_models via wget (resume-capable)
+#   into the wheel cache first, then pip install face-recognition pointing
+#   at the local cache so it never needs to re-download the model data.
+# ---------------------------------------------------------------------------
 if [[ "${RECOGNITION_ENABLED}" != "false" ]]; then
-    info "Installing face-recognition (1-2 minutes)..."
-    pip_install_retry "face-recognition" face-recognition
-    info "face-recognition installed."
+    if sudo -u "${REAL_USER}" ${PYTHON} -c "import face_recognition" 2>/dev/null; then
+        info "face-recognition already installed — skipping."
+    else
+        info "Downloading face_recognition_models with resume support..."
+
+        # Ask PyPI for the current source-dist URL
+        MODELS_URL=$(curl -sf "https://pypi.org/pypi/face_recognition_models/json" | \
+            python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for u in data.get('urls', []):
+    if u['packagetype'] == 'sdist':
+        print(u['url'])
+        break
+" 2>/dev/null)
+
+        MODELS_DEST=""
+        if [[ -n "${MODELS_URL}" ]]; then
+            MODELS_DEST="${WHEEL_CACHE}/${MODELS_URL##*/}"
+            if [[ -f "${MODELS_DEST}" ]]; then
+                info "face_recognition_models already cached — skipping download."
+            else
+                wget_resume "${MODELS_URL}" "${MODELS_DEST}" || {
+                    warn "wget failed — pip will download face_recognition_models directly."
+                    MODELS_DEST=""
+                }
+                [[ -n "${MODELS_DEST}" ]] && \
+                    chown "${REAL_USER}:${REAL_USER}" "${MODELS_DEST}"
+            fi
+        else
+            warn "Could not get face_recognition_models URL from PyPI — pip will download directly."
+        fi
+
+        info "Installing face-recognition..."
+        if [[ -n "${MODELS_DEST}" ]]; then
+            pip_install_retry "face-recognition" \
+                --find-links "${WHEEL_CACHE}" face-recognition
+        else
+            pip_install_retry "face-recognition" face-recognition
+        fi
+        info "face-recognition installed."
+    fi
 fi
 
 # Pin NumPy < 2 — system python3-opencv is compiled against NumPy 1.x
