@@ -490,18 +490,24 @@ chown -R "${REAL_USER}:${REAL_USER}" "${REAL_HOME}/.config"
 
 cat > "${SERVICE_DIR}/smartkegerator.service" << EOF
 [Unit]
-Description=SmartKegerator
+Description=SmartKegerator GUI
+# The GUI needs Wayland, which is started by the desktop session after autologin.
+# Restart=always with no rate limit means systemd keeps retrying silently until
+# the Wayland socket appears — it never marks the service as "failed", which
+# prevents the "Press Enter to read the journal" prompt at the console.
 After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=${SRC_DIR}
 ExecStart=${SRC_DIR}/scripts/launch_gui.sh
-Restart=on-failure
+Restart=always
 RestartSec=5
+StartLimitIntervalSec=0
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=QT_QPA_PLATFORM=wayland
+Environment=QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 
 [Install]
 WantedBy=default.target
@@ -516,8 +522,9 @@ After=network.target
 Type=simple
 WorkingDirectory=${SRC_DIR}
 ExecStart=${PYTHON} -m uvicorn web.server:app --host 0.0.0.0 --port 8080
-Restart=on-failure
+Restart=always
 RestartSec=5
+StartLimitIntervalSec=0
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
