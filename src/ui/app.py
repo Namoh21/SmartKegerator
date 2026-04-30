@@ -454,11 +454,19 @@ class App(QObject):
             dlg = PinLoginDialog(self._config, self._db, self._main_window)
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
-            admin   = dlg.authenticated_admin()
             user_id = dlg.authenticated_user_id()
-            if not admin or user_id is None:
+            if user_id is None:
                 return
-            self._on_user_identified(user_id)
+            # Establish admin session without a confidence score
+            user = self._db.get_user(user_id)
+            if not user:
+                return
+            self._current_user_id   = user.id
+            self._current_user_name = user.name
+            self._is_admin          = True
+            self._idle_timer.start(_IDLE_MS)
+            self._main_window.set_current_user(user.id, user.name, is_admin=True)
+            log.info("Admin session via PIN: %s (id=%d)", user.name, user.id)
 
         from ui.settings_window import SettingsWindow
         w = SettingsWindow(self._config, self._db, self._main_window)
