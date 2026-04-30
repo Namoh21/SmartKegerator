@@ -184,19 +184,9 @@
       {% endfor %}
     </div>
 
-    <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
-      <button type="button" class="btn btn-accent btn-sm"
-              hx-post="/users/{{ user.id }}/photos/train"
-              hx-target="#train-result"
-              hx-swap="innerHTML"
-              hx-indicator="#train-spinner">
-        <i class="bi bi-cpu me-1"></i>Train Recognition
-      </button>
-      <span id="train-spinner" class="htmx-indicator spinner-border spinner-border-sm text-accent"></span>
-      <span class="text-muted small">
-        {{ photo_items | length }} photo(s) — use different angles for best accuracy.
-      </span>
-    </div>
+    <span class="text-muted small">
+      {{ photo_items | length }} photo(s) — use different angles for best accuracy.
+    </span>
 
     {% else %}
     <p class="text-muted small mb-3">
@@ -205,6 +195,19 @@
       angles, then click <strong>Train Recognition</strong>.
     </p>
     {% endif %}
+
+    <!-- Train always visible — enabled only when photos exist -->
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
+      <button type="button" class="btn btn-accent btn-sm"
+              {% if not photo_items %}disabled title="Capture photos first"{% endif %}
+              hx-post="/users/{{ user.id }}/photos/train"
+              hx-target="#train-result"
+              hx-swap="innerHTML"
+              hx-indicator="#train-spinner">
+        <i class="bi bi-cpu me-1"></i>Train Recognition
+      </button>
+      <span id="train-spinner" class="htmx-indicator spinner-border spinner-border-sm text-accent"></span>
+    </div>
 
     <!-- Live camera preview -->
     <div class="mb-3">

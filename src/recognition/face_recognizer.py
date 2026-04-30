@@ -151,6 +151,13 @@ class FaceRecognizer(QObject):
                 self.train_user(user.id)
 
     def _do_train(self, user_id: int) -> None:
+        try:
+            self._do_train_inner(user_id)
+        except Exception as exc:
+            log.error("Training user %d crashed: %s", user_id, exc, exc_info=True)
+            self.training_failed.emit(user_id, f"unexpected error: {exc}")
+
+    def _do_train_inner(self, user_id: int) -> None:
         user = self._db.get_user(user_id)
         if user is None:
             self.training_failed.emit(user_id, "user not found")

@@ -507,13 +507,19 @@ class UsersWindow(QDialog):
     # ------------------------------------------------------------------
 
     def _train_user(self) -> None:
-        if not self._selected_user or not self._recognizer:
-            return
-
-        self._train_btn.setEnabled(False)
-        self._lbl_train_status.setText("Training…")
-        self._lbl_train_status.setStyleSheet(f"color: {self._c['warn']}; font-size: 16px;")
-        self._recognizer.train_user(self._selected_user.id)
+        try:
+            if not self._selected_user or not self._recognizer:
+                return
+            self._train_btn.setEnabled(False)
+            self._lbl_train_status.setText("Training…")
+            self._lbl_train_status.setStyleSheet(f"color: {self._c['warn']}; font-size: 16px;")
+            self._recognizer.train_user(self._selected_user.id)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("Train user error: %s", exc, exc_info=True)
+            self._lbl_train_status.setText(f"✗  Error: {exc}")
+            self._lbl_train_status.setStyleSheet(f"color: {self._c['warn']}; font-size: 16px;")
+            self._train_btn.setEnabled(True)
 
     def _on_training_complete(self, user_id: int, count: int) -> None:
         if self._selected_user and self._selected_user.id == user_id:
