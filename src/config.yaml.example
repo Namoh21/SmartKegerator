@@ -43,7 +43,7 @@ data:
   beer_logos_dir: /opt/smartkegerator/logos
 
 display:
-  rotation: 90       # degrees: 0=landscape, 90=portrait-CW, 180=flipped, 270=portrait-CCW
+  rotation: 0        # degrees: 0=no rotation, 90, 180, 270
                      # Configurable in web Settings → Appearance. Reboot required.
 
 ui:

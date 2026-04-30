@@ -233,51 +233,20 @@ case "${COMPOSITOR}" in
 esac
 
 # ---------------------------------------------------------------------------
-# Display rotation — Pi 7" touchscreen (90° portrait, installed default)
-#   Override: DISPLAY_ROTATE=180 sudo ./setup_hardware.sh
-#   Values: 0=normal  90=portrait-CW  180=upside-down  270=portrait-CCW
+# Display rotation — managed via web UI (Settings → Appearance)
+#    Remove any rotation line written by older versions of this script.
 # ---------------------------------------------------------------------------
 echo ""
 echo "── Display rotation ──"
-DISPLAY_ROTATE="${DISPLAY_ROTATE:-90}"
 
-# Map degree values to compositor transform names
-case "${DISPLAY_ROTATE}" in
-    0)   WF_TRANSFORM="normal" ;;
-    90)  WF_TRANSFORM="90"     ;;
-    180) WF_TRANSFORM="180"    ;;
-    270) WF_TRANSFORM="270"    ;;
-    *)   WF_TRANSFORM="normal"; warn "Unknown DISPLAY_ROTATE value — defaulting to normal" ;;
-esac
-
-case "${COMPOSITOR}" in
-    wayfire)
-        WAYFIRE_CONF="${REAL_HOME}/.config/wayfire.ini"
-        if grep -q "^\[output:DSI-1\]" "${WAYFIRE_CONF}" 2>/dev/null; then
-            sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = '"${WF_TRANSFORM}"'/}' "${WAYFIRE_CONF}"
-        else
-            printf '\n[output:DSI-1]\ntransform = %s\n' "${WF_TRANSFORM}" >> "${WAYFIRE_CONF}"
-            chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_CONF}"
-        fi
-        info "Wayfire DSI-1 transform set to ${WF_TRANSFORM}"
+if [[ -f "${REAL_HOME}/.config/labwc/autostart" ]]; then
+    if grep -q "wlr-randr.*DSI-1.*transform" "${REAL_HOME}/.config/labwc/autostart"; then
+        sed -i '/wlr-randr --output DSI-1 --transform/d' "${REAL_HOME}/.config/labwc/autostart"
+        info "Removed stale wlr-randr rotation line — configure via web UI."
         REBOOT_NEEDED=true
-        ;;
-    labwc)
-        LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
-        mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
-        if grep -q "wlr-randr.*DSI-1" "${LABWC_AUTOSTART}" 2>/dev/null; then
-            sed -i "s|wlr-randr --output DSI-1 --transform [^ ]*|wlr-randr --output DSI-1 --transform ${WF_TRANSFORM}|" "${LABWC_AUTOSTART}"
-        else
-            echo "wlr-randr --output DSI-1 --transform ${WF_TRANSFORM} &" >> "${LABWC_AUTOSTART}"
-            chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
-        fi
-        info "labwc DSI-1 rotation set to ${WF_TRANSFORM} via wlr-randr"
-        REBOOT_NEEDED=true
-        ;;
-    *)
-        warn "Unknown compositor — set display rotation manually."
-        ;;
-esac
+    fi
+fi
+info "Display rotation is configured via Settings → Appearance in the web UI."
 
 # ---------------------------------------------------------------------------
 # Done

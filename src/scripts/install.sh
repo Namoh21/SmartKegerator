@@ -526,51 +526,29 @@ if [[ -d "$(dirname "${LXDE_AUTOSTART}")" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Display rotation — Pi 7" touchscreen at 90° (portrait)
-#
-#    KMS driver (vc4-kms-v3d) is used on all modern Pi OS images, so
-#    display_rotate in config.txt is NOT used.  Rotation is handled by
-#    the compositor: Wayfire via wayfire.ini, labwc via wlr-randr at startup.
+# 8. Display rotation
+#    No default rotation is applied. Configure via the web UI:
+#    Settings → Appearance → Display rotation.
+#    Remove any legacy display_rotate from config.txt (breaks KMS driver).
 # ---------------------------------------------------------------------------
 section "Display rotation"
 
-# Remove any stale display_rotate from config.txt (legacy — breaks KMS)
 CONFIG_TXT="/boot/firmware/config.txt"
 [[ -f "${CONFIG_TXT}" ]] || CONFIG_TXT="/boot/config.txt"
 if grep -q "^display_rotate=" "${CONFIG_TXT}" 2>/dev/null; then
     sed -i '/^display_rotate=/d' "${CONFIG_TXT}"
-    info "Removed legacy display_rotate from ${CONFIG_TXT}"
+    info "Removed legacy display_rotate from ${CONFIG_TXT} (use web UI to set rotation)."
 fi
 
-case "${COMPOSITOR}" in
-    labwc)
-        # labwc: run wlr-randr at startup to rotate the DSI-1 output
-        LABWC_AUTOSTART="${REAL_HOME}/.config/labwc/autostart"
-        mkdir -p "$(dirname "${LABWC_AUTOSTART}")"
-        if ! grep -q "wlr-randr.*DSI-1" "${LABWC_AUTOSTART}" 2>/dev/null; then
-            echo "wlr-randr --output DSI-1 --transform 90 &" >> "${LABWC_AUTOSTART}"
-            chown "${REAL_USER}:${REAL_USER}" "${LABWC_AUTOSTART}"
-            info "Added wlr-randr rotation (90°) to labwc autostart."
-        else
-            info "labwc autostart already has rotation entry."
-        fi
-        ;;
-    wayfire)
-        # Wayfire: set transform in wayfire.ini
-        WAYFIRE_INI="${REAL_HOME}/.config/wayfire.ini"
-        mkdir -p "$(dirname "${WAYFIRE_INI}")"
-        if grep -q "^\[output:DSI-1\]" "${WAYFIRE_INI}" 2>/dev/null; then
-            sed -i '/^\[output:DSI-1\]/,/^\[/{s/^transform *=.*/transform = 90/}' "${WAYFIRE_INI}"
-        else
-            printf '\n[output:DSI-1]\ntransform = 90\n' >> "${WAYFIRE_INI}"
-        fi
-        chown "${REAL_USER}:${REAL_USER}" "${WAYFIRE_INI}"
-        info "Wayfire DSI-1 transform set to 90° (portrait)."
-        ;;
-    *)
-        warn "Unknown compositor — set display rotation manually."
-        ;;
-esac
+# Remove any wlr-randr rotation line written by older versions of this script
+if [[ -f "${REAL_HOME}/.config/labwc/autostart" ]]; then
+    if grep -q "wlr-randr.*DSI-1.*transform" "${REAL_HOME}/.config/labwc/autostart"; then
+        sed -i '/wlr-randr --output DSI-1 --transform/d' "${REAL_HOME}/.config/labwc/autostart"
+        info "Removed stale wlr-randr rotation from labwc autostart."
+    fi
+fi
+
+info "Display rotation is managed via Settings → Appearance in the web UI."
 
 # ---------------------------------------------------------------------------
 # 9. Hardware setup (1-Wire, camera, GPIO, screen blanking)
