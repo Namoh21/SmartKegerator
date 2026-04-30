@@ -716,6 +716,42 @@
 
     </div>{# end tab-content #}
 
+    <!-- ── Application Logs (admin only) ────────────────────────────── -->
+    {% if is_admin %}
+    <div class="card mt-4 border-secondary">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-journal-text me-1"></i><strong>Application Logs</strong>
+        <div class="ms-auto d-flex gap-2">
+          <button class="btn btn-outline-secondary btn-sm"
+                  hx-get="/settings/logs/gui"
+                  hx-target="#log-content"
+                  hx-swap="innerHTML"
+                  onclick="setActiveLog('gui', this)">
+            <i class="bi bi-display me-1"></i>Touchscreen
+          </button>
+          <button class="btn btn-outline-secondary btn-sm"
+                  hx-get="/settings/logs/web"
+                  hx-target="#log-content"
+                  hx-swap="innerHTML"
+                  onclick="setActiveLog('web', this)">
+            <i class="bi bi-globe me-1"></i>Web Server
+          </button>
+          <a id="log-download-btn" href="/settings/logs/gui/download"
+             class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-download me-1"></i>Download
+          </a>
+        </div>
+      </div>
+      <div class="card-body p-0"
+           style="background:#0d1117; max-height:340px; overflow-y:auto;"
+           id="log-container">
+        <div id="log-content" class="p-2 text-muted small font-monospace">
+          Click <strong>Touchscreen</strong> or <strong>Web Server</strong> to load logs.
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- ── Restart services / reboot (admin only) ───────────────────── -->
     {% if is_admin %}
     <div class="card mt-4 border-secondary">
@@ -796,6 +832,20 @@ document.addEventListener('click', function (e) {
     if (inp) inp.value = btn.dataset.id;
   }
 });
+
+function setActiveLog(which, btn) {
+  // Update download link to match selected log
+  const dl = document.getElementById('log-download-btn');
+  if (dl) dl.href = '/settings/logs/' + which + '/download';
+  // Scroll log container to bottom after HTMX swaps content
+  const container = document.getElementById('log-container');
+  if (container) {
+    document.body.addEventListener('htmx:afterSwap', function once() {
+      container.scrollTop = container.scrollHeight;
+      document.body.removeEventListener('htmx:afterSwap', once);
+    });
+  }
+}
 
 function toggleSecret() {
   const inp  = document.getElementById('secretInput');

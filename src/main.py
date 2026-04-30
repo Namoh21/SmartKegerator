@@ -17,12 +17,10 @@ import yaml
 from PyQt6.QtWidgets import QApplication
 
 
-def _configure_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
-        datefmt="%H:%M:%S",
-    )
+def _configure_logging(config: dict) -> None:
+    from log_config import configure
+    log_file = configure(config, "gui")
+    logging.getLogger("main").info("Logging to %s", log_file)
 
 
 def _load_config(path: str) -> dict:
@@ -31,7 +29,9 @@ def _load_config(path: str) -> dict:
 
 
 def main() -> None:
-    _configure_logging()
+    # Basic console logging until we load config and know the log path
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s")
     log = logging.getLogger("main")
 
     config_path = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).parent / "config.yaml")
@@ -41,6 +41,8 @@ def main() -> None:
         sys.exit(1)
 
     config = _load_config(config_path)
+    _configure_logging(config)
+    log = logging.getLogger("main")
     log.info("Loaded config: %s", config_path)
 
     app = QApplication(sys.argv)

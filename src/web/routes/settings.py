@@ -8,11 +8,12 @@ from typing import Optional
 
 import yaml
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from ui.theme import THEMES
 from web.auth import hash_password
-from web.server import get_db, get_config_path, reload_config, templates, ctx
+from log_config import log_dir_for, tail_log
+from web.server import get_db, get_config, get_config_path, reload_config, templates, ctx
 
 router = APIRouter(prefix="/settings")
 
@@ -404,4 +405,40 @@ async def reboot_system():
     asyncio.create_task(_delayed_reboot())
     return HTMLResponse(
         '<span class="text-warning"><i class="bi bi-power me-1"></i>Rebooting in 3 s…</span>'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Application logs
+# ---------------------------------------------------------------------------
+
+_VALID_LOGS = {"gui", "web"}
+
+
+@router.get("/logs/{which}", response_class=HTMLResponse)
+async def view_log(which: str):
+    """Return the last 300 lines of a log file as pre-formatted HTML (HTMX target)."""
+    if which not in _VALID_LOGS:
+        return HTMLResponse("<span class='text-danger'>Unknown log.</span>")
+    log_file = log_dir_for(get_config()) / f"smartkegerator-{which}.log"
+    content  = tail_log(log_file, lines=300)
+    escaped  = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return HTMLResponse(
+        f'<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;">'
+        f'{escaped}</pre>'
+    )
+
+
+@router.get("/logs/{which}/download")
+async def download_log(which: str):
+    """Download the full log file."""
+    if which not in _VALID_LOGS:
+        return HTMLResponse("Unknown log.", status_code=404)
+    log_file = log_dir_for(get_config()) / f"smartkegerator-{which}.log"
+    if not log_file.exists():
+        return HTMLResponse("Log file not found.", status_code=404)
+    return FileResponse(
+        str(log_file),
+        media_type="text/plain",
+        filename=log_file.name,
     )

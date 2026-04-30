@@ -130,6 +130,9 @@ async def lifespan(app: FastAPI):
 
     _db = Database(_config["data"]["database_path"])
 
+    from log_config import configure as _configure_logging
+    _configure_logging(_config, "web")
+
     # Serve user photos as static files
     photos_dir = Path(_config["data"]["user_photos_dir"])
     photos_dir.mkdir(parents=True, exist_ok=True)
