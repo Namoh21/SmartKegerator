@@ -1,9 +1,8 @@
 """
 PIN login dialog — touchscreen fallback for face recognition.
 
-Shows a list of admin names; after selecting one, a numeric PIN pad
-is displayed.  If the correct PIN is entered the dialog accepts and
-exposes the admin's linked user_id so the caller can open a session.
+Shows a list of admin names; after selecting one, a compact numeric
+PIN pad is displayed with OK / Cancel buttons to the right.
 
 Admins set their PIN through the web Settings → Administrators page.
 """
@@ -15,7 +14,7 @@ from typing import Optional
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QGridLayout, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QStackedWidget,
+    QPushButton, QScrollArea, QSizePolicy, QStackedWidget,
     QVBoxLayout, QWidget,
 )
 
@@ -38,20 +37,16 @@ class PinLoginDialog(QDialog):
 
         self.setWindowTitle("Admin Login")
         self.setModal(True)
-        self.setMinimumSize(420, 540)
+        self.setMinimumSize(400, 360)
         self.setStyleSheet(self._style())
 
         self._stack = QStackedWidget()
         self._stack.addWidget(self._build_select_page())
         self._stack.addWidget(self._build_pin_page())
 
-        cancel = QPushButton("Cancel")
-        cancel.setObjectName("cancel")
-        cancel.clicked.connect(self.reject)
-
         root = QVBoxLayout(self)
-        root.addWidget(self._stack, stretch=1)
-        root.addWidget(cancel)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.addWidget(self._stack)
 
     # ── Stylesheet ───────────────────────────────────────────────────
 
@@ -68,25 +63,31 @@ class PinLoginDialog(QDialog):
             color: {c['text']};
             border: 1px solid {c['border']};
             border-radius: 6px;
-            padding: 14px;
+            padding: 8px;
+            font-size: 18px;
+        }}
+        QPushButton:pressed {{ background: {c['accent']}; color: {c['bg']}; }}
+        QPushButton#admin   {{ font-size: 20px; min-height: 54px; }}
+        QPushButton#digit   {{
             font-size: 20px;
+            min-width: 58px; max-width: 70px;
+            min-height: 50px; max-height: 60px;
         }}
-        QPushButton:pressed  {{ background: {c['accent']}; color: {c['bg']}; }}
-        QPushButton#admin    {{ font-size: 22px; min-height: 64px; }}
-        QPushButton#digit    {{ font-size: 28px; min-width: 84px; min-height: 72px; }}
-        QPushButton#confirm  {{
+        QPushButton#ok      {{
             background: {c['accent']}; color: {c['bg']};
-            border-color: {c['accent']}; font-size: 26px;
+            border-color: {c['accent']}; font-size: 18px;
+            min-width: 72px; min-height: 50px;
         }}
-        QPushButton#back     {{
+        QPushButton#back    {{
             background: transparent; color: {c['muted']};
-            border: none; font-size: 17px; padding: 4px 8px;
+            border: none; font-size: 15px; padding: 2px 6px;
         }}
-        QPushButton#cancel   {{
+        QPushButton#cancel  {{
             background: transparent; color: {c['muted']};
-            border: 1px solid {c['muted']}; font-size: 18px; margin-top: 4px;
+            border: 1px solid {c['muted']}; font-size: 16px;
+            min-width: 72px; min-height: 50px;
         }}
-        QScrollArea          {{ border: none; }}
+        QScrollArea {{ border: none; }}
         """
 
     # ── Page 1: select admin ─────────────────────────────────────────
@@ -94,19 +95,19 @@ class PinLoginDialog(QDialog):
     def _build_select_page(self) -> QWidget:
         page   = QWidget()
         layout = QVBoxLayout(page)
-        layout.setSpacing(12)
+        layout.setSpacing(10)
 
         hdr = QLabel("Who are you?")
         hdr.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hdr.setStyleSheet(f"color: {self._c['muted']}; font-size: 19px; padding: 8px;")
+        hdr.setStyleSheet(f"color: {self._c['muted']}; font-size: 18px; padding: 6px;")
         layout.addWidget(hdr)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         inner  = QWidget()
         vbox   = QVBoxLayout(inner)
-        vbox.setSpacing(10)
-        vbox.setContentsMargins(8, 4, 8, 4)
+        vbox.setSpacing(8)
+        vbox.setContentsMargins(4, 4, 4, 4)
         for admin in self._admins:
             label = admin.get("display_name") or admin["username"]
             btn   = QPushButton(label)
@@ -116,6 +117,11 @@ class PinLoginDialog(QDialog):
         vbox.addStretch()
         scroll.setWidget(inner)
         layout.addWidget(scroll)
+
+        cancel = QPushButton("Cancel")
+        cancel.setObjectName("cancel")
+        cancel.clicked.connect(self.reject)
+        layout.addWidget(cancel)
         return page
 
     def _select_admin(self, admin: dict) -> None:
@@ -131,9 +137,10 @@ class PinLoginDialog(QDialog):
     def _build_pin_page(self) -> QWidget:
         page   = QWidget()
         layout = QVBoxLayout(page)
-        layout.setSpacing(10)
+        layout.setSpacing(6)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Back + name row
+        # ── Header: back button + name ──
         top  = QHBoxLayout()
         back = QPushButton("← Back")
         back.setObjectName("back")
@@ -142,37 +149,68 @@ class PinLoginDialog(QDialog):
         top.addStretch()
         self._lbl_who = QLabel("")
         self._lbl_who.setStyleSheet(
-            f"color: {self._c['accent']}; font-size: 20px; font-weight: bold;"
+            f"color: {self._c['accent']}; font-size: 18px; font-weight: bold;"
         )
         top.addWidget(self._lbl_who)
         layout.addLayout(top)
 
-        # PIN dots
+        # ── PIN dots ──
         self._lbl_dots = QLabel()
         self._lbl_dots.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_dots.setStyleSheet(
-            f"color: {self._c['muted']}; font-size: 30px; letter-spacing: 10px; padding: 8px;"
+            f"color: {self._c['muted']}; font-size: 26px; letter-spacing: 8px; padding: 4px;"
         )
         layout.addWidget(self._lbl_dots)
         self._refresh_dots()
 
-        # Error message
+        # ── Error label ──
         self._lbl_error = QLabel("")
         self._lbl_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_error.setStyleSheet(f"color: {self._c['warn']}; font-size: 16px;")
+        self._lbl_error.setStyleSheet(f"color: {self._c['warn']}; font-size: 13px;")
         self._lbl_error.setWordWrap(True)
+        self._lbl_error.setFixedHeight(36)
         layout.addWidget(self._lbl_error)
 
-        # Digit grid: 1-9 | ⌫ | 0 | ✓
+        # ── Numpad (left) + OK/Cancel (right) ──
+        pad_row = QHBoxLayout()
+        pad_row.setSpacing(10)
+
+        # 3×4 digit grid: 1-9 on rows 0-2, ⌫ and 0 on row 3
         grid = QGridLayout()
-        grid.setSpacing(8)
-        for i, key in enumerate(["1","2","3","4","5","6","7","8","9","⌫","0","✓"]):
+        grid.setSpacing(6)
+        for i, key in enumerate(["1","2","3","4","5","6","7","8","9","⌫","0"]):
             btn = QPushButton(key)
-            btn.setObjectName("confirm" if key == "✓" else "digit")
+            btn.setObjectName("digit")
+            btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             btn.clicked.connect(lambda _, k=key: self._tap(k))
             grid.addWidget(btn, i // 3, i % 3)
-        layout.addLayout(grid)
+        pad_row.addLayout(grid)
+
+        # OK + Cancel stacked on the right
+        side = QVBoxLayout()
+        side.setSpacing(6)
+
+        ok_btn = QPushButton("OK")
+        ok_btn.setObjectName("ok")
+        ok_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        ok_btn.clicked.connect(lambda: self._tap("✓"))
+        side.addWidget(ok_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setObjectName("cancel")
+        cancel_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        cancel_btn.clicked.connect(self.reject)
+        side.addWidget(cancel_btn)
+
+        side.addStretch()
+        pad_row.addLayout(side)
+        pad_row.addStretch()
+
+        layout.addLayout(pad_row)
+        layout.addStretch()
         return page
+
+    # ── PIN logic ────────────────────────────────────────────────────
 
     def _refresh_dots(self) -> None:
         n      = len(self._pin)
@@ -197,8 +235,7 @@ class PinLoginDialog(QDialog):
         stored = (self._selected.get("pin_hash") or "").strip()
         if not stored:
             self._lbl_error.setText(
-                "No PIN set for this account.\n"
-                "Set one via the web UI: Settings → Administrators."
+                "No PIN set — use web Settings → Administrators to set one."
             )
             self._pin = ""
             self._refresh_dots()
