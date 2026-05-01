@@ -59,6 +59,7 @@ class Camera(QObject):
         self._width     = hw.get("camera_width",  640)
         self._height    = hw.get("camera_height", 480)
         self._use_color = hw.get("camera_use_color", True)
+        self._mirror    = hw.get("camera_mirror",   True)
 
         # Preview JPEG written periodically for the web UI
         import pathlib
@@ -195,8 +196,12 @@ class Camera(QObject):
             return False
         try:
             picam = Picamera2()
+            # Use RGB888 explicitly so we always know what we're getting,
+            # then convert to BGR for OpenCV consistency.  BGR888 is
+            # ambiguous across Pi Camera generations and can deliver RGB
+            # data on some sensors, causing red/blue to appear swapped.
             cfg   = picam.create_preview_configuration(
-                main={"size": (self._width, self._height), "format": "BGR888"}
+                main={"size": (self._width, self._height), "format": "RGB888"}
             )
             picam.configure(cfg)
             picam.start()
@@ -204,7 +209,8 @@ class Camera(QObject):
 
             # Grab one frame immediately so latest_frame is never None
             # from the moment start() returns
-            first = picam.capture_array("main")
+            first_rgb = picam.capture_array("main")
+            first     = cv2.cvtColor(first_rgb, cv2.COLOR_RGB2BGR)
             with self._lock:
                 self._latest = first
 
@@ -221,9 +227,9 @@ class Camera(QObject):
     def _picam_loop(self) -> None:
         while self._running and self._picam is not None:
             try:
-                frame = self._picam.capture_array("main")
-                # picamera2 BGR888 → already BGR np.ndarray
-                if frame.ndim == 3 and frame.shape[2] == 3:
+                frame_rgb = self._picam.capture_array("main")
+                if frame_rgb.ndim == 3 and frame_rgb.shape[2] == 3:
+                    frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
                     self._emit(frame)
                 else:
                     time.sleep(0.05)
@@ -239,6 +245,8 @@ class Camera(QObject):
         if not self._use_color:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        if self._mirror:
+            frame = cv2.flip(frame, 1)   # horizontal flip — mirror effect
         with self._lock:
             self._latest = frame
         self.frame_ready.emit(_bgr_to_pixmap(frame))
