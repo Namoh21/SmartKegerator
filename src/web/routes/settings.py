@@ -247,19 +247,23 @@ async def settings_save_taps(
 
 @router.post("/camera", response_class=RedirectResponse)
 async def settings_save_camera(
-    camera_index:     int           = Form(0),
-    camera_width:     int           = Form(640),
-    camera_height:    int           = Form(480),
-    camera_use_color: Optional[str] = Form(None),
-    camera_leds_pin:  int           = Form(18),
+    camera_index:         int           = Form(0),
+    camera_width:         int           = Form(640),
+    camera_height:        int           = Form(480),
+    camera_use_color:     Optional[str] = Form(None),
+    camera_swap_red_blue: Optional[str] = Form(None),
+    camera_mirror:        Optional[str] = Form(None),
+    camera_leds_pin:      int           = Form(18),
 ):
     cfg = _read_yaml()
     cfg.setdefault("hardware", {})
-    cfg["hardware"]["camera_index"]     = camera_index
-    cfg["hardware"]["camera_width"]     = camera_width
-    cfg["hardware"]["camera_height"]    = camera_height
-    cfg["hardware"]["camera_use_color"] = camera_use_color is not None
-    cfg["hardware"]["camera_leds_pin"]  = camera_leds_pin
+    cfg["hardware"]["camera_index"]         = camera_index
+    cfg["hardware"]["camera_width"]         = camera_width
+    cfg["hardware"]["camera_height"]        = camera_height
+    cfg["hardware"]["camera_use_color"]     = camera_use_color is not None
+    cfg["hardware"]["camera_swap_red_blue"] = camera_swap_red_blue is not None
+    cfg["hardware"]["camera_mirror"]        = camera_mirror is not None
+    cfg["hardware"]["camera_leds_pin"]      = camera_leds_pin
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=camera", status_code=303)
 

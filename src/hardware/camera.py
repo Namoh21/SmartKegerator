@@ -264,7 +264,10 @@ class Camera(QObject):
 # ---------------------------------------------------------------------------
 
 def _bgr_to_pixmap(frame: np.ndarray) -> QPixmap:
-    rgb     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    h, w, ch = rgb.shape
-    img     = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
+    # Use Format_BGR888 so Qt handles the byte order natively — no cvtColor
+    # needed.  This avoids a double-swap when camera_swap_red_blue is also
+    # active: the old COLOR_BGR2RGB conversion was cancelling out the R↔B
+    # swap applied in _emit(), keeping colors wrong.
+    h, w = frame.shape[:2]
+    img = QImage(frame.data, w, h, frame.strides[0], QImage.Format.Format_BGR888)
     return QPixmap.fromImage(img)

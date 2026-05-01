@@ -327,7 +327,7 @@
 
               <div class="mb-4">
                 {% if is_admin %}
-                <div class="form-check">
+                <div class="form-check mb-2">
                   <input class="form-check-input" type="checkbox" id="cameraColor"
                          name="camera_use_color" value="true"
                          {% if hw.get('camera_use_color', True) %}checked{% endif %}>
@@ -335,8 +335,28 @@
                     Color mode <span class="text-muted">(uncheck for grayscale)</span>
                   </label>
                 </div>
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="cameraSwapRB"
+                         name="camera_swap_red_blue" value="true"
+                         {% if hw.get('camera_swap_red_blue', True) %}checked{% endif %}>
+                  <label class="form-check-label" for="cameraSwapRB">
+                    Swap red/blue channels <span class="text-muted">(enable if red objects appear blue)</span>
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="cameraMirror"
+                         name="camera_mirror" value="true"
+                         {% if hw.get('camera_mirror', True) %}checked{% endif %}>
+                  <label class="form-check-label" for="cameraMirror">
+                    Mirror image <span class="text-muted">(flip horizontally for user positioning)</span>
+                  </label>
+                </div>
                 {% else %}
-                <span class="text-muted small">Mode: {{ 'Color' if hw.get('camera_use_color', True) else 'Grayscale' }}</span>
+                <span class="text-muted small">
+                  Mode: {{ 'Color' if hw.get('camera_use_color', True) else 'Grayscale' }} ·
+                  Swap R/B: {{ 'Yes' if hw.get('camera_swap_red_blue', True) else 'No' }} ·
+                  Mirror: {{ 'Yes' if hw.get('camera_mirror', True) else 'No' }}
+                </span>
                 {% endif %}
               </div>
 
