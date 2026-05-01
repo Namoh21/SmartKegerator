@@ -100,6 +100,17 @@
                 </div>
               </div>
 
+              <div class="mb-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="uiFullscreen"
+                         name="fullscreen" value="true"
+                         {% if yaml_config.get('ui', {}).get('fullscreen', True) %}checked{% endif %}>
+                  <label class="form-check-label" for="uiFullscreen">
+                    Fullscreen mode <span class="text-muted">(touchscreen — requires restart)</span>
+                  </label>
+                </div>
+              </div>
+
               <button type="submit" class="btn btn-accent">
                 <i class="bi bi-save me-1"></i>Save Appearance
               </button>
@@ -258,6 +269,16 @@
               </div>
 
               {% if is_admin %}
+              <hr class="my-3">
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="logPours"
+                       name="log_pours" value="true"
+                       {% if yaml_config.get('ui', {}).get('log_pours', True) %}checked{% endif %}>
+                <label class="form-check-label" for="logPours">
+                  Log pours to database
+                  <span class="text-muted small">(uncheck to disable pour history recording)</span>
+                </label>
+              </div>
               <button type="submit" class="btn btn-accent mt-2">
                 <i class="bi bi-save me-1"></i>Save Taps
               </button>
@@ -381,6 +402,57 @@
                 <i class="bi bi-save me-1"></i>Save Camera
               </button>
             </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Facial Recognition -->
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-person-bounding-box me-2"></i><strong>Facial Recognition</strong></div>
+          <div class="card-body">
+            {% set recog = yaml_config.get('recognition', {}) %}
+            {% if is_admin %}
+            <form method="post" action="/settings/recognition">
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="recogEnabled"
+                       name="enabled" value="true"
+                       {% if recog.get('enabled', False) %}checked{% endif %}>
+                <label class="form-check-label" for="recogEnabled">Enable facial recognition</label>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Confidence threshold</label>
+                <input type="number" class="form-control" name="confidence_threshold"
+                       value="{{ recog.get('confidence_threshold', 0.55) }}"
+                       min="0.1" max="1.0" step="0.05" style="max-width:140px;">
+                <div class="form-text text-muted">0.1 = very lenient, 1.0 = very strict. Default: 0.55.</div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Detection model</label>
+                <select class="form-select w-auto" name="detection_model">
+                  <option value="hog" {% if recog.get('detection_model', 'hog') == 'hog' %}selected{% endif %}>
+                    HOG — fast, CPU-based (recommended for Pi)
+                  </option>
+                  <option value="cnn" {% if recog.get('detection_model', 'hog') == 'cnn' %}selected{% endif %}>
+                    CNN — accurate, requires GPU / slower on Pi
+                  </option>
+                </select>
+              </div>
+
+              <button type="submit" class="btn btn-accent">
+                <i class="bi bi-save me-1"></i>Save Recognition
+              </button>
+            </form>
+            {% else %}
+            <dl class="row mb-0">
+              <dt class="col-sm-4">Enabled</dt>
+              <dd class="col-sm-8">{{ 'Yes' if recog.get('enabled', False) else 'No' }}</dd>
+              <dt class="col-sm-4">Confidence</dt>
+              <dd class="col-sm-8">{{ recog.get('confidence_threshold', 0.55) }}</dd>
+              <dt class="col-sm-4">Model</dt>
+              <dd class="col-sm-8">{{ recog.get('detection_model', 'hog') | upper }}</dd>
+            </dl>
             {% endif %}
           </div>
         </div>

@@ -191,14 +191,16 @@ async def settings_page(request: Request):
 
 @router.post("/appearance", response_class=RedirectResponse)
 async def settings_save_appearance(
-    site_name: str = Form("SmartKegerator"),
-    theme:     str = Form("dark_blue"),
+    site_name:  str           = Form("SmartKegerator"),
+    theme:      str           = Form("dark_blue"),
+    fullscreen: Optional[str] = Form(None),
 ):
     from ui.theme import THEMES as _THEMES
     cfg = _read_yaml()
     cfg.setdefault("ui", {})
-    cfg["ui"]["name"]  = site_name.strip() or "SmartKegerator"
-    cfg["ui"]["theme"] = theme if theme in _THEMES else "dark_blue"
+    cfg["ui"]["name"]       = site_name.strip() or "SmartKegerator"
+    cfg["ui"]["theme"]      = theme if theme in _THEMES else "dark_blue"
+    cfg["ui"]["fullscreen"] = fullscreen is not None
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=appearance", status_code=303)
 
@@ -221,18 +223,19 @@ async def settings_save_display_rotation(rotation: int = Form(90)):
 
 @router.post("/taps", response_class=RedirectResponse)
 async def settings_save_taps(
-    tap_count:        int   = Form(...),
-    tap1_name:        str   = Form("Left"),
-    tap1_pin:         int   = Form(23),
-    tap2_name:        str   = Form("Center"),
-    tap2_pin:         int   = Form(24),
-    tap3_name:        str   = Form("Right"),
-    tap3_pin:         int   = Form(25),
-    tap4_name:        str   = Form("Tap 4"),
-    tap4_pin:         int   = Form(26),
-    ticks_per_liter:  int   = Form(700),
-    tick_threshold:   int   = Form(3),
-    end_pour_seconds: float = Form(5.0),
+    tap_count:        int           = Form(...),
+    tap1_name:        str           = Form("Left"),
+    tap1_pin:         int           = Form(23),
+    tap2_name:        str           = Form("Center"),
+    tap2_pin:         int           = Form(24),
+    tap3_name:        str           = Form("Right"),
+    tap3_pin:         int           = Form(25),
+    tap4_name:        str           = Form("Tap 4"),
+    tap4_pin:         int           = Form(26),
+    ticks_per_liter:  int           = Form(700),
+    tick_threshold:   int           = Form(3),
+    end_pour_seconds: float         = Form(5.0),
+    log_pours:        Optional[str] = Form(None),
 ):
     cfg = _read_yaml()
     cfg.setdefault("taps", {})
@@ -245,6 +248,8 @@ async def settings_save_taps(
     cfg["hardware"]["ticks_per_liter"]  = max(1, ticks_per_liter)
     cfg["hardware"]["tick_threshold"]   = max(1, tick_threshold)
     cfg["hardware"]["end_pour_seconds"] = max(1.0, end_pour_seconds)
+    cfg.setdefault("ui", {})
+    cfg["ui"]["log_pours"] = log_pours is not None
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=taps", status_code=303)
 
@@ -272,6 +277,25 @@ async def settings_save_camera(
     cfg["hardware"]["camera_swap_red_blue"] = camera_swap_red_blue is not None
     cfg["hardware"]["camera_mirror"]        = camera_mirror is not None
     cfg["hardware"]["camera_leds_pin"]      = camera_leds_pin
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=camera", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Facial recognition
+# ---------------------------------------------------------------------------
+
+@router.post("/recognition", response_class=RedirectResponse)
+async def settings_save_recognition(
+    enabled:              Optional[str] = Form(None),
+    confidence_threshold: float         = Form(0.55),
+    detection_model:      str           = Form("hog"),
+):
+    cfg = _read_yaml()
+    cfg.setdefault("recognition", {})
+    cfg["recognition"]["enabled"]              = enabled is not None
+    cfg["recognition"]["confidence_threshold"] = max(0.1, min(1.0, confidence_threshold))
+    cfg["recognition"]["detection_model"]      = detection_model if detection_model in ("hog", "cnn") else "hog"
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=camera", status_code=303)
 

@@ -12,6 +12,7 @@ effect after a restart — those fields are marked accordingly.
 from __future__ import annotations
 
 import logging
+import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
@@ -19,12 +20,13 @@ import yaml
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
+    QApplication, QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout,
+    QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
     QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from ui.theme import get as _get_theme, THEMES
+from log_config import apply_level, LEVEL_LABELS
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +87,7 @@ class SettingsWindow(QDialog):
     def __init__(self, config: dict, db, parent=None) -> None:
         super().__init__(parent)
         self._config      = config
+        self._db          = db
         self._config_path = _find_config_path()
         self._widgets: dict[tuple[str, str], QWidget] = {}
         self._c           = _get_theme(config)
@@ -137,8 +140,9 @@ class SettingsWindow(QDialog):
         layout.addWidget(self._build_appearance_group())
 
         layout.addWidget(self._build_group(
-            "POUR",
+            "TAPS",
             [
+                ("taps",     "count",           "Active taps",              "spin",   (1, 4)),
                 ("hardware", "ticks_per_liter",  "Ticks per liter",         "spin",   (1, 9999)),
                 ("hardware", "end_pour_seconds", "End pour after (seconds)", "dspin",  (1.0, 60.0)),
                 ("hardware", "tick_threshold",   "Tick threshold",           "spin",   (1, 20)),
@@ -158,9 +162,12 @@ class SettingsWindow(QDialog):
         layout.addWidget(self._build_group(
             "CAMERA  (restart required)",
             [
-                ("hardware", "camera_index",  "Camera device index", "spin", (0, 10)),
-                ("hardware", "camera_width",  "Capture width",       "spin", (160, 1920)),
-                ("hardware", "camera_height", "Capture height",      "spin", (120, 1080)),
+                ("hardware", "camera_index",         "Camera device index",   "spin",  (0, 10)),
+                ("hardware", "camera_width",          "Capture width",         "spin",  (160, 1920)),
+                ("hardware", "camera_height",         "Capture height",        "spin",  (120, 1080)),
+                ("hardware", "camera_use_color",      "Color mode",            "check", None),
+                ("hardware", "camera_swap_red_blue",  "Swap red/blue channels","check", None),
+                ("hardware", "camera_mirror",         "Mirror image",          "check", None),
             ],
         ))
 
@@ -179,16 +186,12 @@ class SettingsWindow(QDialog):
         layout.addWidget(self._build_group(
             "ADMIN",
             [
-                ("admin", "password", "Admin password", "password", None),
+                ("admin", "password",   "Admin password", "password", None),
+                ("ui",    "fullscreen", "Fullscreen mode", "check",   None),
             ],
         ))
 
-        layout.addWidget(self._build_group(
-            "UI",
-            [
-                ("ui", "fullscreen", "Fullscreen mode", "check", None),
-            ],
-        ))
+        layout.addWidget(self._build_service_group())
 
         layout.addStretch()
         scroll.setWidget(container)
@@ -215,6 +218,32 @@ class SettingsWindow(QDialog):
             if key == current_theme:
                 self._w_theme.setCurrentIndex(self._w_theme.count() - 1)
         form.addRow("Color theme:", self._w_theme)
+
+        # Display rotation
+        self._w_rotation = QComboBox()
+        current_rotation = self._config.get("display", {}).get("rotation", 90)
+        for deg in (0, 90, 180, 270):
+            self._w_rotation.addItem(f"{deg}°", userData=deg)
+            if deg == current_rotation:
+                self._w_rotation.setCurrentIndex(self._w_rotation.count() - 1)
+        form.addRow("Display rotation:", self._w_rotation)
+
+        return group
+
+    def _build_service_group(self) -> QGroupBox:
+        group = QGroupBox("SERVICE")
+        form  = QFormLayout(group)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        form.setSpacing(8)
+        form.setContentsMargins(12, 16, 12, 12)
+
+        self._w_log_level = QComboBox()
+        current_level = self._db.get_setting("log_level", "high") if self._db else "high"
+        for key, label in LEVEL_LABELS.items():
+            self._w_log_level.addItem(label, userData=key)
+            if key == current_level:
+                self._w_log_level.setCurrentIndex(self._w_log_level.count() - 1)
+        form.addRow("Log level:", self._w_log_level)
 
         return group
 
@@ -252,6 +281,20 @@ class SettingsWindow(QDialog):
         shutdown_btn.clicked.connect(self._shutdown_service)
         row.addWidget(shutdown_btn)
 
+        restart_btn = QPushButton("Restart Services")
+        restart_btn.setStyleSheet(
+            f"border-color: {self._c['warn']}; color: {self._c['warn']};"
+        )
+        restart_btn.clicked.connect(self._restart_services)
+        row.addWidget(restart_btn)
+
+        reboot_btn = QPushButton("Reboot")
+        reboot_btn.setStyleSheet(
+            f"border-color: {self._c['warn']}; color: {self._c['warn']};"
+        )
+        reboot_btn.clicked.connect(self._reboot_system)
+        row.addWidget(reboot_btn)
+
         if self._config_path:
             path_lbl = QLabel(f"Config: {self._config_path}")
             path_lbl.setStyleSheet(f"color: {self._c['muted']}; font-size: 11px;")
@@ -273,6 +316,34 @@ class SettingsWindow(QDialog):
         self.accept()   # close settings first, then App opens users via signal
         self.users_requested.emit()
 
+    def _restart_services(self) -> None:
+        result = QMessageBox.question(
+            self, "Restart Services",
+            "Restart the kegerator and web services?\n\n"
+            "Both services will be back online within a few seconds.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if result != QMessageBox.StandardButton.Yes:
+            return
+        log.info("Service restart requested by user")
+        subprocess.Popen(
+            ["systemctl", "--user", "restart", "smartkegerator", "smartkegerator-web"],
+            start_new_session=True,
+        )
+
+    def _reboot_system(self) -> None:
+        result = QMessageBox.question(
+            self, "Reboot System",
+            "Reboot the Raspberry Pi?\n\n"
+            "The kegerator will be unavailable for about 30 seconds.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if result != QMessageBox.StandardButton.Yes:
+            return
+        log.info("System reboot requested by user")
+        subprocess.Popen(["sudo", "reboot"], start_new_session=True)
+        QApplication.quit()
+
     def _shutdown_service(self) -> None:
         result = QMessageBox.question(
             self, "Shutdown Service",
@@ -283,8 +354,6 @@ class SettingsWindow(QDialog):
         )
         if result != QMessageBox.StandardButton.Yes:
             return
-        import subprocess, sys
-        from PyQt6.QtWidgets import QApplication
         # Stop the web service too, then exit — systemd will not auto-restart
         # because we're stopping the unit (not letting it crash).
         log.info("Shutdown requested by user — stopping services")
@@ -343,6 +412,16 @@ class SettingsWindow(QDialog):
         self._config.setdefault("ui", {})
         self._config["ui"]["name"]  = self._w_name.text().strip() or "SmartKegerator"
         self._config["ui"]["theme"] = self._w_theme.currentData()
+
+        # Display rotation
+        self._config.setdefault("display", {})
+        self._config["display"]["rotation"] = self._w_rotation.currentData()
+
+        # Log level (DB-stored)
+        level = self._w_log_level.currentData()
+        if self._db:
+            self._db.set_setting("log_level", level)
+        apply_level(level)
 
         for (section, key), widget in self._widgets.items():
             value = self._read_widget(widget)
