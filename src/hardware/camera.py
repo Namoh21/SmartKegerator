@@ -59,7 +59,8 @@ class Camera(QObject):
         self._width     = hw.get("camera_width",  640)
         self._height    = hw.get("camera_height", 480)
         self._use_color = hw.get("camera_use_color", True)
-        self._mirror    = hw.get("camera_mirror",   True)
+        self._mirror    = hw.get("camera_mirror",    True)
+        self._swap_rb   = hw.get("camera_swap_red_blue", True)
 
         # Preview JPEG written periodically for the web UI
         import pathlib
@@ -209,8 +210,7 @@ class Camera(QObject):
 
             # Grab one frame immediately so latest_frame is never None
             # from the moment start() returns
-            first_rgb = picam.capture_array("main")
-            first     = cv2.cvtColor(first_rgb, cv2.COLOR_RGB2BGR)
+            first = picam.capture_array("main")
             with self._lock:
                 self._latest = first
 
@@ -227,9 +227,8 @@ class Camera(QObject):
     def _picam_loop(self) -> None:
         while self._running and self._picam is not None:
             try:
-                frame_rgb = self._picam.capture_array("main")
-                if frame_rgb.ndim == 3 and frame_rgb.shape[2] == 3:
-                    frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+                frame = self._picam.capture_array("main")
+                if frame.ndim == 3 and frame.shape[2] == 3:
                     self._emit(frame)
                 else:
                     time.sleep(0.05)
@@ -242,6 +241,8 @@ class Camera(QObject):
     # ------------------------------------------------------------------
 
     def _emit(self, frame: np.ndarray) -> None:
+        if self._swap_rb:
+            frame = frame[:, :, ::-1]    # swap R↔B channels (fix camera BGR/RGB mismatch)
         if not self._use_color:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
