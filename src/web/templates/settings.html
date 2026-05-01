@@ -570,20 +570,45 @@
               <label class="form-label fw-semibold">Server address</label>
               <div class="p-2 rounded border font-monospace mb-2"
                    style="background:var(--sk-bg); border-color:var(--sk-border) !important;">
-                <span class="text-muted">http://</span><strong>{{ server_ip }}</strong><span class="text-muted">:</span><strong>{{ server_port }}</strong>
+                <span class="text-muted">{% if ssl_enabled %}https://{% else %}http://{% endif %}</span><strong>{{ server_ip }}</strong><span class="text-muted">:</span><strong>{{ server_port }}</strong>
               </div>
-              <form method="post" action="/settings/server-port" class="d-flex align-items-center gap-2">
-                <label class="text-muted small mb-0 text-nowrap">Change port:</label>
-                <input type="number" class="form-control form-control-sm font-monospace"
-                       name="port" value="{{ server_port }}" min="1024" max="65535"
-                       style="width:100px;">
+              <form method="post" action="/settings/server-port">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <label class="text-muted small mb-0 text-nowrap">Port:</label>
+                  <input type="number" class="form-control form-control-sm font-monospace"
+                         name="port" value="{{ server_port }}" min="1" max="65535"
+                         style="width:100px;">
+                </div>
+
+                <div class="mb-2">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="ssl_enabled"
+                           id="ssl_enabled" value="1" {% if ssl_enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="ssl_enabled">
+                      Enable HTTPS / TLS
+                    </label>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small text-muted mb-1">SSL certificate file (full path)</label>
+                  <input type="text" class="form-control form-control-sm font-monospace"
+                         name="ssl_certfile" value="{{ ssl_certfile }}"
+                         placeholder="/etc/ssl/certs/smartkegerator.crt">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small text-muted mb-1">SSL key file (full path)</label>
+                  <input type="text" class="form-control form-control-sm font-monospace"
+                         name="ssl_keyfile" value="{{ ssl_keyfile }}"
+                         placeholder="/etc/ssl/private/smartkegerator.key">
+                </div>
+
                 <button type="submit" class="btn btn-accent btn-sm text-nowrap">
-                  <i class="bi bi-save me-1"></i>Save Port
+                  <i class="bi bi-save me-1"></i>Save &amp; Restart Web Service
                 </button>
               </form>
-              <div class="form-text text-muted mt-1">
-                Enter <code>http://{{ server_ip }}:{{ server_port }}</code> in the Android app setup screen.
-                Changing the port requires a service restart.
+              <div class="form-text text-muted mt-2">
+                Enter <code>{% if ssl_enabled %}https{% else %}http{% endif %}://{{ server_ip }}:{{ server_port }}</code> in the Android app setup screen.
+                The web service will restart automatically after saving.
               </div>
             </div>
 

@@ -530,7 +530,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${SRC_DIR}
-ExecStart=${PYTHON} -m uvicorn web.server:app --host 0.0.0.0 --port 8080
+ExecStart=${SRC_DIR}/scripts/launch_web.sh
 Restart=always
 RestartSec=5
 StartLimitIntervalSec=0
@@ -577,6 +577,7 @@ info "Compositor detected: ${COMPOSITOR}"
 
 LAUNCH_SCRIPT="${SRC_DIR}/scripts/launch_gui.sh"
 chmod +x "${LAUNCH_SCRIPT}"
+chmod +x "${SRC_DIR}/scripts/launch_web.sh"
 
 case "${COMPOSITOR}" in
     labwc)

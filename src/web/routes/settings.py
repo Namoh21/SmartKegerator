@@ -167,7 +167,12 @@ async def settings_page(request: Request):
     cfg      = _read_yaml()
     admins   = db.get_all_admins() if request.session.get("admin_username") else []
     server_ip   = _get_local_ip()
-    server_port = int(cfg.get("web", {}).get("port", 8080))
+    web_cfg     = cfg.get("web", {})
+    server_port = int(web_cfg.get("port", 8080))
+    ssl_cfg     = web_cfg.get("ssl", {})
+    ssl_enabled  = bool(ssl_cfg.get("enabled", False))
+    ssl_certfile = ssl_cfg.get("certfile", "")
+    ssl_keyfile  = ssl_cfg.get("keyfile", "")
     current_level = db.get_setting("log_level", "high")
     return templates.TemplateResponse(
         request,
@@ -175,6 +180,7 @@ async def settings_page(request: Request):
         ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS,
             admins=admins, themes=THEMES,
             server_ip=server_ip, server_port=server_port,
+            ssl_enabled=ssl_enabled, ssl_certfile=ssl_certfile, ssl_keyfile=ssl_keyfile,
             log_levels=LEVEL_LABELS, current_log_level=current_level),
     )
 
@@ -354,12 +360,26 @@ async def settings_save_admin_timeout(
 
 @router.post("/server-port", response_class=RedirectResponse)
 async def settings_save_server_port(
-    port: int = Form(8080),
+    port:         int           = Form(8080),
+    ssl_enabled:  Optional[str] = Form(None),
+    ssl_certfile: str           = Form(""),
+    ssl_keyfile:  str           = Form(""),
 ):
     cfg = _read_yaml()
     cfg.setdefault("web", {})
-    cfg["web"]["port"] = max(1024, min(65535, port))
+    cfg["web"]["port"] = max(1, min(65535, port))
+    cfg["web"].setdefault("ssl", {})
+    cfg["web"]["ssl"]["enabled"]  = ssl_enabled is not None
+    cfg["web"]["ssl"]["certfile"] = ssl_certfile.strip()
+    cfg["web"]["ssl"]["keyfile"]  = ssl_keyfile.strip()
     _write_yaml(cfg)
+
+    # Restart web service so the new port/SSL takes effect immediately
+    async def _restart():
+        await asyncio.sleep(1)
+        subprocess.run(["systemctl", "--user", "restart", "smartkegerator-web"], check=False)
+
+    asyncio.create_task(_restart())
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
