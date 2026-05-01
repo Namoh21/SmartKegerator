@@ -459,6 +459,24 @@ async def reboot_system(request: Request):
     )
 
 
+@router.post("/shutdown", response_class=HTMLResponse)
+async def shutdown_services(request: Request):
+    """Stop both services without restarting them — returns desktop."""
+    admin = request.session.get("admin_username", "unknown")
+    log.warning("Service shutdown requested by admin=%s from %s", admin, request.client.host if request.client else "unknown")
+
+    async def _delayed_shutdown():
+        await asyncio.sleep(2)
+        subprocess.run(["systemctl", "--user", "stop", "smartkegerator"],     check=False)
+        subprocess.run(["systemctl", "--user", "stop", "smartkegerator-web"], check=False)
+
+    asyncio.create_task(_delayed_shutdown())
+    return HTMLResponse(
+        '<span class="text-secondary"><i class="bi bi-stop-circle me-1"></i>'
+        'Services stopping in 2 s — this page will become unreachable.</span>'
+    )
+
+
 # ---------------------------------------------------------------------------
 # Log level
 # ---------------------------------------------------------------------------

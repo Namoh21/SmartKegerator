@@ -244,6 +244,14 @@ class SettingsWindow(QDialog):
         users_btn.clicked.connect(self._open_users)
         row.addWidget(users_btn)
 
+        shutdown_btn = QPushButton("Shutdown Service")
+        shutdown_btn.setObjectName("danger")
+        shutdown_btn.setStyleSheet(
+            f"border-color: {self._c['warn']}; color: {self._c['warn']};"
+        )
+        shutdown_btn.clicked.connect(self._shutdown_service)
+        row.addWidget(shutdown_btn)
+
         if self._config_path:
             path_lbl = QLabel(f"Config: {self._config_path}")
             path_lbl.setStyleSheet(f"color: {self._c['muted']}; font-size: 11px;")
@@ -264,6 +272,32 @@ class SettingsWindow(QDialog):
     def _open_users(self) -> None:
         self.accept()   # close settings first, then App opens users via signal
         self.users_requested.emit()
+
+    def _shutdown_service(self) -> None:
+        result = QMessageBox.question(
+            self, "Shutdown Service",
+            "Stop the kegerator service and return to the desktop?\n\n"
+            "The service will not restart automatically until the next reboot\n"
+            "or until you manually run:  systemctl --user start smartkegerator",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if result != QMessageBox.StandardButton.Yes:
+            return
+        import subprocess, sys
+        from PyQt6.QtWidgets import QApplication
+        # Stop the web service too, then exit — systemd will not auto-restart
+        # because we're stopping the unit (not letting it crash).
+        log.info("Shutdown requested by user — stopping services")
+        subprocess.Popen(
+            ["systemctl", "--user", "stop", "smartkegerator-web"],
+            start_new_session=True,
+        )
+        # Stop this service last (a small delay lets the web stop command fire)
+        subprocess.Popen(
+            ["bash", "-c", "sleep 1 && systemctl --user stop smartkegerator"],
+            start_new_session=True,
+        )
+        QApplication.quit()
 
     # ------------------------------------------------------------------
     # Widget factory

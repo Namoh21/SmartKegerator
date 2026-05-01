@@ -409,21 +409,30 @@ for u in data.get('urls', []):
     fi
 fi
 
-# Pin NumPy < 2 — system python3-opencv is compiled against NumPy 1.x
-# and NumPy 2.x breaks its C extension (_ARRAY_API not found).
-pip_install_retry "numpy" "numpy<2"
+# Remaining packages installed one-at-a-time with a progress counter
+# so the terminal doesn't appear frozen during a slow connection.
+REMAINING_PKGS=(
+    "numpy<2"
+    "pyqtgraph"
+    "adafruit-circuitpython-dht"
+    "fastapi>=0.110"
+    "uvicorn[standard]>=0.27"
+    "jinja2>=3.1"
+    "python-multipart>=0.0.9"
+    "httpx>=0.27"
+    "itsdangerous>=2.1"
+    "PyYAML"
+)
+TOTAL_REMAINING=${#REMAINING_PKGS[@]}
 
-# Remaining packages — all pure Python, install in seconds
-pip_install_retry "web + UI packages" \
-    pyqtgraph \
-    adafruit-circuitpython-dht \
-    "fastapi>=0.110" \
-    "uvicorn[standard]>=0.27" \
-    "jinja2>=3.1" \
-    "python-multipart>=0.0.9" \
-    "httpx>=0.27" \
-    "itsdangerous>=2.1" \
-    PyYAML
+for i in "${!REMAINING_PKGS[@]}"; do
+    PKG="${REMAINING_PKGS[$i]}"
+    NUM=$((i + 1))
+    # Strip version specifier for display
+    PKG_DISPLAY="${PKG%%[\[>=<]*}"
+    info "  [${NUM}/${TOTAL_REMAINING}]  ${PKG_DISPLAY}"
+    pip_install_retry "${PKG_DISPLAY}" "${PKG}"
+done
 
 info "Pip packages installed."
 info "(Any 'dependency conflict' warnings above are from system packages like types-seaborn and are harmless.)"

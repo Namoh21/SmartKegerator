@@ -832,12 +832,41 @@
                   hx-post="/settings/restart"
                   hx-target="#restart-result"
                   hx-swap="innerHTML">
-            Restart Services
+            <i class="bi bi-arrow-clockwise me-1"></i>Restart Services
+          </button>
+          <button type="button" class="btn btn-outline-secondary"
+                  data-bs-toggle="modal" data-bs-target="#shutdownModal">
+            <i class="bi bi-stop-circle me-1"></i>Shutdown Service
           </button>
           <button type="button" class="btn btn-outline-danger"
                   data-bs-toggle="modal" data-bs-target="#rebootModal">
             <i class="bi bi-power me-1"></i>Reboot System
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shutdown confirmation modal -->
+    <div class="modal fade" id="shutdownModal" tabindex="-1">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content" style="background:var(--sk-card);">
+          <div class="modal-header border-secondary">
+            <h6 class="modal-title"><i class="bi bi-stop-circle me-2 text-secondary"></i>Shutdown Services?</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-muted small">
+            Both services will stop and return to the desktop. They will not restart automatically until the next reboot or manual <code>systemctl --user start</code>.
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    data-bs-dismiss="modal"
+                    hx-post="/settings/shutdown"
+                    hx-target="#restart-result"
+                    hx-swap="innerHTML">
+              Yes, Shutdown
+            </button>
+          </div>
         </div>
       </div>
     </div>
