@@ -441,7 +441,9 @@ info "Pip packages installed."
 info "(Any 'dependency conflict' warnings above are from system packages like types-seaborn and are harmless.)"
 
 # ---------------------------------------------------------------------------
-# 4. Directory tree
+# 4. Directory tree + database preservation
+#    Back up the database before install resets anything, then restore it
+#    after.  Photos and videos are left in place — only config is reset.
 # ---------------------------------------------------------------------------
 section "Creating directories"
 
@@ -450,6 +452,14 @@ for dir in "${INSTALL_DIR}" "${SRC_DIR}" "${DATA_DIR}" "${PHOTOS_DIR}" \
     mkdir -p "${dir}"
     chown "${REAL_USER}:${REAL_USER}" "${dir}"
 done
+
+# Preserve existing database across reinstalls
+DB_BACKUP=""
+if [[ -f "${DB_PATH}" ]]; then
+    DB_BACKUP="${INSTALL_DIR}/smartkegerator.db.install-backup"
+    cp "${DB_PATH}" "${DB_BACKUP}"
+    info "Database backed up to ${DB_BACKUP}"
+fi
 
 info "Directories ready."
 
@@ -468,18 +478,16 @@ if [[ "${REPO_SRC}" != "${SRC_DIR}" ]]; then
     info "Source files copied."
 fi
 
-# config.yaml is gitignored — create it from the template if missing,
-# then patch all paths to match this installation.
+# config.yaml — always recreate from template on install so settings are reset.
+# The database is preserved (backed up and restored below).
 CONFIG="${SRC_DIR}/config.yaml"
 CONFIG_EXAMPLE="${SRC_DIR}/config.yaml.example"
 
-if [[ ! -f "${CONFIG}" ]]; then
-    if [[ -f "${CONFIG_EXAMPLE}" ]]; then
-        sudo -u "${REAL_USER}" cp "${CONFIG_EXAMPLE}" "${CONFIG}"
-        info "Created config.yaml from template."
-    else
-        error "config.yaml.example not found — cannot create configuration."
-    fi
+if [[ -f "${CONFIG_EXAMPLE}" ]]; then
+    sudo -u "${REAL_USER}" cp "${CONFIG_EXAMPLE}" "${CONFIG}"
+    info "config.yaml reset from template."
+else
+    error "config.yaml.example not found — cannot create configuration."
 fi
 
 sed -i \
@@ -598,6 +606,8 @@ info "Compositor detected: ${COMPOSITOR}"
 LAUNCH_SCRIPT="${SRC_DIR}/scripts/launch_gui.sh"
 chmod +x "${LAUNCH_SCRIPT}"
 chmod +x "${SRC_DIR}/scripts/launch_web.sh"
+chmod +x "${SRC_DIR}/scripts/reset_db.sh"
+chmod +x "${SRC_DIR}/scripts/update.sh"
 
 case "${COMPOSITOR}" in
     labwc)
@@ -719,6 +729,16 @@ else
     echo "${SUDOERS_LINE}" > "${SUDOERS_FILE}"
     chmod 440 "${SUDOERS_FILE}"
     info "Sudoers rule written: ${REAL_USER} may run sudo reboot without password."
+fi
+
+# ---------------------------------------------------------------------------
+# Restore database backup (preserved from before install)
+# ---------------------------------------------------------------------------
+if [[ -n "${DB_BACKUP:-}" && -f "${DB_BACKUP}" ]]; then
+    cp "${DB_BACKUP}" "${DB_PATH}"
+    chown "${REAL_USER}:${REAL_USER}" "${DB_PATH}"
+    rm -f "${DB_BACKUP}"
+    info "Database restored."
 fi
 
 section "Installation complete"

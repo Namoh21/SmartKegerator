@@ -2,8 +2,17 @@
 # =============================================================================
 # SmartKegerator updater — pull latest code and restart services
 #
-# Run from the git clone directory:
-#   cd ~/smartkegerator && bash src/scripts/update.sh
+# Preserves everything user-specific:  config.yaml, database, photos, videos.
+# Only source code and scripts are updated.
+#
+# Run from the git clone directory (no sudo required):
+#   cd ~/SmartKegerator && bash src/scripts/update.sh
+#
+# To do a full reset (keeps only the database), re-run the installer:
+#   sudo bash src/scripts/install.sh
+#
+# To wipe the database for a clean slate:
+#   bash src/scripts/reset_db.sh
 # =============================================================================
 set -euo pipefail
 
@@ -13,14 +22,13 @@ warn() { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 
 INSTALL_DIR="/opt/smartkegerator"
 SRC_DIR="${INSTALL_DIR}/src"
-VENV_DIR="${INSTALL_DIR}/venv"
 REAL_USER="${SUDO_USER:-$(whoami)}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_SRC="$(dirname "${SCRIPT_DIR}")"   # parent of scripts/ = src/
 
 # ---------------------------------------------------------------------------
-# 1. Pull latest code (hard-reset handles force-pushed history rewrites)
+# 1. Pull latest code
 # ---------------------------------------------------------------------------
 info "Pulling latest code…"
 REPO_DIR="$(dirname "${REPO_SRC}")"
@@ -28,7 +36,8 @@ git -C "${REPO_DIR}" fetch origin
 git -C "${REPO_DIR}" reset --hard origin/master
 
 # ---------------------------------------------------------------------------
-# 2. Sync source files to /opt (preserve config.yaml — it's gitignored)
+# 2. Sync source files — preserves config.yaml, database, photos, videos
+#    (config.yaml is gitignored so rsync never touches it)
 # ---------------------------------------------------------------------------
 info "Syncing source files to ${SRC_DIR}…"
 if [[ "$(id -u)" -eq 0 ]]; then
@@ -38,7 +47,7 @@ else
     sudo rsync -a --exclude="config.yaml" "${REPO_SRC}/" "${SRC_DIR}/"
     sudo chown -R "${REAL_USER}:${REAL_USER}" "${SRC_DIR}"
 fi
-info "Source files updated."
+info "Source files updated (config.yaml, database, and photos unchanged)."
 
 # ---------------------------------------------------------------------------
 # 2b. Ensure sudoers rule exists for web-initiated reboot
