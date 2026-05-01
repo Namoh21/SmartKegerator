@@ -25,9 +25,9 @@ Original concept by [PhilsProjects](https://philsprojects.wordpress.com/2015/07/
 
 | Model | OS | Notes |
 |---|---|---|
-| Raspberry Pi 5 (4/8 GB) | Bookworm or Trixie | Recommended |
-| Raspberry Pi 4 (2/4 GB) | Bookworm or Trixie | Fully supported |
-| Raspberry Pi 3B / 3B+ (1 GB) | Bookworm or Trixie | Supported — longer install time |
+| Raspberry Pi 5 (4/8 GB) | Trixie | Recommended |
+| Raspberry Pi 4 (2/4 GB) | Trixie | Fully supported |
+| Raspberry Pi 3B / 3B+ (1 GB) | Trixie | Supported — longer install time |
 
 > **Pi 5 power supply:** Use the official 27W USB-C supply (5V/5A). Underpowered
 > supplies cause random crashes during compilation and runtime instability.
@@ -38,7 +38,7 @@ Original concept by [PhilsProjects](https://philsprojects.wordpress.com/2015/07/
 
 ### 1. Flash the Pi
 
-Use **Raspberry Pi Imager** and select **Raspberry Pi OS (64-bit)** — Bookworm or Trixie.
+Use **Raspberry Pi Imager** and select **Raspberry Pi OS (64-bit)** — Trixie.
 
 During imaging *(click the gear/settings icon before writing)*:
 - Set **hostname** (e.g. `smartkegerator`)
