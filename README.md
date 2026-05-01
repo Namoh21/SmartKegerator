@@ -8,6 +8,12 @@ Original concept by [PhilsProjects](https://philsprojects.wordpress.com/2015/07/
 
 ---
 
+## Disclaimer
+
+This project is provided as-is for personal and hobbyist use. The author makes no warranties, express or implied, regarding the software's fitness for any particular purpose, reliability, or freedom from defects. Use at your own risk. The author is not responsible for any damages — including but not limited to hardware damage, data loss, property damage, or personal injury — arising from the use or misuse of this software or the instructions provided in this repository.
+
+---
+
 ## Features
 
 - **Touchscreen UI** — tap cards with beer info, keg levels, and pour history (PyQt6 / Wayland)
@@ -51,8 +57,6 @@ This lets you connect over SSH on first boot without a monitor or keyboard.
 ### 2. SSH in and clone the repo
 
 ```bash
-ssh <username>@smartkegerator.local
-
 cd ~
 git clone https://github.com/Namoh21/SmartKegerator.git
 cd SmartKegerator
