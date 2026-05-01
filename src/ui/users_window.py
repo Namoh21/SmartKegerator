@@ -663,19 +663,21 @@ class UsersWindow(QDialog):
             self._restart_camera_after_training()
 
     def _stop_camera_for_training(self) -> None:
-        self._camera_was_running = (
-            self._camera is not None and self._camera.is_running
-        )
-        if self._camera_was_running:
-            self._camera.stop()
-            log.info("Camera paused for training (freeing RAM)")
+        # Pause the capture loop via a flag — do NOT call camera.stop()
+        # from the main thread while the picamera2 loop runs in its own
+        # thread.  Calling picam.stop() mid-capture is a libcamera race
+        # condition that raises SIGABRT and kills the process instantly.
+        if self._camera and self._camera.is_running:
+            self._camera.set_paused(True)
+            self._camera_paused_for_training = True
+            log.info("Camera paused for training")
 
     def _restart_camera_after_training(self) -> None:
-        if getattr(self, "_camera_was_running", False):
-            self._camera_was_running = False
+        if getattr(self, "_camera_paused_for_training", False):
+            self._camera_paused_for_training = False
             if self._camera:
-                self._camera.start()
-                log.info("Camera restarted after training")
+                self._camera.set_paused(False)
+                log.info("Camera resumed after training")
         if self._selected_user:
             self._capture_btn.setEnabled(
                 self._selected_user.id != UNKNOWN_USER_ID

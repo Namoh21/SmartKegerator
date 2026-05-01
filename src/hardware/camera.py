@@ -104,6 +104,18 @@ class Camera(QObject):
             self._picam = None
         log.info("Camera: stopped")
 
+    def set_paused(self, paused: bool) -> None:
+        """
+        Pause or resume frame capture without stopping the camera.
+
+        Safe to call from any thread — only sets a boolean flag.
+        Use this instead of stop()/start() when you need to free CPU
+        but cannot safely call picamera2 methods from a different thread
+        (e.g. during face recognition training on Pi 3).
+        """
+        self._paused = paused
+        log.info("Camera: %s", "paused" if paused else "resumed")
+
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
@@ -181,6 +193,9 @@ class Camera(QObject):
 
     def _opencv_loop(self) -> None:
         while self._running and self._cap is not None:
+            if getattr(self, "_paused", False):
+                time.sleep(0.1)
+                continue
             ret, frame = self._cap.read()
             if not ret:
                 log.warning("Camera: failed to read frame — retrying")
@@ -226,6 +241,9 @@ class Camera(QObject):
 
     def _picam_loop(self) -> None:
         while self._running and self._picam is not None:
+            if getattr(self, "_paused", False):
+                time.sleep(0.1)
+                continue
             try:
                 frame = self._picam.capture_array("main")
                 if frame.ndim == 3 and frame.shape[2] == 3:
