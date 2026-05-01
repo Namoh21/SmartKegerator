@@ -367,6 +367,15 @@ async def settings_save_server_port(
 ):
     cfg = _read_yaml()
     cfg.setdefault("web", {})
+    # Privileged ports: only 80 (HTTP) or 443 (HTTPS) are permitted below 1024
+    if port < 1024:
+        ssl_on = ssl_enabled is not None
+        if port == 443 and ssl_on:
+            pass  # allowed
+        elif port == 80 and not ssl_on:
+            pass  # allowed
+        else:
+            port = 8080  # reject other privileged ports
     cfg["web"]["port"] = max(1, min(65535, port))
     cfg["web"].setdefault("ssl", {})
     cfg["web"]["ssl"]["enabled"]  = ssl_enabled is not None

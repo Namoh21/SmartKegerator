@@ -39,6 +39,22 @@ print(str(ssl.get('enabled', False)).lower(), ssl.get('certfile', ''), ssl.get('
 fi
 
 # ---------------------------------------------------------------------------
+# Validate port — ports below 1024 are privileged.
+# Only allow 80 (plain HTTP) or 443 (HTTPS with SSL enabled).
+# Anything else below 1024 falls back to 8080.
+# ---------------------------------------------------------------------------
+if [[ "${PORT}" -lt 1024 ]]; then
+    if [[ "${PORT}" -eq 443 && "${SSL_ENABLED}" == "true" ]]; then
+        : # 443 + SSL enabled — allowed
+    elif [[ "${PORT}" -eq 80 && "${SSL_ENABLED}" != "true" ]]; then
+        : # 80 without SSL — allowed
+    else
+        echo "launch_web: port ${PORT} is not allowed (privileged ports: 80 for HTTP, 443 for HTTPS only) — falling back to 8080" >&2
+        PORT=8080
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Build uvicorn command
 # ---------------------------------------------------------------------------
 CMD=(
