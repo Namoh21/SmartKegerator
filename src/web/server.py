@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import secrets
 import sys
+import threading
 import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -159,6 +161,118 @@ app = FastAPI(
 
 # ── Middleware (last added = outermost = first to process requests) ─────────
 
+class _RateLimitMiddleware(BaseHTTPMiddleware):
+    """
+    In-memory rate limiter for all /api/ routes.
+
+    Login endpoint  — 5 attempts per minute per IP.
+                      After 10 cumulative failures the IP is locked out for
+                      15 minutes.  A successful login resets the failure count.
+
+    All other /api/ routes — 120 requests per minute per IP (generous; only
+                      catches runaway scripts or denial-of-service attempts).
+
+    Uses a sliding-window counter so limits are per *rolling* minute, not
+    per calendar minute.  No external dependencies — pure in-memory state.
+    Memory is bounded: stale entries are pruned on every check, and we only
+    track IPs that are actively making requests.
+    """
+
+    _LOGIN_PATH     = "/api/v1/auth/login"
+    _LOGIN_RPM      = 5     # max login attempts per 60-second window
+    _LOGIN_FAILURES = 10    # cumulative failures before lockout
+    _LOCKOUT_SECS   = 900   # 15 minutes
+    _API_RPM        = 120   # max general API requests per 60-second window
+    _WINDOW         = 60    # sliding window in seconds
+
+    def __init__(self, app) -> None:
+        super().__init__(app)
+        self._lock            = threading.Lock()
+        self._login_window:   dict[str, list[float]] = defaultdict(list)
+        self._login_failures: dict[str, int]         = defaultdict(int)
+        self._login_lockout:  dict[str, float]        = {}
+        self._api_window:     dict[str, list[float]]  = defaultdict(list)
+
+    @staticmethod
+    def _client_ip(request: Request) -> str:
+        fwd = request.headers.get("X-Forwarded-For", "")
+        if fwd:
+            return fwd.split(",")[0].strip()
+        return request.client.host if request.client else "unknown"
+
+    def _prune(self, window: list[float], now: float) -> list[float]:
+        return [t for t in window if now - t < self._WINDOW]
+
+    def _reject(self, message: str, retry_after: int) -> Response:
+        import json
+        return Response(
+            content=json.dumps({"detail": message}),
+            status_code=429,
+            media_type="application/json",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        path = request.url.path
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
+        ip  = self._client_ip(request)
+        now = time.time()
+
+        with self._lock:
+            is_login = (path == self._LOGIN_PATH and request.method == "POST")
+
+            if is_login:
+                # Lockout check
+                until = self._login_lockout.get(ip, 0)
+                if now < until:
+                    secs = int(until - now)
+                    return self._reject(
+                        f"Too many failed login attempts — locked out for "
+                        f"{secs // 60 + 1} more minute(s).",
+                        retry_after=secs,
+                    )
+                # Rate limit
+                self._login_window[ip] = self._prune(self._login_window[ip], now)
+                if len(self._login_window[ip]) >= self._LOGIN_RPM:
+                    return self._reject(
+                        "Too many login attempts — wait 1 minute and try again.",
+                        retry_after=self._WINDOW,
+                    )
+                self._login_window[ip].append(now)
+
+            else:
+                self._api_window[ip] = self._prune(self._api_window[ip], now)
+                if len(self._api_window[ip]) >= self._API_RPM:
+                    return self._reject(
+                        "API rate limit exceeded — slow down and try again.",
+                        retry_after=self._WINDOW,
+                    )
+                self._api_window[ip].append(now)
+
+        response = await call_next(request)
+
+        # Track login outcomes for lockout logic
+        if path == self._LOGIN_PATH and request.method == "POST":
+            with self._lock:
+                if response.status_code == 401:
+                    self._login_failures[ip] += 1
+                    if self._login_failures[ip] >= self._LOGIN_FAILURES:
+                        self._login_lockout[ip] = now + self._LOCKOUT_SECS
+                        self._login_failures[ip] = 0
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            "IP %s locked out after %d failed login attempts",
+                            ip, self._LOGIN_FAILURES,
+                        )
+                elif response.status_code == 200:
+                    self._login_failures[ip] = 0
+                    self._login_lockout.pop(ip, None)
+
+        return response
+
+
 class _SecurityHeaders(BaseHTTPMiddleware):
     """Attach security response headers to every reply.
 
@@ -256,6 +370,7 @@ app.add_middleware(
 )
 
 # Order matters: last add_middleware = outermost = runs first on requests
+app.add_middleware(_RateLimitMiddleware)
 app.add_middleware(_SecurityHeaders)
 app.add_middleware(_AdminAuthMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=False)
