@@ -186,6 +186,9 @@ apt-get install -y \
 # YAML
 apt-get install -y python3-yaml
 
+# authbind — lets non-root user services bind to ports 80 and 443
+apt-get install -y authbind
+
 # picamera2 — Pi Camera Module support on Trixie / Bookworm
 # (system package; the venv inherits it via --system-site-packages)
 apt-get install -y python3-picamera2 2>/dev/null || \
@@ -541,9 +544,6 @@ StartLimitIntervalSec=0
 KillMode=control-group
 TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
-# Allow binding to ports below 1024 (e.g. 80/443) without running as root
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=default.target
@@ -552,6 +552,15 @@ EOF
 chown "${REAL_USER}:${REAL_USER}" \
     "${SERVICE_DIR}/smartkegerator.service" \
     "${SERVICE_DIR}/smartkegerator-web.service"
+
+# authbind — grant the real user permission to bind to port 80 (HTTP) and
+# port 443 (HTTPS) so the web service can use them without running as root.
+for _port in 80 443; do
+    touch "/etc/authbind/byport/${_port}"
+    chmod 500 "/etc/authbind/byport/${_port}"
+    chown "${REAL_USER}:${REAL_USER}" "/etc/authbind/byport/${_port}"
+done
+info "authbind configured for ports 80 and 443."
 
 # Enable lingering so user services start at boot without login
 loginctl enable-linger "${REAL_USER}" 2>/dev/null || true

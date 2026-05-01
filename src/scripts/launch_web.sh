@@ -68,4 +68,8 @@ if [[ "${SSL_ENABLED}" == "true" && -f "${SSL_CERTFILE}" && -f "${SSL_KEYFILE}" 
 fi
 
 cd "${SRC_DIR}"
-exec "${CMD[@]}"
+if [[ "${PORT}" -lt 1024 ]]; then
+    exec authbind --deep "${CMD[@]}"
+else
+    exec "${CMD[@]}"
+fi
