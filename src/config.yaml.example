@@ -19,7 +19,7 @@ hardware:
   camera_width: 640
   camera_height: 480
   camera_use_color: true
-  camera_swap_red_blue: true  # swap R↔B channels — set true if red objects appear blue
+  camera_swap_red_blue: false  # swap R↔B channels — enable if red objects appear blue
   camera_mirror: true         # flip preview horizontally (mirror effect for user positioning)
   camera_leds_pin: 18
 

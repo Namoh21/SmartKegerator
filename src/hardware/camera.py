@@ -60,7 +60,7 @@ class Camera(QObject):
         self._height    = hw.get("camera_height", 480)
         self._use_color = hw.get("camera_use_color", True)
         self._mirror    = hw.get("camera_mirror",    True)
-        self._swap_rb   = hw.get("camera_swap_red_blue", True)
+        self._swap_rb   = hw.get("camera_swap_red_blue", False)
 
         # Preview JPEG written periodically for the web UI
         import pathlib
