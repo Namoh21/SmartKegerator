@@ -780,6 +780,34 @@
           </a>
         </div>
       </div>
+
+      <!-- Log level selector -->
+      <div class="card-body border-bottom border-secondary py-2">
+        <form method="post" action="/settings/log-level"
+              class="d-flex align-items-center gap-3 flex-wrap">
+          <label class="form-label mb-0 fw-semibold">
+            <i class="bi bi-sliders me-1"></i>Logging Level
+          </label>
+          <div class="d-flex gap-2 flex-wrap">
+            {% for key, label in log_levels.items() %}
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="radio" name="level"
+                     id="loglvl_{{ key }}" value="{{ key }}"
+                     {% if current_log_level == key %}checked{% endif %}>
+              <label class="form-check-label" for="loglvl_{{ key }}">{{ label }}</label>
+            </div>
+            {% endfor %}
+          </div>
+          <button type="submit" class="btn btn-sm btn-accent">
+            <i class="bi bi-check-lg me-1"></i>Apply
+          </button>
+          <span class="text-muted small">
+            Changes apply to the web server immediately. The touchscreen
+            app picks up the new level within 60 seconds.
+          </span>
+        </form>
+      </div>
+
       <div class="card-body p-0"
            style="background:#0d1117; max-height:340px; overflow-y:auto;"
            id="log-container">

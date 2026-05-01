@@ -17,10 +17,12 @@ import yaml
 from PyQt6.QtWidgets import QApplication
 
 
-def _configure_logging(config: dict) -> None:
-    from log_config import configure
+def _configure_logging(config: dict, db=None) -> None:
+    from log_config import configure, apply_level
     log_file = configure(config, "gui")
     logging.getLogger("main").info("Logging to %s", log_file)
+    if db is not None:
+        apply_level(db.get_setting("log_level", "high"))
 
 
 def _load_config(path: str) -> dict:
@@ -41,7 +43,7 @@ def main() -> None:
         sys.exit(1)
 
     config = _load_config(config_path)
-    _configure_logging(config)
+    _configure_logging(config)   # basic setup first so DB errors are logged
     log = logging.getLogger("main")
     log.info("Loaded config: %s", config_path)
 
@@ -50,6 +52,20 @@ def main() -> None:
 
     from ui.app import App
     keg_app = App(config)
+
+    # Apply the log level stored in the DB and poll for changes every 30 s
+    from log_config import apply_level
+    from data.database import Database
+    _db_for_level = Database(config["data"]["database_path"])
+    apply_level(_db_for_level.get_setting("log_level", "high"))
+
+    from PyQt6.QtCore import QTimer
+    def _poll_log_level():
+        apply_level(_db_for_level.get_setting("log_level", "high"))
+    _level_timer = QTimer()
+    _level_timer.setInterval(30_000)
+    _level_timer.timeout.connect(_poll_log_level)
+    _level_timer.start()
 
     # Clean shutdown when the Qt event loop exits
     app.aboutToQuit.connect(keg_app.shutdown)

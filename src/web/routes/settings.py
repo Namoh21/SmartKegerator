@@ -14,7 +14,7 @@ from ui.theme import THEMES
 from web.auth import hash_password
 import logging
 
-from log_config import log_dir_for, tail_log
+from log_config import log_dir_for, tail_log, apply_level, LEVELS, LEVEL_LABELS
 from web.server import get_db, get_config, get_config_path, reload_config, templates, ctx
 
 log = logging.getLogger(__name__)
@@ -168,12 +168,14 @@ async def settings_page(request: Request):
     admins   = db.get_all_admins() if request.session.get("admin_username") else []
     server_ip   = _get_local_ip()
     server_port = int(cfg.get("web", {}).get("port", 8080))
+    current_level = db.get_setting("log_level", "high")
     return templates.TemplateResponse(
         request,
         "settings.html",
         ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS,
             admins=admins, themes=THEMES,
-            server_ip=server_ip, server_port=server_port),
+            server_ip=server_ip, server_port=server_port,
+            log_levels=LEVEL_LABELS, current_log_level=current_level),
     )
 
 
@@ -455,6 +457,19 @@ async def reboot_system(request: Request):
     return HTMLResponse(
         '<span class="text-warning"><i class="bi bi-power me-1"></i>Rebooting in 3 s…</span>'
     )
+
+
+# ---------------------------------------------------------------------------
+# Log level
+# ---------------------------------------------------------------------------
+
+@router.post("/log-level", response_class=RedirectResponse)
+async def settings_save_log_level(level: str = Form("high")):
+    if level not in LEVELS:
+        level = "high"
+    get_db().set_setting("log_level", level)
+    apply_level(level)   # apply to web server immediately
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
 # ---------------------------------------------------------------------------

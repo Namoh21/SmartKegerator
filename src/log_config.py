@@ -10,12 +10,38 @@ Log location is derived from config["data"]["database_path"]:
       → /opt/smartkegerator/logs/smartkegerator-web.log
 
 Each log file rotates at 5 MB and keeps 5 backups (max 25 MB each).
+
+Log levels (stored as the string key in the DB under "log_level"):
+  none     → CRITICAL  (only fatal errors)
+  basic    → WARNING   (warnings + errors)
+  high     → INFO      (normal operational messages — default)
+  verbose  → DEBUG     (full debug trace, very noisy)
 """
 from __future__ import annotations
 
 import logging
 import logging.handlers
 from pathlib import Path
+
+# Mapping from UI label to Python logging level
+LEVELS: dict[str, int] = {
+    "none":    logging.CRITICAL,
+    "basic":   logging.WARNING,
+    "high":    logging.INFO,
+    "verbose": logging.DEBUG,
+}
+
+LEVEL_LABELS: dict[str, str] = {
+    "none":    "None (fatal errors only)",
+    "basic":   "Basic (warnings + errors)",
+    "high":    "High (normal operation)",
+    "verbose": "Verbose (full debug trace)",
+}
+
+_DEFAULT_LEVEL = "high"
+
+# Third-party loggers kept quieter regardless of the chosen level
+_NOISY = ("uvicorn.access", "httpx", "httpcore", "PIL", "picamera2")
 
 
 def configure(config: dict, process: str = "app") -> Path:
@@ -51,11 +77,27 @@ def configure(config: dict, process: str = "app") -> Path:
 
     root.setLevel(logging.INFO)
 
-    # Reduce noise from chatty third-party loggers
-    for noisy in ("uvicorn.access", "httpx", "httpcore", "PIL"):
+    for noisy in _NOISY:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     return log_file
+
+
+def apply_level(level_key: str) -> None:
+    """
+    Apply a log level key (none/basic/high/verbose) to the root logger
+    immediately.  Safe to call from any thread at any time.
+    """
+    level = LEVELS.get(level_key, logging.INFO)
+    logging.getLogger().setLevel(level)
+    # Keep third-party loggers at WARNING unless we're in verbose mode
+    floor = logging.DEBUG if level_key == "verbose" else logging.WARNING
+    for noisy in _NOISY:
+        logging.getLogger(noisy).setLevel(max(level, floor))
+    logging.getLogger(__name__).info(
+        "Log level set to %s (%s)", level_key.upper(),
+        logging.getLevelName(level)
+    )
 
 
 def log_dir_for(config: dict) -> Path:
