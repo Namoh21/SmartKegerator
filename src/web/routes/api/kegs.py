@@ -55,7 +55,7 @@ def _parse_date(s: str) -> datetime:
         return datetime.today()
 
 
-@router.get("/kegs", response_model=list[KegResponse])
+@router.get("/kegs", response_model=list[KegResponse], dependencies=[Depends(require_admin)])
 async def list_kegs():
     db = get_db()
     return [_out(db, k) for k in db.get_all_kegs()]

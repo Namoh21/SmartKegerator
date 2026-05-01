@@ -36,7 +36,7 @@ class TrainStatusResponse(BaseModel):
     error:    str | None  = None
 
 
-@router.get("/users", response_model=list[UserResponse])
+@router.get("/users", response_model=list[UserResponse], dependencies=[Depends(require_admin)])
 async def list_users():
     """All registered users with their current balance."""
     db = get_db()
@@ -119,7 +119,8 @@ async def trigger_training(user_id: int):
     return {"ok": True, "status": "pending"}
 
 
-@router.get("/users/{user_id}/train/status", response_model=TrainStatusResponse)
+@router.get("/users/{user_id}/train/status", response_model=TrainStatusResponse,
+            dependencies=[Depends(require_admin)])
 async def training_status(user_id: int):
     """Poll the training status started by POST /users/{user_id}/train."""
     db     = get_db()

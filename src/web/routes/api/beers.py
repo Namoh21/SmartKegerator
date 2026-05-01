@@ -49,12 +49,12 @@ def _out(beer: Beer) -> BeerResponse:
     )
 
 
-@router.get("/beers", response_model=list[BeerResponse])
+@router.get("/beers", response_model=list[BeerResponse], dependencies=[Depends(require_admin)])
 async def list_beers():
     return [_out(b) for b in get_db().get_all_beers()]
 
 
-@router.get("/beers/{beer_id}", response_model=BeerResponse)
+@router.get("/beers/{beer_id}", response_model=BeerResponse, dependencies=[Depends(require_admin)])
 async def get_beer(beer_id: int):
     beer = get_db().get_beer(beer_id)
     if not beer:

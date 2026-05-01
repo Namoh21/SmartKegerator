@@ -31,7 +31,7 @@ class SummaryResponse(BaseModel):
     pours:      list[PourResponse]
 
 
-@router.get("/pours", response_model=SummaryResponse)
+@router.get("/pours", response_model=SummaryResponse, dependencies=[Depends(require_admin)])
 async def list_pours(
     period:   str   = Query(default="30d"),
     user_id:  int   = Query(default=0),

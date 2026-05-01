@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from web.api_auth import require_admin
 from web.server import get_db
 
 router = APIRouter()
@@ -18,7 +19,7 @@ class StatusResponse(BaseModel):
     current_user_name: Optional[str]
 
 
-@router.get("/status", response_model=StatusResponse)
+@router.get("/status", response_model=StatusResponse, dependencies=[Depends(require_admin)])
 async def get_status():
     """Current sensor readings, temperature, humidity, and who is at the keg."""
     db = get_db()

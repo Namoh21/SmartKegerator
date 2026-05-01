@@ -33,7 +33,7 @@ class AssignRequest(BaseModel):
     keg_id: Optional[int] = None
 
 
-@router.get("/taps", response_model=list[TapResponse])
+@router.get("/taps", response_model=list[TapResponse], dependencies=[Depends(require_admin)])
 async def list_taps():
     """Current status of every configured tap."""
     db     = get_db()
