@@ -541,6 +541,9 @@ StartLimitIntervalSec=0
 KillMode=control-group
 TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
+# Allow binding to ports below 1024 (e.g. 80/443) without running as root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=default.target
