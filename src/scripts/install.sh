@@ -454,16 +454,18 @@ done
 info "Directories ready."
 
 # ---------------------------------------------------------------------------
-# 5. Copy source files (only if not already there — won't overwrite edits)
+# 5. Copy source files — always overwrite so re-running install picks up
+#    the latest scripts and code.  config.yaml is gitignored so it is never
+#    in REPO_SRC and will not be touched here.
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_SRC="$(dirname "${SCRIPT_DIR}")"   # parent of scripts/ = src/
 
 if [[ "${REPO_SRC}" != "${SRC_DIR}" ]]; then
     section "Copying source files to ${SRC_DIR}"
-    cp -rn "${REPO_SRC}/." "${SRC_DIR}/"
+    cp -r "${REPO_SRC}/." "${SRC_DIR}/"
     chown -R "${REAL_USER}:${REAL_USER}" "${SRC_DIR}"
-    info "Source files copied (existing files not overwritten)."
+    info "Source files copied."
 fi
 
 # config.yaml is gitignored — create it from the template if missing,
