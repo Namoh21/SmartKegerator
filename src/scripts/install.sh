@@ -513,6 +513,10 @@ ExecStart=${SRC_DIR}/scripts/launch_gui.sh
 Restart=always
 RestartSec=5
 StartLimitIntervalSec=0
+# Kill the entire process group on stop so Qt/picamera2 children don't linger
+KillMode=control-group
+# Don't block reboot — force-kill after 10 s if still running
+TimeoutStopSec=10
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=QT_QPA_PLATFORM=wayland
@@ -534,6 +538,8 @@ ExecStart=${SRC_DIR}/scripts/launch_web.sh
 Restart=always
 RestartSec=5
 StartLimitIntervalSec=0
+KillMode=control-group
+TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
 
 [Install]

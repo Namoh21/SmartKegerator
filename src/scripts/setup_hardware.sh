@@ -133,18 +133,32 @@ else
 fi
 info "Compositor: ${COMPOSITOR}"
 
-# consoleblank=0 keeps the TTY console from going dark (all compositors)
+# consoleblank=0 keeps the TTY console from going dark.
+# On Pi5 this is managed via the compositor config instead, so skip it to
+# avoid any risk of corrupting the kernel command line on Pi5's boot partition.
 CMDLINE="/boot/firmware/cmdline.txt"
 [[ -f "${CMDLINE}" ]] || CMDLINE="/boot/cmdline.txt"
 if [[ -f "${CMDLINE}" ]]; then
-    if ! grep -q "consoleblank=0" "${CMDLINE}"; then
-        # Modify only line 1 — 's/$/' matches every line including trailing
-        # empty lines, which corrupts the single-line kernel command line.
-        sed -i '1s/$/ consoleblank=0/' "${CMDLINE}"
-        info "Added consoleblank=0 to ${CMDLINE}"
-        REBOOT_NEEDED=true
-    else
+    if grep -q "consoleblank=0" "${CMDLINE}"; then
         ok "consoleblank=0 already set"
+    elif echo "${PI_MODEL}" | grep -qi "Raspberry Pi 5"; then
+        info "Pi 5 detected — skipping cmdline.txt consoleblank (managed via compositor)."
+    else
+        # Back up before touching, restore on failure
+        cp "${CMDLINE}" "${CMDLINE}.bak"
+        # Read the first line, strip any trailing CR, append parameter
+        CMDLINE_CONTENT=$(head -n1 "${CMDLINE}" | tr -d '\r')
+        echo "${CMDLINE_CONTENT} consoleblank=0" > "${CMDLINE}"
+        # Sanity check — file must not be empty and must contain 'root='
+        if grep -q "root=" "${CMDLINE}"; then
+            info "Added consoleblank=0 to ${CMDLINE}"
+            rm -f "${CMDLINE}.bak"
+            REBOOT_NEEDED=true
+        else
+            warn "cmdline.txt validation failed — restoring backup"
+            cp "${CMDLINE}.bak" "${CMDLINE}"
+            rm -f "${CMDLINE}.bak"
+        fi
     fi
 fi
 
@@ -185,6 +199,43 @@ case "${COMPOSITOR}" in
         warn "Unknown compositor — disable screen blanking manually."
         ;;
 esac
+
+# ---------------------------------------------------------------------------
+# GPIO chip — Pi 5 uses /dev/gpiochip4 (RP1); all others use /dev/gpiochip0
+# Write gpio_chip into config.yaml so the app uses the correct device.
+# ---------------------------------------------------------------------------
+echo ""
+echo "── GPIO chip detection ──"
+
+CONFIG_YAML="${REAL_HOME}/SmartKegerator/src/config.yaml"
+# Prefer the installed copy
+[[ -f "/opt/smartkegerator/src/config.yaml" ]] && CONFIG_YAML="/opt/smartkegerator/src/config.yaml"
+
+if echo "${PI_MODEL}" | grep -qi "Raspberry Pi 5"; then
+    GPIO_CHIP="/dev/gpiochip4"
+    info "Pi 5 detected — GPIO chip: ${GPIO_CHIP}"
+else
+    GPIO_CHIP="/dev/gpiochip0"
+    info "GPIO chip: ${GPIO_CHIP}"
+fi
+
+if [[ -f "${CONFIG_YAML}" ]]; then
+    if grep -q "gpio_chip:" "${CONFIG_YAML}"; then
+        sed -i "s|gpio_chip:.*|gpio_chip: ${GPIO_CHIP}|" "${CONFIG_YAML}"
+    else
+        # Insert under [hardware] if present, or append at end of file
+        if grep -q "^hardware:" "${CONFIG_YAML}"; then
+            sed -i "/^hardware:/a\\  gpio_chip: ${GPIO_CHIP}" "${CONFIG_YAML}"
+        else
+            echo "" >> "${CONFIG_YAML}"
+            echo "hardware:" >> "${CONFIG_YAML}"
+            echo "  gpio_chip: ${GPIO_CHIP}" >> "${CONFIG_YAML}"
+        fi
+    fi
+    info "gpio_chip written to ${CONFIG_YAML}"
+else
+    warn "config.yaml not found at ${CONFIG_YAML} — set hardware.gpio_chip: ${GPIO_CHIP} manually"
+fi
 
 # ---------------------------------------------------------------------------
 # Display rotation — managed via web UI (Settings → Appearance)

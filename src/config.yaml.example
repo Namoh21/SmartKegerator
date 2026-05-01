@@ -28,6 +28,10 @@ hardware:
   tick_threshold: 3          # ticks required before a pour is registered
   end_pour_seconds: 5.0      # seconds of no ticks before pour ends
 
+  # GPIO chip device — auto-detected by setup_hardware.sh at install time
+  # Pi 5: /dev/gpiochip4 (RP1 chip)   Pi 3/4: /dev/gpiochip0
+  gpio_chip: /dev/gpiochip0
+
   # Temperature sensors (DHT22 ambient sensor)
   temp_sensor_power_pin: 17   # GPIO pin used to power-cycle the DHT22 on reset
   temp_sensor_dht_pin: 22     # GPIO data pin for the DHT22
