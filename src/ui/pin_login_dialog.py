@@ -14,7 +14,7 @@ from typing import Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QDialog, QGridLayout, QHBoxLayout, QLabel,
+    QApplication, QDialog, QGridLayout, QHBoxLayout, QLabel,
     QPushButton, QScrollArea, QStackedWidget,
     QVBoxLayout, QWidget,
 )
@@ -193,10 +193,10 @@ class PinLoginDialog(QDialog):
         side = QVBoxLayout()
         side.setSpacing(8)
 
-        ok_btn = QPushButton("OK")
-        ok_btn.setObjectName("ok")
-        ok_btn.clicked.connect(lambda: self._tap("✓"))
-        side.addWidget(ok_btn, stretch=1)
+        self._ok_btn = QPushButton("OK")
+        self._ok_btn.setObjectName("ok")
+        self._ok_btn.clicked.connect(lambda: self._tap("✓"))
+        side.addWidget(self._ok_btn, stretch=1)
 
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setObjectName("cancel")
@@ -218,12 +218,17 @@ class PinLoginDialog(QDialog):
             if key == "⌫":
                 self._pin = self._pin[:-1]
                 self._lbl_error.clear()
+                self._refresh_dots()
             elif key == "✓":
+                # Give immediate visual feedback before running the hash check
+                self._ok_btn.setText("Checking…")
+                self._ok_btn.setEnabled(False)
+                QApplication.processEvents()
                 self._check_pin()
                 return
             elif len(self._pin) < 6:
                 self._pin += key
-            self._refresh_dots()
+                self._refresh_dots()
         except Exception as exc:
             log.error("PIN dialog tap error: %s", exc)
 
@@ -244,16 +249,22 @@ class PinLoginDialog(QDialog):
             if verify_password(self._pin, stored):
                 self._auth_user_id = self._selected.get("user_id")
                 self._auth_admin   = self._selected
+                self._ok_btn.setText("✓")
+                QApplication.processEvents()
                 self.accept()
             else:
                 self._lbl_error.setText("Incorrect PIN — try again.")
                 self._pin = ""
                 self._refresh_dots()
+                self._ok_btn.setText("OK")
+                self._ok_btn.setEnabled(True)
         except Exception as exc:
             log.error("PIN check error: %s", exc)
             self._lbl_error.setText("Login error — see service log.")
             self._pin = ""
             self._refresh_dots()
+            self._ok_btn.setText("OK")
+            self._ok_btn.setEnabled(True)
 
     # ── Result accessors ─────────────────────────────────────────────
 

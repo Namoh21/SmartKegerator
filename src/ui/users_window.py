@@ -642,8 +642,15 @@ class UsersWindow(QDialog):
         try:
             if not self._selected_user or not self._recognizer:
                 return
+            # Exit live mode then stop the camera so dlib doesn't compete
+            # for RAM with picamera2 on Pi 3 (1 GB) — the OOM killer fires
+            # when both are in memory simultaneously.
+            if self._live_mode:
+                self._exit_live_mode()
+            self._stop_camera_for_training()
             self._train_btn.setEnabled(False)
-            self._lbl_train_status.setText("Training…")
+            self._capture_btn.setEnabled(False)
+            self._lbl_train_status.setText("Training… (may take several minutes on Pi 3)")
             self._lbl_train_status.setStyleSheet(
                 f"color: {self._c['warn']}; font-size: 15px;")
             self._recognizer.train_user(self._selected_user.id)
@@ -653,6 +660,26 @@ class UsersWindow(QDialog):
             self._lbl_train_status.setStyleSheet(
                 f"color: {self._c['warn']}; font-size: 15px;")
             self._train_btn.setEnabled(True)
+            self._restart_camera_after_training()
+
+    def _stop_camera_for_training(self) -> None:
+        self._camera_was_running = (
+            self._camera is not None and self._camera.is_running
+        )
+        if self._camera_was_running:
+            self._camera.stop()
+            log.info("Camera paused for training (freeing RAM)")
+
+    def _restart_camera_after_training(self) -> None:
+        if getattr(self, "_camera_was_running", False):
+            self._camera_was_running = False
+            if self._camera:
+                self._camera.start()
+                log.info("Camera restarted after training")
+        if self._selected_user:
+            self._capture_btn.setEnabled(
+                self._selected_user.id != UNKNOWN_USER_ID
+            )
 
     def _on_training_complete(self, user_id: int, count: int) -> None:
         if self._selected_user and self._selected_user.id == user_id:
@@ -660,6 +687,7 @@ class UsersWindow(QDialog):
             self._lbl_train_status.setStyleSheet(
                 f"color: {self._c['ok']}; font-size: 15px;")
             self._train_btn.setEnabled(True)
+            self._restart_camera_after_training()
 
     def _on_training_failed(self, user_id: int, reason: str) -> None:
         if self._selected_user and self._selected_user.id == user_id:
@@ -667,6 +695,7 @@ class UsersWindow(QDialog):
             self._lbl_train_status.setStyleSheet(
                 f"color: {self._c['warn']}; font-size: 15px;")
             self._train_btn.setEnabled(True)
+            self._restart_camera_after_training()
 
     # ------------------------------------------------------------------
     # Payments
