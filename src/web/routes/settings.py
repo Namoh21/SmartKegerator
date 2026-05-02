@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+import httpx
 import yaml
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -407,7 +408,7 @@ async def settings_save_server_port(
     # Restart web service so the new port/SSL takes effect immediately
     async def _restart():
         await asyncio.sleep(1)
-        subprocess.run(["systemctl", "--user", "restart", "smartkegerator-web"], check=False)
+        subprocess.run(["systemctl", "--user", "restart", "smartkegerator-web"], check=False, env=_wayland_env())
 
     asyncio.create_task(_restart())
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
@@ -484,8 +485,9 @@ async def restart_services(request: Request):
 
     async def _delayed_restart():
         await asyncio.sleep(2)
-        subprocess.run(["systemctl", "--user", "restart", "smartkegerator"],     check=False)
-        subprocess.run(["systemctl", "--user", "restart", "smartkegerator-web"], check=False)
+        env = _wayland_env()
+        subprocess.run(["systemctl", "--user", "restart", "smartkegerator"],     check=False, env=env)
+        subprocess.run(["systemctl", "--user", "restart", "smartkegerator-web"], check=False, env=env)
 
     asyncio.create_task(_delayed_restart())
     return HTMLResponse(
@@ -517,8 +519,9 @@ async def shutdown_services(request: Request):
 
     async def _delayed_shutdown():
         await asyncio.sleep(2)
-        subprocess.run(["systemctl", "--user", "stop", "smartkegerator"],     check=False)
-        subprocess.run(["systemctl", "--user", "stop", "smartkegerator-web"], check=False)
+        env = _wayland_env()
+        subprocess.run(["systemctl", "--user", "stop", "smartkegerator"],     check=False, env=env)
+        subprocess.run(["systemctl", "--user", "stop", "smartkegerator-web"], check=False, env=env)
 
     asyncio.create_task(_delayed_shutdown())
     return HTMLResponse(
@@ -573,4 +576,98 @@ async def download_log(which: str):
         str(log_file),
         media_type="text/plain",
         filename=log_file.name,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Version / Updates
+# ---------------------------------------------------------------------------
+
+_GITHUB_OWNER = "Namoh21"
+_GITHUB_REPO  = "SmartKegerator"
+_UPDATE_SCRIPT = Path("/opt/smartkegerator/src/scripts/update.sh")
+
+
+def _read_version() -> str:
+    version_file = Path(__file__).parent.parent.parent / "VERSION"
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return "unknown"
+
+
+def _read_git_hash() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(Path("/opt/smartkegerator")), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5
+        )
+        return result.stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+
+@router.get("/version", response_class=HTMLResponse)
+async def version_info(request: Request):
+    """HTMX endpoint — returns current version info snippet."""
+    version = _read_version()
+    git_hash = _read_git_hash()
+    return HTMLResponse(
+        f'<span class="fw-semibold text-accent">{version}</span>'
+        f'<span class="text-muted small ms-2">({git_hash})</span>'
+    )
+
+
+@router.get("/check-updates", response_class=HTMLResponse)
+async def check_updates(request: Request):
+    """HTMX endpoint — compares local commit to GitHub latest."""
+    local_hash = _read_git_hash()
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                f"https://api.github.com/repos/{_GITHUB_OWNER}/{_GITHUB_REPO}/commits/master",
+                headers={"Accept": "application/vnd.github.v3+json"},
+            )
+        resp.raise_for_status()
+        remote_sha = resp.json().get("sha", "")[:7]
+    except Exception as exc:
+        return HTMLResponse(
+            f'<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>'
+            f'Could not reach GitHub: {exc}</span>'
+        )
+
+    if remote_sha and local_hash != "unknown" and remote_sha == local_hash:
+        return HTMLResponse(
+            '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Up to date.</span>'
+        )
+    return HTMLResponse(
+        f'<span class="text-info"><i class="bi bi-arrow-down-circle me-1"></i>'
+        f'Update available (remote: <code>{remote_sha}</code>). '
+        f'Click <strong>Update Now</strong> to apply.</span>'
+    )
+
+
+@router.post("/update-now", response_class=HTMLResponse)
+async def update_now(request: Request):
+    """Run update.sh in the background and report immediately."""
+    admin = request.session.get("admin_username", "unknown")
+    log.warning("System update requested by admin=%s from %s", admin, request.client.host if request.client else "unknown")
+
+    if not _UPDATE_SCRIPT.exists():
+        return HTMLResponse(
+            '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+            f'Update script not found at {_UPDATE_SCRIPT}.</span>'
+        )
+
+    async def _run_update():
+        await asyncio.sleep(1)
+        subprocess.run(
+            ["sudo", "bash", str(_UPDATE_SCRIPT)],
+            check=False, env=_wayland_env(),
+        )
+
+    asyncio.create_task(_run_update())
+    return HTMLResponse(
+        '<span class="text-warning"><i class="bi bi-arrow-clockwise me-1"></i>'
+        'Update started — services will restart automatically when complete. '
+        'This page may become temporarily unreachable.</span>'
     )

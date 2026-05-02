@@ -568,6 +568,7 @@ StartLimitIntervalSec=0
 KillMode=control-group
 TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/%U
 
 [Install]
 WantedBy=default.target
@@ -736,14 +737,14 @@ fi
 section "Sudoers rule for web-initiated reboot"
 
 SUDOERS_FILE="/etc/sudoers.d/smartkegerator-reboot"
-SUDOERS_LINE="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
-if [[ -f "${SUDOERS_FILE}" ]] && grep -qF "${SUDOERS_LINE}" "${SUDOERS_FILE}"; then
-    info "Sudoers rule already present."
-else
-    echo "${SUDOERS_LINE}" > "${SUDOERS_FILE}"
-    chmod 440 "${SUDOERS_FILE}"
-    info "Sudoers rule written: ${REAL_USER} may run sudo reboot without password."
-fi
+SUDOERS_REBOOT="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
+SUDOERS_UPDATE="${REAL_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SRC_DIR}/scripts/update.sh"
+{
+    echo "${SUDOERS_REBOOT}"
+    echo "${SUDOERS_UPDATE}"
+} > "${SUDOERS_FILE}"
+chmod 440 "${SUDOERS_FILE}"
+info "Sudoers rules written: ${REAL_USER} may run sudo reboot and sudo bash update.sh without password."
 
 # ---------------------------------------------------------------------------
 # Restore database backup (preserved from before install)
