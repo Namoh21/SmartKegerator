@@ -60,7 +60,26 @@ find "${SRC_DIR}" \( -name "*.sh" -o -name "*.py" -o -name "*.html" \
     -exec sed -i 's/\r$//' {} \;
 
 # ---------------------------------------------------------------------------
-# 2b. Ensure sudoers rule exists for web-initiated reboot
+# 2b. Ensure service files use /bin/bash explicitly so CRLF shebangs never
+#     cause systemd exit code 203/EXEC regardless of line ending state.
+# ---------------------------------------------------------------------------
+SERVICE_DIR="${REAL_HOME}/.config/systemd/user"
+for _svc in smartkegerator.service smartkegerator-web.service; do
+    _file="${SERVICE_DIR}/${_svc}"
+    if [[ -f "${_file}" ]]; then
+        sed -i \
+            's|ExecStart=/opt/.*/launch_gui\.sh|ExecStart=/bin/bash /opt/smartkegerator/src/scripts/launch_gui.sh|' \
+            "${_file}"
+        sed -i \
+            's|ExecStart=/opt/.*/launch_web\.sh|ExecStart=/bin/bash /opt/smartkegerator/src/scripts/launch_web.sh|' \
+            "${_file}"
+    fi
+done
+sudo -u "${REAL_USER}" XDG_RUNTIME_DIR="/run/user/$(id -u ${REAL_USER})" \
+    systemctl --user daemon-reload 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# 2c. Ensure sudoers rule exists for web-initiated reboot
 # ---------------------------------------------------------------------------
 SUDOERS_FILE="/etc/sudoers.d/smartkegerator-reboot"
 SUDOERS_LINE="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"

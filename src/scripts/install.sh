@@ -536,7 +536,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${SRC_DIR}
-ExecStart=${SRC_DIR}/scripts/launch_gui.sh
+ExecStart=/bin/bash ${SRC_DIR}/scripts/launch_gui.sh
 Restart=always
 RestartSec=5
 StartLimitIntervalSec=0
@@ -561,7 +561,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${SRC_DIR}
-ExecStart=${SRC_DIR}/scripts/launch_web.sh
+ExecStart=/bin/bash ${SRC_DIR}/scripts/launch_web.sh
 Restart=always
 RestartSec=5
 StartLimitIntervalSec=0
