@@ -5,15 +5,18 @@
 <!-- ── Header ───────────────────────────────────────────────────────── -->
 <div class="d-flex align-items-center gap-3 mb-4">
   <a href="/users/" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  {% if stats.photo_url %}
-  <img src="{{ stats.photo_url }}" alt="{{ user.name }}"
-       class="rounded-circle" style="width:56px;height:56px;object-fit:cover;">
-  {% else %}
-  <div class="rounded-circle d-flex align-items-center justify-content-center"
-       style="width:56px;height:56px;background:var(--bs-secondary-bg);">
-    <i class="bi bi-person-fill fs-3 text-muted"></i>
+  <div class="rounded-circle overflow-hidden flex-shrink-0"
+       style="width:56px;height:56px;min-width:56px;">
+    {% if stats.photo_url %}
+    <img src="{{ stats.photo_url }}" alt="{{ user.name }}"
+         style="width:56px;height:56px;object-fit:cover;object-position:top;display:block;max-width:none;">
+    {% else %}
+    <div class="d-flex align-items-center justify-content-center w-100 h-100"
+         style="background:var(--bs-secondary-bg);">
+      <i class="bi bi-person-fill fs-3 text-muted"></i>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
   <div>
     <h2 class="text-accent mb-0">{{ user.name }}</h2>
     {% if stats.last_pour_at %}
@@ -158,7 +161,6 @@
   <div class="card-header d-flex align-items-center gap-2">
     <i class="bi bi-person-bounding-box me-1"></i>
     <strong>Face Recognition Photos</strong>
-    <span id="train-result" class="ms-auto small"></span>
   </div>
   <div class="card-body">
 
@@ -198,14 +200,13 @@
         </p>
         {% endif %}
 
-        <!-- Train button -->
-        <div class="d-flex align-items-center gap-2 mt-2">
+        <!-- Train button + live status — the whole div is swapped by HTMX -->
+        <div id="train-section" class="d-flex align-items-center gap-2 mt-2 flex-wrap">
           <button type="button" class="btn btn-accent btn-sm"
                   {% if not photo_items %}disabled title="Capture photos first"{% endif %}
                   hx-post="/users/{{ user.id }}/photos/train"
-                  hx-target="#train-result"
-                  hx-swap="innerHTML"
-                  hx-disabled-elt="this">
+                  hx-target="#train-section"
+                  hx-swap="innerHTML">
             <i class="bi bi-cpu me-1"></i>Train Recognition
           </button>
         </div>

@@ -245,33 +245,80 @@ async def photo_train(user_id: int):
             db.set_setting(f"train_status_{user_id}", f"error:{exc}")
 
     threading.Thread(target=_run, name=f"train-web-{user_id}", daemon=True).start()
-    return HTMLResponse(_train_polling_html(user_id))
+    return HTMLResponse(_train_section_pending(user_id))
 
 
 @router.get("/{user_id}/photos/train/poll", response_class=HTMLResponse)
 async def photo_train_poll(user_id: int):
-    """HTMX polling endpoint — returns spinner while training, result when done."""
+    """HTMX polling endpoint — returns the full #train-section HTML each time."""
     db     = get_db()
     status = db.get_setting(f"train_status_{user_id}", "")
 
     if not status or status == "pending":
-        return HTMLResponse(_train_polling_html(user_id))
+        return HTMLResponse(_train_section_pending(user_id))
 
     db.set_setting(f"train_status_{user_id}", "")
 
     if status.startswith("done:"):
         n = status[5:]
-        return HTMLResponse(
-            f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
-            f'Trained on {n} encoding(s). Recognition updates within 60 s.</span>'
-        )
+        return HTMLResponse(_train_section_done(user_id, f"{n} encoding(s) stored — recognition updates within 60 s."))
     msg = status[6:] if status.startswith("error:") else status
-    return HTMLResponse(
-        f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>{msg}</span>'
+    return HTMLResponse(_train_section_error(user_id, msg))
+
+
+def _train_btn(user_id: int, *, disabled: bool = False) -> str:
+    dis = 'disabled' if disabled else (
+        f'hx-post="/users/{user_id}/photos/train" '
+        f'hx-target="#train-section" hx-swap="innerHTML"'
+    )
+    return (
+        f'<button type="button" class="btn btn-accent btn-sm" {dis}>'
+        f'<i class="bi bi-cpu me-1"></i>Train Recognition'
+        f'</button>'
+    )
+
+
+def _train_section_pending(user_id: int) -> str:
+    """Disabled button + spinner + live status — polls itself every 3 s."""
+    return (
+        f'<button type="button" class="btn btn-accent btn-sm" disabled>'
+        f'<span class="spinner-border spinner-border-sm me-1" role="status"></span>'
+        f'Training…'
+        f'</button>'
+        f'<span class="text-muted small"'
+        f' hx-get="/users/{user_id}/photos/train/poll"'
+        f' hx-trigger="every 3s"'
+        f' hx-target="#train-section"'
+        f' hx-swap="innerHTML">'
+        f'Processing photos — this may take several minutes on Pi 3…'
+        f'</span>'
+    )
+
+
+def _train_section_done(user_id: int, msg: str) -> str:
+    return (
+        f'{_train_btn(user_id)}'
+        f'<span class="text-success small">'
+        f'<i class="bi bi-check-circle me-1"></i>{msg}'
+        f'</span>'
+    )
+
+
+def _train_section_error(user_id: int, msg: str) -> str:
+    return (
+        f'{_train_btn(user_id)}'
+        f'<span class="text-danger small">'
+        f'<i class="bi bi-x-circle me-1"></i>{msg}'
+        f'</span>'
     )
 
 
 def _train_polling_html(user_id: int) -> str:
+    # kept for backward compat — now delegates to _train_section_pending
+    return _train_section_pending(user_id)
+
+
+def _unused_old_polling(user_id: int) -> str:
     return (
         f'<span id="train-result-inner"'
         f' hx-get="/users/{user_id}/photos/train/poll"'
