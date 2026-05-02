@@ -53,19 +53,21 @@
             {% endif %}
           </div>
 
-          <!-- Thumbnail photo below stats -->
-          {% if s.photo_url %}
-          <div class="rounded-circle overflow-hidden"
-               style="width:36px;height:36px;">
-            <img src="{{ s.photo_url }}" alt="{{ s.name }}"
-                 style="width:36px;height:36px;object-fit:cover;object-position:top;display:block;max-width:none;">
+          <!-- Thumbnail photo below stats, centered -->
+          <div class="d-flex justify-content-center">
+            {% if s.photo_url %}
+            <div class="rounded-circle overflow-hidden"
+                 style="width:36px;height:36px;">
+              <img src="{{ s.photo_url }}" alt="{{ s.name }}"
+                   style="width:36px;height:36px;object-fit:cover;object-position:center;display:block;max-width:none;">
+            </div>
+            {% else %}
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width:36px;height:36px;background:var(--sk-card-hover,#2a2a3e);">
+              <i class="bi bi-person-fill text-muted small"></i>
+            </div>
+            {% endif %}
           </div>
-          {% else %}
-          <div class="rounded-circle d-flex align-items-center justify-content-center"
-               style="width:36px;height:36px;background:var(--sk-card-hover,#2a2a3e);">
-            <i class="bi bi-person-fill text-muted small"></i>
-          </div>
-          {% endif %}
 
         </div>
       </div>
