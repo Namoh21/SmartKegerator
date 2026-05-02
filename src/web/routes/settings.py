@@ -615,14 +615,12 @@ def _read_version() -> str:
 
 
 def _read_git_hash() -> str:
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(Path("/opt/smartkegerator")), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=5
-        )
-        return result.stdout.strip() or "unknown"
-    except Exception:
-        return "unknown"
+    hash_file = Path("/opt/smartkegerator/GIT_HASH")
+    if hash_file.exists():
+        v = hash_file.read_text().strip()
+        if v:
+            return v
+    return "unknown"
 
 
 @router.get("/version", response_class=HTMLResponse)

@@ -898,14 +898,17 @@
             <div class="mb-4">
               <div class="text-muted small mb-2">Update status</div>
               <div id="update-status"></div>
-              <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
-                      hx-get="/settings/check-updates"
-                      hx-target="#update-status"
-                      hx-swap="innerHTML"
-                      hx-indicator="#check-spinner">
-                <span id="check-spinner" class="htmx-indicator spinner-border spinner-border-sm me-1"></span>
-                <i class="bi bi-search me-1"></i>Check for Updates
-              </button>
+              <div class="d-flex align-items-center gap-2 mt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        hx-get="/settings/check-updates"
+                        hx-trigger="click"
+                        hx-target="#update-status"
+                        hx-swap="innerHTML"
+                        hx-indicator="#check-spinner">
+                  <i class="bi bi-search me-1"></i>Check for Updates
+                </button>
+                <span id="check-spinner" class="htmx-indicator spinner-border spinner-border-sm text-muted"></span>
+              </div>
             </div>
 
             {% if is_admin %}

@@ -46,6 +46,9 @@ info "Update channel: ${BRANCH}"
 git -C "${REPO_DIR}" fetch origin
 git -C "${REPO_DIR}" reset --hard "origin/${BRANCH}"
 
+# Write the current commit hash so the web UI can display it without needing a git repo
+git -C "${REPO_DIR}" rev-parse --short HEAD > "${INSTALL_DIR}/GIT_HASH" 2>/dev/null || true
+
 # ---------------------------------------------------------------------------
 # 2. Sync source files — preserves config.yaml, database, photos, videos
 #    (config.yaml is gitignored so rsync never touches it)
