@@ -921,7 +921,8 @@
                       hx-post="/settings/update-now"
                       hx-target="#update-now-result"
                       hx-swap="innerHTML"
-                      hx-confirm="This will pull the latest code and restart services. Continue?">
+                      hx-disabled-elt="this"
+                      hx-on::before-request="if(!confirm('This will pull the latest code and restart services. Continue?')){htmx.trigger(this,'cancel');return false;}">
                 <i class="bi bi-cloud-download me-1"></i>Update Now
               </button>
             </div>
@@ -1135,6 +1136,52 @@ document.addEventListener('click', function(e) {
   // Confirm dialogs
   const form = e.target.closest('form.js-confirm');
   if (form && !confirm(form.dataset.confirm)) e.preventDefault();
+});
+
+// Update log stream — fired by HX-Trigger: startUpdateStream
+document.body.addEventListener('startUpdateStream', function() {
+  const output = document.getElementById('update-log-output');
+  const badge  = document.getElementById('update-status-badge');
+  if (!output) return;
+
+  const es = new EventSource('/settings/update-stream');
+
+  es.onmessage = function(e) {
+    output.textContent += e.data + '\n';
+    output.scrollTop = output.scrollHeight;
+  };
+
+  // Server signals clean completion (update finished without restarting)
+  es.addEventListener('complete', function() {
+    es.close();
+    if (badge) { badge.className = 'badge bg-success'; badge.textContent = 'Complete'; }
+    output.textContent += '\n✓ Update complete. Reloading page…\n';
+    output.scrollTop = output.scrollHeight;
+    setTimeout(() => location.reload(), 2000);
+  });
+
+  // Connection dropped — services restarting
+  es.onerror = function() {
+    es.close();
+    if (badge) { badge.className = 'badge bg-info'; badge.textContent = 'Restarting…'; }
+    output.textContent += '\n⟳ Services restarting — waiting for server…\n';
+    output.scrollTop = output.scrollHeight;
+
+    function poll() {
+      fetch('/settings/')
+        .then(function(r) {
+          if (r.ok) {
+            output.textContent += '✓ Server is back. Reloading…\n';
+            output.scrollTop = output.scrollHeight;
+            setTimeout(() => location.reload(), 1500);
+          } else {
+            setTimeout(poll, 2000);
+          }
+        })
+        .catch(function() { setTimeout(poll, 2000); });
+    }
+    setTimeout(poll, 4000);
+  };
 });
 </script>
 {% endblock %}

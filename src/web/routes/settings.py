@@ -694,11 +694,16 @@ async def check_updates(request: Request):
     )
 
 
+_UPDATE_LOG  = Path("/tmp/sk-update.log")
+_UPDATE_DONE = Path("/tmp/sk-update.done")
+
+
 @router.post("/update-now", response_class=HTMLResponse)
 async def update_now(request: Request):
-    """Run update.sh in the background and report immediately."""
+    """Start update.sh, stream its output via SSE."""
     admin = request.session.get("admin_username", "unknown")
-    log.warning("System update requested by admin=%s from %s", admin, request.client.host if request.client else "unknown")
+    log.warning("System update requested by admin=%s from %s", admin,
+                request.client.host if request.client else "unknown")
 
     if not _UPDATE_SCRIPT.exists():
         return HTMLResponse(
@@ -706,16 +711,79 @@ async def update_now(request: Request):
             f'Update script not found at {_UPDATE_SCRIPT}.</span>'
         )
 
-    async def _run_update():
-        await asyncio.sleep(1)
-        subprocess.run(
-            ["sudo", "bash", str(_UPDATE_SCRIPT)],
-            check=False, env=_wayland_env(),
-        )
+    for p in (_UPDATE_LOG, _UPDATE_DONE):
+        try:
+            p.unlink()
+        except FileNotFoundError:
+            pass
 
-    asyncio.create_task(_run_update())
-    return HTMLResponse(
-        '<span class="text-warning"><i class="bi bi-arrow-clockwise me-1"></i>'
-        'Update started — services will restart automatically when complete. '
-        'This page may become temporarily unreachable.</span>'
+    async def _run():
+        await asyncio.sleep(0.5)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "sudo", "bash", str(_UPDATE_SCRIPT),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=_wayland_env(),
+            )
+            with open(_UPDATE_LOG, "wb") as f:
+                async for line in proc.stdout:
+                    f.write(line)
+                    f.flush()
+            await proc.wait()
+        except Exception as exc:
+            with open(_UPDATE_LOG, "ab") as f:
+                f.write(f"\n[ERROR] {exc}\n".encode())
+        _UPDATE_DONE.write_text("done")
+
+    asyncio.create_task(_run())
+
+    from fastapi.responses import HTMLResponse as _HR
+    resp = templates.TemplateResponse(
+        request, "partials/update_log.html", ctx(request),
+    )
+    resp.headers["HX-Trigger"] = "startUpdateStream"
+    return resp
+
+
+@router.get("/update-stream")
+async def update_stream():
+    """SSE endpoint — streams the running update log to the browser."""
+    from fastapi.responses import StreamingResponse
+
+    async def generate():
+        pos      = 0
+        deadline = asyncio.get_event_loop().time() + 600
+        ka_tick  = 0
+
+        while asyncio.get_event_loop().time() < deadline:
+            # Send new log content
+            if _UPDATE_LOG.exists():
+                text = _UPDATE_LOG.read_bytes()
+                if len(text) > pos:
+                    chunk = text[pos:].decode(errors="replace")
+                    pos   = len(text)
+                    for line in chunk.splitlines():
+                        yield f"data: {line}\n\n"
+
+            # Signal completion if done file appeared
+            if _UPDATE_DONE.exists():
+                yield "event: complete\ndata: done\n\n"
+                try:
+                    _UPDATE_DONE.unlink()
+                except Exception:
+                    pass
+                return
+
+            # Keepalive every ~15 s so proxies don't close idle connections
+            ka_tick += 1
+            if ka_tick % 50 == 0:
+                yield ": keepalive\n\n"
+
+            await asyncio.sleep(0.3)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
