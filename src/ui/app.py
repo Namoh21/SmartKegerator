@@ -469,6 +469,7 @@ class App(QObject):
         from ui.settings_window import SettingsWindow
         w = SettingsWindow(self._config, self._db, self._main_window)
         w.users_requested.connect(self._open_users)
+        w.kegs_requested.connect(self._open_kegs)
         if self._fullscreen:
             w.showFullScreen()
         w.exec()
@@ -480,6 +481,13 @@ class App(QObject):
             self._main_window,
             is_admin=self._is_admin,
         )
+        if self._fullscreen:
+            w.showFullScreen()
+        w.exec()
+
+    def _open_kegs(self) -> None:
+        from ui.kegs_window import KegsWindow
+        w = KegsWindow(self._config, self._db, self._main_window)
         if self._fullscreen:
             w.showFullScreen()
         w.exec()

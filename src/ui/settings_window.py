@@ -83,6 +83,7 @@ def _build_style(c: dict) -> str:
 
 class SettingsWindow(QDialog):
     users_requested = pyqtSignal()
+    kegs_requested  = pyqtSignal()
 
     def __init__(self, config: dict, db, parent=None) -> None:
         super().__init__(parent)
@@ -273,6 +274,10 @@ class SettingsWindow(QDialog):
         users_btn.clicked.connect(self._open_users)
         row.addWidget(users_btn)
 
+        kegs_btn = QPushButton("Manage Kegs")
+        kegs_btn.clicked.connect(self._open_kegs)
+        row.addWidget(kegs_btn)
+
         shutdown_btn = QPushButton("Shutdown Service")
         shutdown_btn.setObjectName("danger")
         shutdown_btn.setStyleSheet(
@@ -313,8 +318,12 @@ class SettingsWindow(QDialog):
         return bar
 
     def _open_users(self) -> None:
-        self.accept()   # close settings first, then App opens users via signal
+        self.accept()
         self.users_requested.emit()
+
+    def _open_kegs(self) -> None:
+        self.accept()
+        self.kegs_requested.emit()
 
     def _restart_services(self) -> None:
         result = QMessageBox.question(
