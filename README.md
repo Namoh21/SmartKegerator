@@ -307,10 +307,11 @@ sudo cp -r /media/usb/wheel-cache /opt/smartkegerator/
 sudo chown -R $(whoami):$(whoami) ~/SmartKegerator
 
 cd ~/SmartKegerator
-bash src/scripts/update.sh
+sudo git pull
+sudo bash src/scripts/update.sh
 ```
 
-Pulls the latest code, syncs to `/opt/smartkegerator/src/`, and restarts both services.
+Pulls the latest code, syncs to `/opt/smartkegerator/src/`, strips CRLF line endings, and restarts both services.
 `config.yaml` is never overwritten.
 
 ---
