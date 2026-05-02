@@ -17,54 +17,56 @@
   <div class="col-sm-6 col-xl-4">
     <a href="/users/{{ s.user_id }}" class="text-decoration-none">
       <div class="card h-100 user-card">
-        <div class="card-body d-flex gap-3 align-items-start">
-          <!-- Photo -->
-          <div class="flex-shrink-0 rounded-circle overflow-hidden"
-               style="width:32px;height:32px;min-width:32px;">
-            {% if s.photo_url %}
-            <img src="{{ s.photo_url }}" alt="{{ s.name }}"
-                 style="width:32px;height:32px;object-fit:cover;object-position:top;display:block;max-width:none;">
-            {% else %}
-            <div class="d-flex align-items-center justify-content-center w-100 h-100"
-                 style="background:var(--sk-card-hover,#2a2a3e);">
-              <i class="bi bi-person-fill text-muted"></i>
+        <div class="card-body">
+
+          <!-- Name + admin badge -->
+          <h5 class="mb-2 text-white text-truncate">
+            {{ s.name }}
+            {% if s.user_id in admin_user_ids %}
+            <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;" title="Administrator">
+              <i class="bi bi-shield-check"></i> Admin
+            </span>
+            {% endif %}
+          </h5>
+
+          <!-- Stats -->
+          <div class="row g-1 small mb-3">
+            <div class="col-7 text-muted">Balance owed</div>
+            <div class="col-5 text-end fw-bold {% if s.balance > 0 %}text-danger{% else %}text-success{% endif %}">
+              {{ s.balance | usd }}
             </div>
+
+            <div class="col-7 text-muted">Total poured</div>
+            <div class="col-5 text-end">{{ s.pour_count }} pours</div>
+
+            <div class="col-7 text-muted">Total oz</div>
+            <div class="col-5 text-end">{{ "%.1f"|format(s.oz_total) }} oz</div>
+
+            {% if s.favorite_beer %}
+            <div class="col-7 text-muted">Fav beer</div>
+            <div class="col-5 text-end text-truncate" title="{{ s.favorite_beer }}">{{ s.favorite_beer }}</div>
+            {% endif %}
+
+            {% if s.last_pour_at %}
+            <div class="col-7 text-muted">Last pour</div>
+            <div class="col-5 text-end">{{ s.last_pour_at.strftime("%b %d") }}</div>
             {% endif %}
           </div>
 
-          <!-- Info -->
-          <div class="flex-grow-1 min-w-0">
-            <h5 class="mb-1 text-white text-truncate">
-              {{ s.name }}
-              {% if s.user_id in admin_user_ids %}
-              <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;" title="Administrator">
-                <i class="bi bi-shield-check"></i> Admin
-              </span>
-              {% endif %}
-            </h5>
-            <div class="row g-1 small">
-              <div class="col-7 text-muted">Balance owed</div>
-              <div class="col-5 text-end fw-bold {% if s.balance > 0 %}text-danger{% else %}text-success{% endif %}">
-                {{ s.balance | usd }}
-              </div>
-
-              <div class="col-7 text-muted">Total poured</div>
-              <div class="col-5 text-end">{{ s.pour_count }} pours</div>
-
-              <div class="col-7 text-muted">Total oz</div>
-              <div class="col-5 text-end">{{ "%.1f"|format(s.oz_total) }} oz</div>
-
-              {% if s.favorite_beer %}
-              <div class="col-7 text-muted">Fav beer</div>
-              <div class="col-5 text-end text-truncate" title="{{ s.favorite_beer }}">{{ s.favorite_beer }}</div>
-              {% endif %}
-
-              {% if s.last_pour_at %}
-              <div class="col-7 text-muted">Last pour</div>
-              <div class="col-5 text-end">{{ s.last_pour_at.strftime("%b %d") }}</div>
-              {% endif %}
-            </div>
+          <!-- Thumbnail photo below stats -->
+          {% if s.photo_url %}
+          <div class="rounded-circle overflow-hidden"
+               style="width:36px;height:36px;">
+            <img src="{{ s.photo_url }}" alt="{{ s.name }}"
+                 style="width:36px;height:36px;object-fit:cover;object-position:top;display:block;max-width:none;">
           </div>
+          {% else %}
+          <div class="rounded-circle d-flex align-items-center justify-content-center"
+               style="width:36px;height:36px;background:var(--sk-card-hover,#2a2a3e);">
+            <i class="bi bi-person-fill text-muted small"></i>
+          </div>
+          {% endif %}
+
         </div>
       </div>
     </a>
