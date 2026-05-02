@@ -33,8 +33,15 @@ REPO_SRC="$(dirname "${SCRIPT_DIR}")"   # parent of scripts/ = src/
 # ---------------------------------------------------------------------------
 info "Pulling latest code…"
 REPO_DIR="$(dirname "${REPO_SRC}")"
+CHANNEL_FILE="${INSTALL_DIR}/update_channel"
+BRANCH="master"
+if [[ -f "${CHANNEL_FILE}" ]]; then
+    BRANCH=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
+fi
+[[ "${BRANCH}" == "dev" || "${BRANCH}" == "master" ]] || BRANCH="master"
+info "Update channel: ${BRANCH}"
 git -C "${REPO_DIR}" fetch origin
-git -C "${REPO_DIR}" reset --hard origin/master
+git -C "${REPO_DIR}" reset --hard "origin/${BRANCH}"
 
 # ---------------------------------------------------------------------------
 # 2. Sync source files — preserves config.yaml, database, photos, videos
@@ -83,11 +90,12 @@ sudo -u "${REAL_USER}" XDG_RUNTIME_DIR="/run/user/$(id -u ${REAL_USER})" \
 # 2c. Ensure sudoers rule exists for web-initiated reboot
 # ---------------------------------------------------------------------------
 SUDOERS_FILE="/etc/sudoers.d/smartkegerator-reboot"
-SUDOERS_LINE="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
-if [[ ! -f "${SUDOERS_FILE}" ]] || ! grep -qF "${SUDOERS_LINE}" "${SUDOERS_FILE}"; then
-    echo "${SUDOERS_LINE}" | sudo tee "${SUDOERS_FILE}" > /dev/null
+SUDOERS_REBOOT="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
+SUDOERS_UPDATE="${REAL_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SRC_DIR}/scripts/update.sh"
+if [[ ! -f "${SUDOERS_FILE}" ]] || ! grep -qF "${SUDOERS_UPDATE}" "${SUDOERS_FILE}"; then
+    printf '%s\n%s\n' "${SUDOERS_REBOOT}" "${SUDOERS_UPDATE}" | sudo tee "${SUDOERS_FILE}" > /dev/null
     sudo chmod 440 "${SUDOERS_FILE}"
-    info "Sudoers rule added: ${REAL_USER} may run sudo reboot without password."
+    info "Sudoers rules updated."
 fi
 
 # ---------------------------------------------------------------------------

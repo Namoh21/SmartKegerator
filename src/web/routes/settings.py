@@ -183,7 +183,8 @@ async def settings_page(request: Request):
             server_ip=server_ip, server_port=server_port,
             ssl_enabled=ssl_enabled, ssl_certfile=ssl_certfile, ssl_keyfile=ssl_keyfile,
             log_levels=LEVEL_LABELS, current_log_level=current_level,
-            app_version=_read_version(), app_git_hash=_read_git_hash()),
+            app_version=_read_version(), app_git_hash=_read_git_hash(),
+            update_channel=_read_channel()),
     )
 
 
@@ -584,9 +585,26 @@ async def download_log(which: str):
 # Version / Updates
 # ---------------------------------------------------------------------------
 
-_GITHUB_OWNER = "Namoh21"
-_GITHUB_REPO  = "SmartKegerator"
-_UPDATE_SCRIPT = Path("/opt/smartkegerator/src/scripts/update.sh")
+_GITHUB_OWNER   = "Namoh21"
+_GITHUB_REPO    = "SmartKegerator"
+_UPDATE_SCRIPT  = Path("/opt/smartkegerator/src/scripts/update.sh")
+_CHANNEL_FILE   = Path("/opt/smartkegerator/update_channel")
+
+
+def _read_channel() -> str:
+    if _CHANNEL_FILE.exists():
+        v = _CHANNEL_FILE.read_text().strip()
+        if v in ("master", "dev"):
+            return v
+    return "master"
+
+
+def _write_channel(channel: str) -> None:
+    try:
+        _CHANNEL_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _CHANNEL_FILE.write_text(channel + "\n")
+    except Exception as exc:
+        log.warning("Could not write channel file: %s", exc)
 
 
 def _read_version() -> str:
@@ -618,14 +636,28 @@ async def version_info(request: Request):
     )
 
 
+@router.post("/update-channel", response_class=HTMLResponse)
+async def save_update_channel(channel: str = Form("master")):
+    """HTMX endpoint — saves the update channel preference."""
+    if channel not in ("master", "dev"):
+        channel = "master"
+    _write_channel(channel)
+    label = "Stable (master)" if channel == "master" else "Dev (unstable)"
+    return HTMLResponse(
+        f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>Channel set to <strong>{label}</strong>.</span>'
+    )
+
+
 @router.get("/check-updates", response_class=HTMLResponse)
 async def check_updates(request: Request):
-    """HTMX endpoint — compares local commit to GitHub latest."""
+    """HTMX endpoint — compares local commit to GitHub latest on the selected branch."""
     local_hash = _read_git_hash()
+    channel    = _read_channel()
+    branch     = "master" if channel == "master" else "dev"
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                f"https://api.github.com/repos/{_GITHUB_OWNER}/{_GITHUB_REPO}/commits/master",
+                f"https://api.github.com/repos/{_GITHUB_OWNER}/{_GITHUB_REPO}/commits/{branch}",
                 headers={"Accept": "application/vnd.github.v3+json"},
             )
         resp.raise_for_status()
@@ -642,7 +674,7 @@ async def check_updates(request: Request):
         )
     return HTMLResponse(
         f'<span class="text-info"><i class="bi bi-arrow-down-circle me-1"></i>'
-        f'Update available (remote: <code>{remote_sha}</code>). '
+        f'Update available on <strong>{branch}</strong> (remote: <code>{remote_sha}</code>). '
         f'Click <strong>Update Now</strong> to apply.</span>'
     )
 
