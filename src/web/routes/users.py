@@ -221,6 +221,15 @@ async def photo_train(user_id: int):
     log = logging.getLogger(__name__)
     db  = get_db()
 
+    # Guard: reject if a training run is already in progress for this user.
+    # Without this, rapid clicks or duplicate requests spawn multiple dlib
+    # threads simultaneously — each one uses ~400 MB, which OOM-kills the
+    # Pi 3 and leaves the status key in an unpredictable state.
+    current = db.get_setting(f"train_status_{user_id}", "")
+    if current == "pending":
+        log.warning("train: already in progress for user %d — ignoring duplicate request", user_id)
+        return HTMLResponse(_train_polling_html(user_id))
+
     db.set_setting(f"train_status_{user_id}", "pending")
 
     def _run():

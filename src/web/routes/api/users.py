@@ -100,6 +100,12 @@ async def trigger_training(user_id: int):
     if not user.image_paths:
         raise HTTPException(400, "User has no training photos — capture photos first")
 
+    # Guard: reject if already training — prevents simultaneous dlib threads
+    # that would OOM-kill the Pi 3 (~400 MB each).
+    if db.get_setting(f"train_status_{user_id}", "") == "pending":
+        log.warning("train: already in progress for user %d — ignoring duplicate API request", user_id)
+        return {"ok": True, "status": "pending"}
+
     db.set_setting(f"train_status_{user_id}", "pending")
 
     def _run():
