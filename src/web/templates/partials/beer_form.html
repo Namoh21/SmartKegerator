@@ -1,20 +1,19 @@
 <!-- Shared form fields for Add/Edit Beer modals -->
 
-<!-- ── Untappd search ──────────────────────────────────────────────── -->
+<!-- ── catalog.beer search ─────────────────────────────────────────── -->
 <div class="mb-3">
   <label class="form-label small text-muted">
-    <img src="https://untappd.com/favicon.ico" width="14" height="14" class="me-1" alt="">
-    Search Untappd to auto-fill fields
+    <i class="bi bi-search me-1"></i>Search catalog.beer to auto-fill fields
   </label>
   <input type="text" class="form-control"
-         placeholder="Type a beer name to search Untappd…"
-         hx-get="/untappd/search"
+         placeholder="Type a beer name to search…"
+         hx-get="/beers/search"
          hx-trigger="keyup changed delay:400ms"
-         hx-target="#untappd-results"
-         hx-include="[name='untappd_q']"
-         name="untappd_q"
+         hx-target="#catalog-beer-results"
+         hx-include="[name='catalog_q']"
+         name="catalog_q"
          autocomplete="off">
-  <div id="untappd-results"></div>
+  <div id="catalog-beer-results"></div>
 </div>
 <hr style="border-color: #2a2a4e;">
 
@@ -55,11 +54,6 @@
     <input type="number" class="form-control" name="ibu" id="bf-ibu" min="0"
            value="{{ beer.ibu if beer is defined else '0' }}">
   </div>
-  <div class="col-md-4 mb-3">
-    <label class="form-label">Untappd Rating</label>
-    <input type="text" class="form-control" name="untappd_rating" id="bf-rating"
-           value="{{ beer.rating_display if beer is defined else '' }}"
-           placeholder="0.00–5.00" readonly>
   </div>
 </div>
 <div class="mb-3">
@@ -68,8 +62,8 @@
             rows="3">{{ beer.description if beer is defined else '' }}</textarea>
 </div>
 
-<!-- Hidden fields populated by Untappd selection -->
-<input type="hidden" name="untappd_id"  id="bf-untappd-id"
-       value="{{ beer.untappd_id if beer is defined else '' }}">
-<input type="hidden" name="label_url"   id="bf-label-url"
+<!-- Hidden fields populated by catalog.beer selection -->
+<input type="hidden" name="catalog_id" id="bf-catalog-id"
+       value="{{ beer.catalog_id if beer is defined else '' }}">
+<input type="hidden" name="label_url"  id="bf-label-url"
        value="{{ beer.label_url if beer is defined else '' }}">

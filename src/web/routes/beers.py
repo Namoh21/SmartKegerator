@@ -29,17 +29,16 @@ async def beer_list(request: Request):
 
 @router.post("/add", response_class=RedirectResponse)
 async def beer_add(
-    request:               Request,
-    name:                  str   = Form(...),
-    company:               str   = Form(""),
-    location:              str   = Form(""),
-    style:                 str   = Form(""),
-    abv:                   float = Form(0.0),
-    ibu:                   int   = Form(0),
-    description:           str   = Form(""),
-    untappd_id:            str   = Form(""),
-    untappd_rating:        str   = Form(""),
-    label_url:             str   = Form(""),
+    request:     Request,
+    name:        str   = Form(...),
+    company:     str   = Form(""),
+    location:    str   = Form(""),
+    style:       str   = Form(""),
+    abv:         float = Form(0.0),
+    ibu:         int   = Form(0),
+    description: str   = Form(""),
+    catalog_id:  str   = Form(""),
+    label_url:   str   = Form(""),
 ):
     db   = get_db()
     beer = Beer(
@@ -48,8 +47,7 @@ async def beer_add(
         location=location.strip(), style=style.strip(),
         abv=abv, ibu=ibu,
         description=description.strip(),
-        untappd_id=int(untappd_id) if untappd_id.strip() else None,
-        untappd_rating=float(untappd_rating) if untappd_rating.strip() else None,
+        catalog_id=catalog_id.strip() or None,
         label_url=label_url.strip(),
     )
     db.save_beer(beer)
@@ -58,31 +56,29 @@ async def beer_add(
 
 @router.post("/{beer_id}/edit", response_class=RedirectResponse)
 async def beer_edit(
-    beer_id:               int,
-    name:                  str   = Form(...),
-    company:               str   = Form(""),
-    location:              str   = Form(""),
-    style:                 str   = Form(""),
-    abv:                   float = Form(0.0),
-    ibu:                   int   = Form(0),
-    description:           str   = Form(""),
-    untappd_id:            str   = Form(""),
-    untappd_rating:        str   = Form(""),
-    label_url:             str   = Form(""),
+    beer_id:     int,
+    name:        str   = Form(...),
+    company:     str   = Form(""),
+    location:    str   = Form(""),
+    style:       str   = Form(""),
+    abv:         float = Form(0.0),
+    ibu:         int   = Form(0),
+    description: str   = Form(""),
+    catalog_id:  str   = Form(""),
+    label_url:   str   = Form(""),
 ):
     db   = get_db()
     beer = db.get_beer(beer_id)
     if beer:
-        beer.name          = name.strip()
-        beer.company       = company.strip()
-        beer.location      = location.strip()
-        beer.style         = style.strip()
-        beer.abv           = abv
-        beer.ibu           = ibu
-        beer.description   = description.strip()
-        beer.untappd_id    = int(untappd_id) if untappd_id.strip() else None
-        beer.untappd_rating = float(untappd_rating) if untappd_rating.strip() else None
-        beer.label_url     = label_url.strip()
+        beer.name        = name.strip()
+        beer.company     = company.strip()
+        beer.location    = location.strip()
+        beer.style       = style.strip()
+        beer.abv         = abv
+        beer.ibu         = ibu
+        beer.description = description.strip()
+        beer.catalog_id  = catalog_id.strip() or None
+        beer.label_url   = label_url.strip()
         db.save_beer(beer)
     return RedirectResponse("/beers/", status_code=303)
 

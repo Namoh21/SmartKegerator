@@ -18,19 +18,12 @@ class Beer:
     abv: float
     ibu: int
     description: str = ""
-    untappd_id: Optional[int] = None
-    untappd_rating: Optional[float] = None
+    catalog_id: Optional[str] = None
     label_url: str = ""
 
     @property
     def logo_filename(self) -> str:
         return f"{self.name}.png"
-
-    @property
-    def rating_display(self) -> str:
-        if self.untappd_rating is None:
-            return ""
-        return f"{self.untappd_rating:.2f}"
 
 
 @dataclass

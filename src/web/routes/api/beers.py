@@ -13,30 +13,28 @@ router = APIRouter()
 
 
 class BeerResponse(BaseModel):
-    id:             int
-    name:           str
-    company:        str
-    location:       str
-    style:          str
-    abv:            float
-    ibu:            int
-    description:    str
-    untappd_id:     Optional[int]
-    untappd_rating: Optional[float]
-    label_url:      str
+    id:          int
+    name:        str
+    company:     str
+    location:    str
+    style:       str
+    abv:         float
+    ibu:         int
+    description: str
+    catalog_id:  Optional[str]
+    label_url:   str
 
 
 class BeerRequest(BaseModel):
-    name:           str
-    company:        str            = ""
-    location:       str            = ""
-    style:          str            = ""
-    abv:            float          = 0.0
-    ibu:            int            = 0
-    description:    str            = ""
-    untappd_id:     Optional[int]  = None
-    untappd_rating: Optional[float] = None
-    label_url:      str            = ""
+    name:        str
+    company:     str           = ""
+    location:    str           = ""
+    style:       str           = ""
+    abv:         float         = 0.0
+    ibu:         int           = 0
+    description: str           = ""
+    catalog_id:  Optional[str] = None
+    label_url:   str           = ""
 
 
 def _out(beer: Beer) -> BeerResponse:
@@ -44,7 +42,7 @@ def _out(beer: Beer) -> BeerResponse:
         id=beer.id, name=beer.name, company=beer.company,
         location=beer.location, style=beer.style, abv=beer.abv,
         ibu=beer.ibu, description=beer.description,
-        untappd_id=beer.untappd_id, untappd_rating=beer.untappd_rating,
+        catalog_id=beer.catalog_id,
         label_url=beer.label_url,
     )
 
@@ -69,7 +67,7 @@ async def add_beer(body: BeerRequest):
         id=None, name=body.name.strip(), company=body.company.strip(),
         location=body.location.strip(), style=body.style.strip(),
         abv=body.abv, ibu=body.ibu, description=body.description.strip(),
-        untappd_id=body.untappd_id, untappd_rating=body.untappd_rating,
+        catalog_id=body.catalog_id,
         label_url=body.label_url.strip(),
     )
     db.save_beer(beer)
@@ -89,9 +87,8 @@ async def update_beer(beer_id: int, body: BeerRequest):
     beer.abv            = body.abv
     beer.ibu            = body.ibu
     beer.description    = body.description.strip()
-    beer.untappd_id     = body.untappd_id
-    beer.untappd_rating = body.untappd_rating
-    beer.label_url      = body.label_url.strip()
+    beer.catalog_id  = body.catalog_id
+    beer.label_url   = body.label_url.strip()
     db.save_beer(beer)
     return _out(beer)
 

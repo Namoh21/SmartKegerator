@@ -1,0 +1,38 @@
+{% if results %}
+<div class="list-group mt-2" style="max-height: 320px; overflow-y: auto;">
+  {% for item in results %}
+  <button type="button"
+          class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 js-fill-beer"
+          style="background: var(--sk-card); border-color: #2a2a4e;"
+          data-name="{{ item.name }}"
+          data-company="{{ item.brewer.name if item.brewer else '' }}"
+          data-location=""
+          data-style="{{ item.style or '' }}"
+          data-abv="{{ item.abv or '' }}"
+          data-ibu="{{ item.ibu | int if item.ibu else 0 }}"
+          data-description="{{ (item.description or '') | replace('"', '&quot;') }}"
+          data-catalog-id="{{ item.id }}"
+          data-label-url="">
+
+    <span style="width:40px;height:40px;display:inline-block;flex-shrink:0;">
+      <i class="bi bi-cup-fill" style="font-size:1.8rem;color:var(--sk-accent);"></i>
+    </span>
+
+    <div class="flex-grow-1 text-start">
+      <div class="fw-semibold text-white">{{ item.name }}</div>
+      <div class="small text-muted">
+        {{ item.brewer.name if item.brewer else '—' }}
+        {% if item.style %}&middot; {{ item.style }}{% endif %}
+      </div>
+    </div>
+
+    <div class="text-end small">
+      {% if item.abv %}<div class="text-accent fw-semibold">{{ item.abv }}% ABV</div>{% endif %}
+      {% if item.ibu %}<div class="text-muted">{{ item.ibu }} IBU</div>{% endif %}
+    </div>
+  </button>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-muted small mt-2">No results for "{{ query }}".</p>
+{% endif %}

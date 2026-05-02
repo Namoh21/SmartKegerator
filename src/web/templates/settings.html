@@ -39,7 +39,7 @@
           ('taps',       'bi-diagram-3',   'Taps'),
           ('camera',     'bi-camera',      'Camera'),
           ('sensors',    'bi-thermometer', 'Sensors'),
-          ('untappd',    'bi-cup-straw',   'Untappd'),
+          ('beer-db',    'bi-database',    'Beer DB'),
           ('admins',     'bi-shield-lock', 'Administrators'),
       ] %}
       {% if tab_id != 'admins' or is_admin %}
@@ -514,47 +514,41 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
-           TAB: UNTAPPD
+           TAB: BEER DATABASE (catalog.beer)
            ══════════════════════════════════════════════════════════════ -->
-      <div class="tab-pane fade {% if active_tab == 'untappd' %}show active{% endif %}" id="pane-untappd">
+      <div class="tab-pane fade {% if active_tab == 'beer-db' %}show active{% endif %}" id="pane-beer-db">
         <div class="card mb-3">
           <div class="card-header d-flex align-items-center gap-2">
-            <img src="https://untappd.com/favicon.ico" width="18" height="18" alt="">
-            <strong>Untappd API</strong>
+            <i class="bi bi-database me-1"></i>
+            <strong>catalog.beer API</strong>
             <span class="text-muted small ms-auto">
               Register at
-              <a href="https://untappd.com/api/register" target="_blank" rel="noopener"
-                 class="text-accent">untappd.com/api/register</a>
+              <a href="https://catalog.beer" target="_blank" rel="noopener"
+                 class="text-accent">catalog.beer</a>
             </span>
           </div>
           <div class="card-body">
             {% if is_admin %}
-            <form method="post" action="/settings/untappd">
+            <form method="post" action="/settings/catalog-beer">
               <div class="mb-3">
-                <label class="form-label">Client ID</label>
-                <input type="text" class="form-control font-monospace"
-                       name="untappd_client_id"
-                       value="{{ settings.get('untappd_client_id', '') }}"
-                       placeholder="Your Untappd Client ID"
-                       autocomplete="off">
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Client Secret</label>
-                {% set _secret_set = settings.get('untappd_client_secret', '') != '' %}
+                <label class="form-label">API Key</label>
+                {% set _key_set = settings.get('catalog_beer_api_key', '') != '' %}
                 <div class="input-group">
                   <input type="password" class="form-control font-monospace"
-                         name="untappd_client_secret"
+                         name="catalog_beer_api_key"
                          value=""
-                         placeholder="{{ '••••••••  (saved — leave blank to keep)' if _secret_set else 'Your Untappd Client Secret' }}"
+                         placeholder="{{ '••••••••  (saved — leave blank to keep)' if _key_set else 'Your catalog.beer API key' }}"
                          autocomplete="off"
-                         id="secretInput">
-                  <button type="button" class="btn btn-outline-secondary" id="toggleSecretBtn">
-                    <i class="bi bi-eye" id="eyeIcon"></i>
+                         id="catalogKeyInput">
+                  <button type="button" class="btn btn-outline-secondary" id="toggleCatalogKeyBtn">
+                    <i class="bi bi-eye" id="catalogEyeIcon"></i>
                   </button>
                 </div>
                 <div class="form-text text-muted">
+                  Get your API key from your account page at
+                  <a href="https://catalog.beer" target="_blank" rel="noopener" class="text-accent">catalog.beer</a>.
                   Stored only in the local database — never in source code or config files.
+                  Free tier: 1,000 requests/month.
                 </div>
               </div>
 
@@ -573,11 +567,11 @@
             </form>
             {% else %}
             <p class="text-muted small mb-0">
-              <i class="bi bi-lock me-1"></i>Untappd credentials are managed by administrators.
-              {% if settings.get('untappd_client_id') %}
-              <br><span class="text-success"><i class="bi bi-check-circle me-1"></i>API credentials are configured.</span>
+              <i class="bi bi-lock me-1"></i>Beer database credentials are managed by administrators.
+              {% if settings.get('catalog_beer_api_key') %}
+              <br><span class="text-success"><i class="bi bi-check-circle me-1"></i>API key is configured.</span>
               {% else %}
-              <br><span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>No API credentials set — beer search will not work.</span>
+              <br><span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>No API key set — beer search will not work.</span>
               {% endif %}
             </p>
             {% endif %}
@@ -1037,10 +1031,10 @@ document.addEventListener('click', function(e) {
       });
     }
   }
-  // Secret visibility toggle
-  if (e.target.closest('#toggleSecretBtn')) {
-    const inp  = document.getElementById('secretInput');
-    const icon = document.getElementById('eyeIcon');
+  // API key visibility toggle
+  if (e.target.closest('#toggleCatalogKeyBtn')) {
+    const inp  = document.getElementById('catalogKeyInput');
+    const icon = document.getElementById('catalogEyeIcon');
     if (!inp) return;
     if (inp.type === 'password') {
       inp.type = 'text';

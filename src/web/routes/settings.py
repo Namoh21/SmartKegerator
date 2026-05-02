@@ -318,21 +318,18 @@ async def settings_save_sensors(
 
 
 # ---------------------------------------------------------------------------
-# Untappd credentials (stored in DB, not YAML)
+# catalog.beer API key (stored in DB, not YAML)
 # ---------------------------------------------------------------------------
 
-@router.post("/untappd", response_class=RedirectResponse)
-async def settings_save_untappd(
-    untappd_client_id:     str = Form(""),
-    untappd_client_secret: str = Form(""),
+@router.post("/catalog-beer", response_class=RedirectResponse)
+async def settings_save_catalog_beer(
+    catalog_beer_api_key: str = Form(""),
 ):
     db = get_db()
-    db.set_setting("untappd_client_id", untappd_client_id.strip())
-    # Only overwrite secret when user typed a new value; blank = keep existing
-    secret = untappd_client_secret.strip()
-    if secret:
-        db.set_setting("untappd_client_secret", secret)
-    return RedirectResponse("/settings/?saved=1&tab=untappd", status_code=303)
+    key = catalog_beer_api_key.strip()
+    if key:
+        db.set_setting("catalog_beer_api_key", key)
+    return RedirectResponse("/settings/?saved=1&tab=beer-db", status_code=303)
 
 
 # ---------------------------------------------------------------------------

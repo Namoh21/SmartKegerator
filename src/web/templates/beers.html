@@ -22,7 +22,6 @@
             <th>Name</th><th>Brewery</th><th>Style</th>
             <th class="text-center">ABV</th>
             <th class="text-center">IBU</th>
-            <th class="text-center" title="Untappd community rating">&#9733;</th>
             <th class="text-center">Kegs</th>
             <th></th>
           </tr>
@@ -51,11 +50,6 @@
             <td><span class="badge bg-secondary">{{ beer.style or "—" }}</span></td>
             <td class="text-center">{{ beer.abv | abv }}</td>
             <td class="text-center">{{ beer.ibu if beer.ibu else "—" }}</td>
-            <td class="text-center">
-              {% if beer.untappd_rating %}
-              <span class="text-accent fw-semibold">{{ beer.rating_display }}</span>
-              {% else %}—{% endif %}
-            </td>
             <td class="text-center">{{ keg_counts.get(beer.id, 0) }}</td>
             <td class="text-end">
               {% if is_admin %}
@@ -79,7 +73,7 @@
       </table>
     </div>
     {% else %}
-    <p class="text-muted p-3">No beers yet — use the Untappd search to add one.</p>
+    <p class="text-muted p-3">No beers yet — use the beer search to add one.</p>
     {% endif %}
   </div>
 </div>
@@ -142,10 +136,9 @@ function _fillBeerForm(btn) {
   document.getElementById('bf-abv').value          = btn.dataset.abv         || '0.0';
   document.getElementById('bf-ibu').value          = btn.dataset.ibu         || '0';
   document.getElementById('bf-description').value  = btn.dataset.description || '';
-  document.getElementById('bf-rating').value       = btn.dataset.untappdRating || '';
-  document.getElementById('bf-untappd-id').value   = btn.dataset.untappdId   || '';
+  document.getElementById('bf-catalog-id').value   = btn.dataset.catalogId   || '';
   document.getElementById('bf-label-url').value    = btn.dataset.labelUrl    || '';
-  document.getElementById('untappd-results').innerHTML = '';
+  document.getElementById('catalog-beer-results').innerHTML = '';
 }
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('.js-fill-beer');

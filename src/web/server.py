@@ -426,9 +426,9 @@ def ctx(request: Request, **kwargs) -> dict:
 
 
 # Register routers — imported after ctx/templates are defined to avoid circular import
-from web.routes import dashboard, beers, kegs, users, pours, settings, untappd  # noqa: E402
-from web.routes import admin, auth                                                # noqa: E402
-from web.routes.api import router as api_router                                   # noqa: E402
+from web.routes import dashboard, beers, kegs, users, pours, settings, catalog_beer  # noqa: E402
+from web.routes import admin, auth                                                     # noqa: E402
+from web.routes.api import router as api_router                                        # noqa: E402
 
 app.include_router(dashboard.router)
 app.include_router(beers.router)
@@ -436,7 +436,7 @@ app.include_router(kegs.router)
 app.include_router(users.router)
 app.include_router(pours.router)
 app.include_router(settings.router)
-app.include_router(untappd.router)
+app.include_router(catalog_beer.router)
 app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(api_router)

@@ -36,8 +36,7 @@ CREATE TABLE IF NOT EXISTS beers (
     abv             REAL    NOT NULL DEFAULT 0.0,
     ibu             INTEGER NOT NULL DEFAULT 0,
     description     TEXT    NOT NULL DEFAULT '',
-    untappd_id      INTEGER,
-    untappd_rating  REAL,
+    catalog_id      TEXT,
     label_url       TEXT    NOT NULL DEFAULT ''
 );
 
@@ -175,10 +174,10 @@ class Database:
         """Schema migrations — safe to re-run on every startup."""
         # Beer columns added after initial release
         new_columns = [
-            "ALTER TABLE beers ADD COLUMN description    TEXT    NOT NULL DEFAULT ''",
-            "ALTER TABLE beers ADD COLUMN untappd_id     INTEGER",
-            "ALTER TABLE beers ADD COLUMN untappd_rating REAL",
-            "ALTER TABLE beers ADD COLUMN label_url      TEXT    NOT NULL DEFAULT ''",
+            "ALTER TABLE beers ADD COLUMN description TEXT    NOT NULL DEFAULT ''",
+            "ALTER TABLE beers ADD COLUMN untappd_id  INTEGER",
+            "ALTER TABLE beers ADD COLUMN label_url   TEXT    NOT NULL DEFAULT ''",
+            "ALTER TABLE beers ADD COLUMN catalog_id  TEXT",
         ]
         with self._cursor() as cur:
             for sql in new_columns:
@@ -269,19 +268,19 @@ class Database:
             if beer.id is None:
                 cur.execute(
                     "INSERT INTO beers "
-                    "(name, company, location, style, abv, ibu, description, untappd_id, untappd_rating, label_url) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "(name, company, location, style, abv, ibu, description, catalog_id, label_url) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (beer.name, beer.company, beer.location, beer.style, beer.abv, beer.ibu,
-                     beer.description, beer.untappd_id, beer.untappd_rating, beer.label_url),
+                     beer.description, beer.catalog_id, beer.label_url),
                 )
                 beer.id = cur.lastrowid
             else:
                 cur.execute(
                     "INSERT OR REPLACE INTO beers "
-                    "(id, name, company, location, style, abv, ibu, description, untappd_id, untappd_rating, label_url) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "(id, name, company, location, style, abv, ibu, description, catalog_id, label_url) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (beer.id, beer.name, beer.company, beer.location, beer.style, beer.abv, beer.ibu,
-                     beer.description, beer.untappd_id, beer.untappd_rating, beer.label_url),
+                     beer.description, beer.catalog_id, beer.label_url),
                 )
         return beer
 
@@ -718,8 +717,7 @@ def _row_to_beer(row: sqlite3.Row) -> Beer:
         abv=row["abv"],
         ibu=row["ibu"],
         description=row["description"] if "description" in keys else "",
-        untappd_id=row["untappd_id"] if "untappd_id" in keys else None,
-        untappd_rating=row["untappd_rating"] if "untappd_rating" in keys else None,
+        catalog_id=row["catalog_id"] if "catalog_id" in keys else None,
         label_url=row["label_url"] if "label_url" in keys else "",
     )
 

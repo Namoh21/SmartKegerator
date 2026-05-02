@@ -1,7 +1,7 @@
 """
-Untappd beer search dialog for the PyQt6 touchscreen app.
+catalog.beer search dialog for the PyQt6 touchscreen app.
 
-Opens when the user taps "Search Untappd" in the beer/keg management screen.
+Opens when the user taps "Search Beer Database" in the beer/keg management screen.
 Reads API credentials from the database (never from source code).
 Returns a pre-filled Beer dataclass on accept.
 """
@@ -79,7 +79,7 @@ _STYLE = f"""
 
 class BeerSearchDialog(QDialog):
     """
-    Modal dialog that searches Untappd and returns a Beer instance.
+    Modal dialog that searches catalog.beer and returns a Beer instance.
 
     Usage:
         dlg = BeerSearchDialog(db, parent=self)
@@ -95,7 +95,7 @@ class BeerSearchDialog(QDialog):
         self._results: list[dict] = []
         self.selected_beer: Optional[Beer] = None
 
-        self.setWindowTitle("Search Untappd")
+        self.setWindowTitle("Search Beer Database")
         self.setStyleSheet(_STYLE)
         self.setMinimumSize(520, 480)
 
