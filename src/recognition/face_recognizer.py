@@ -80,6 +80,11 @@ class FaceRecognizer(QObject):
         self._running  = False
         self._thread:  Optional[threading.Thread] = None
 
+        # Prevents concurrent training threads and pauses recognition inference
+        # during training so both don't compete for the same ~400 MB of RAM.
+        self._training_lock   = threading.Lock()
+        self._training_active = False
+
         if self._enabled:
             self._load_encodings()
 
@@ -139,6 +144,23 @@ class FaceRecognizer(QObject):
         if not _FR_AVAILABLE:
             self.training_failed.emit(user_id, "face_recognition library not available")
             return
+
+        # Guard: only one training thread at a time.  A second call while
+        # training is in progress is silently dropped — the UI button is
+        # disabled during training so this is only a safety net.
+        with self._training_lock:
+            if self._training_active:
+                log.warning("train_user: training already in progress — ignoring duplicate call")
+                return
+            self._training_active = True
+
+        # Write pending status to DB so the web server's cross-process guard
+        # can see that the touchscreen is training and refuse to start its own run.
+        try:
+            self._db.set_setting(f"train_status_{user_id}", "pending")
+        except Exception:
+            pass
+
         threading.Thread(
             target=self._do_train, args=(user_id,), name=f"train-{user_id}", daemon=True
         ).start()
@@ -151,13 +173,31 @@ class FaceRecognizer(QObject):
                 self.train_user(user.id)
 
     def _do_train(self, user_id: int) -> None:
+        import gc
+        # Pause the recognition inference loop while training so both don't
+        # compete for the same ~400 MB of RAM on a Pi 3.
+        self._training_active = True
         try:
             self._do_train_inner(user_id)
         except Exception as exc:
             log.error("Training user %d crashed: %s", user_id, exc, exc_info=True)
             self.training_failed.emit(user_id, f"unexpected error: {exc}")
+            try:
+                self._db.set_setting(f"train_status_{user_id}", f"error:{exc}")
+            except Exception:
+                pass
+        finally:
+            with self._training_lock:
+                self._training_active = False
+            try:
+                self._db.set_setting(f"train_status_{user_id}", "")
+            except Exception:
+                pass
+            gc.collect()
 
     def _do_train_inner(self, user_id: int) -> None:
+        import gc
+
         user = self._db.get_user(user_id)
         if user is None:
             self.training_failed.emit(user_id, "user not found")
@@ -170,6 +210,7 @@ class FaceRecognizer(QObject):
             if not p.exists():
                 log.warning("Training: image not found: %s", img_path)
                 continue
+            img = None
             try:
                 img       = _fr.load_image_file(str(p))
                 locations = _fr.face_locations(img, model=self._model)
@@ -184,6 +225,11 @@ class FaceRecognizer(QObject):
                     log.debug("Training: encoded %s", img_path)
             except Exception as exc:
                 log.warning("Training: failed to encode %s: %s", img_path, exc)
+            finally:
+                # Explicitly free the large image array after each photo so
+                # peak RAM is one-photo-worth, not all photos at once.
+                del img
+                gc.collect()
 
         if not results:
             reason = f"no usable faces found in {len(user.image_paths)} photo(s)"
@@ -208,6 +254,9 @@ class FaceRecognizer(QObject):
             try:
                 frame = self._queue.get(timeout=0.5)
             except Empty:
+                continue
+            # Skip inference while training — both use dlib and ~400 MB RAM
+            if self._training_active:
                 continue
             try:
                 self._process_frame(frame)
