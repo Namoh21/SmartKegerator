@@ -182,7 +182,8 @@ async def settings_page(request: Request):
             admins=admins, themes=THEMES,
             server_ip=server_ip, server_port=server_port,
             ssl_enabled=ssl_enabled, ssl_certfile=ssl_certfile, ssl_keyfile=ssl_keyfile,
-            log_levels=LEVEL_LABELS, current_log_level=current_level),
+            log_levels=LEVEL_LABELS, current_log_level=current_level,
+            app_version=_read_version(), app_git_hash=_read_git_hash()),
     )
 
 

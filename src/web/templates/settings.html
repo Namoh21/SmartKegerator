@@ -854,11 +854,9 @@
 
             <div class="mb-4">
               <div class="text-muted small mb-1">Current version</div>
-              <div id="version-display"
-                   hx-get="/settings/version"
-                   hx-trigger="load"
-                   hx-swap="innerHTML">
-                <span class="text-muted small">Loading…</span>
+              <div id="version-display">
+                <span class="fw-semibold text-accent">{{ app_version }}</span>
+                <span class="text-muted small ms-2">({{ app_git_hash }})</span>
               </div>
             </div>
 
