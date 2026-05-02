@@ -132,23 +132,23 @@ function _fillBeerForm(btn) {
   // Scope to the modal that contains this button so Add and Edit modals
   // don't overwrite each other's fields when multiple modals are on the page.
   const scope = btn.closest('.modal-body') || document;
-  const f = id => scope.querySelector('#' + id);
+  const set = (id, val) => { const el = scope.querySelector('#' + id); if (el) el.value = val; };
 
-  f('bf-name').value        = btn.dataset.name        || '';
-  f('bf-company').value     = btn.dataset.company     || '';
-  f('bf-location').value    = btn.dataset.location    || '';
-  f('bf-style').value       = btn.dataset.style       || '';
-  f('bf-abv').value         = btn.dataset.abv         || '0.0';
-  f('bf-ibu').value         = btn.dataset.ibu         || '0';
-  f('bf-description').value = btn.dataset.description || '';
-  f('bf-catalog-id').value  = btn.dataset.catalogId   || '';
-  f('bf-label-url').value   = btn.dataset.labelUrl    || '';
+  set('bf-name',        btn.dataset.name        || '');
+  set('bf-company',     btn.dataset.company     || '');
+  set('bf-location',    btn.dataset.location    || '');
+  set('bf-style',       btn.dataset.style       || '');
+  set('bf-abv',         btn.dataset.abv         || '0.0');
+  set('bf-ibu',         btn.dataset.ibu         || '0');
+  set('bf-description', btn.dataset.description || '');
+  set('bf-catalog-id',  btn.dataset.catalogId   || '');
+  set('bf-label-url',   btn.dataset.labelUrl    || '');
 
   // Clear results and search input after selection
   const results = scope.querySelector('#catalog-beer-results');
   if (results) results.innerHTML = '';
   const searchInput = scope.querySelector('#catalog-search-input');
-  if (searchInput) searchInput.value = f('bf-name').value;
+  if (searchInput) searchInput.value = btn.dataset.name || '';
 }
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('.js-fill-beer');
