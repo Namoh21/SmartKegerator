@@ -121,6 +121,53 @@ async def test_connection(request: Request):
         return HTMLResponse(f'<span class="text-danger">&#10007; {e}</span>')
 
 
+@router.get("/beers/brewery-location", response_class=JSONResponse)
+async def brewery_location(name: str = Query("")):
+    """Proxy to OpenBreweryDB — returns city/state for a brewery name."""
+    name = name.strip()
+    if not name:
+        return JSONResponse({})
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(
+                "https://api.openbrewerydb.org/v1/breweries/search",
+                params={"query": name, "per_page": 5},
+            )
+        resp.raise_for_status()
+        results = resp.json()
+    except Exception as exc:
+        log.warning("OpenBreweryDB lookup failed for %r: %s", name, exc)
+        return JSONResponse({})
+
+    if not results:
+        return JSONResponse({})
+
+    # Pick the closest name match (case-insensitive prefix or substring)
+    name_lower = name.lower()
+    best = None
+    for r in results:
+        if r.get("name", "").lower().startswith(name_lower[:6]):
+            best = r
+            break
+    if not best:
+        best = results[0]
+
+    city    = best.get("city") or ""
+    state   = best.get("state") or best.get("state_province") or ""
+    country = best.get("country") or ""
+
+    if city and state:
+        location = f"{city}, {state}"
+    elif city and country and country.lower() != "united states":
+        location = f"{city}, {country}"
+    elif city:
+        location = city
+    else:
+        location = ""
+
+    return JSONResponse({"location": location})
+
+
 @router.get("/beers/catalog-lookup", response_class=JSONResponse)
 async def catalog_lookup(catalog_id: str = Query(...)):
     """Fetch full beer details from catalog.beer by ID."""

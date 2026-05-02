@@ -149,6 +149,15 @@ function _fillBeerForm(btn) {
   if (results) results.innerHTML = '';
   const searchInput = scope.querySelector('#catalog-search-input');
   if (searchInput) searchInput.value = btn.dataset.name || '';
+
+  // Look up brewery location from OpenBreweryDB if location not already provided
+  const company = btn.dataset.company || '';
+  if (company && !btn.dataset.location) {
+    fetch('/beers/brewery-location?name=' + encodeURIComponent(company))
+      .then(r => r.json())
+      .then(data => { if (data.location) set('bf-location', data.location); })
+      .catch(() => {});
+  }
 }
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('.js-fill-beer');
