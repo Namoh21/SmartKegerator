@@ -32,9 +32,14 @@ hardware:
   # Pi 5: /dev/gpiochip4 (RP1 chip)   Pi 3/4: /dev/gpiochip0
   gpio_chip: /dev/gpiochip0
 
-  # Temperature sensors (DHT22 ambient sensor)
-  temp_sensor_power_pin: 17   # GPIO pin used to power-cycle the DHT22 on reset
-  temp_sensor_dht_pin: 22     # GPIO data pin for the DHT22
+  # Temperature / humidity sensor
+  # "aht20" — recommended for all Pi models (I2C, no pull-up resistor needed)
+  #            Wiring: VCC→3.3V  SDA→GPIO2 (pin 3)  SCL→GPIO3 (pin 5)  GND→GND
+  # "dht22" — legacy bit-bang sensor, Pi 3/4 only (NOT supported on Pi 5)
+  #            Wiring: VCC→3.3V  Data→GPIO22 + 4.7kΩ pull-up to 3.3V  GND→GND
+  temp_sensor_type: "aht20"
+  temp_sensor_power_pin: 17   # DHT22 only: GPIO pin to power-cycle sensor on error
+  temp_sensor_dht_pin: 22     # DHT22 only: GPIO data pin
 
 recognition:
   enabled: true

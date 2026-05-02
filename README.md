@@ -94,7 +94,31 @@ The installer runs unattended and handles everything:
 
 ### 4. Configure hardware
 
-Edit the config file to match your wiring:
+#### Temperature / humidity sensor
+
+| Sensor | Interface | Pi 3 | Pi 4 | Pi 5 | Notes |
+|---|---|---|---|---|---|
+| **AHT20** *(recommended)* | I2C | ✅ | ✅ | ✅ | No pull-up resistor needed |
+| DHT22 / AM2302 | Bit-bang GPIO | ✅ | ✅ | ❌ | Requires 4.7 kΩ pull-up |
+
+**AHT20 wiring (all Pi models):**
+```
+AHT20 VCC → Pi Pin 1  (3.3V)
+AHT20 SDA → Pi Pin 3  (GPIO 2)
+AHT20 SCL → Pi Pin 5  (GPIO 3)
+AHT20 GND → Pi Pin 6  (GND)
+```
+
+**DHT22 wiring (Pi 3/4 only):**
+```
+DHT22 +   → Pi Pin 1  (3.3V)  ──┬── 4.7 kΩ ──┐
+DHT22 OUT → Pi Pin 15 (GPIO 22) ─┘             │ (same 3.3V rail)
+DHT22 -   → Pi Pin 6  (GND)
+```
+> DHT22 is a 3-pin module (marked +, OUT, −) when sold as a breakout board.
+> The pull-up resistor is built into the module — no external resistor needed.
+
+#### Edit config
 
 ```bash
 nano /opt/smartkegerator/src/config.yaml
@@ -116,11 +140,11 @@ taps:
     pin: 25
 
 hardware:
+  temp_sensor_type: "aht20"   # "aht20" (all Pi models) or "dht22" (Pi 3/4 only)
   camera_index: 0
-  temp_sensor_power_pin: 17
 ```
 
-Run hardware setup to set GPIO permissions and (on Pi 3) create the
+Run hardware setup to enable I2C, set GPIO permissions, and (on Pi 3) create the
 permanent runtime swap that prevents OOM crashes during face recognition training:
 
 ```bash

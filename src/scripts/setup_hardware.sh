@@ -100,6 +100,23 @@ fi
 #    group can access it without sudo.
 # ---------------------------------------------------------------------------
 echo ""
+echo "── I2C bus (AHT20 sensor) ──"
+if grep -q "^dtparam=i2c_arm=on" "${CONFIG}" 2>/dev/null; then
+    ok "I2C already enabled"
+else
+    echo "dtparam=i2c_arm=on" >> "${CONFIG}"
+    info "I2C enabled in ${CONFIG} (required for AHT20 sensor)"
+    REBOOT_NEEDED=true
+fi
+# Add user to i2c group so the app can access /dev/i2c-* without sudo
+if groups "${REAL_USER}" | grep -q i2c; then
+    ok "User ${REAL_USER} already in i2c group"
+else
+    usermod -aG i2c "${REAL_USER}"
+    info "Added ${REAL_USER} to i2c group"
+fi
+
+echo ""
 echo "── GPIO permissions ──"
 REAL_USER="${SUDO_USER:-pi}"
 REAL_HOME=$(getent passwd "${REAL_USER}" | cut -d: -f6)
