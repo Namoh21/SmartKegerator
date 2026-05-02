@@ -472,24 +472,9 @@
             {% endif %}
 
 
-              <div class="mb-4">
-                <label class="form-label fw-semibold">Sensor power GPIO pin (BCM)</label>
-                {% if is_admin %}
-                <select class="form-select w-auto" name="temp_sensor_power_pin">
-                  {% for pin_num, pin_label in gpio_pins %}
-                  <option value="{{ pin_num }}"
-                    {% if hw.get('temp_sensor_power_pin', 17) == pin_num %}selected{% endif %}>
-                    {{ pin_label }}
-                  </option>
-                  {% endfor %}
-                </select>
-                {% else %}
-                <p class="form-control-plaintext font-monospace">GPIO {{ hw.get('temp_sensor_power_pin', 17) }}</p>
-                {% endif %}
-              </div>
-
               <div class="mb-2">
-                <label class="form-label fw-semibold">DHT22 humidity sensor GPIO pin (BCM)</label>
+                <label class="form-label fw-semibold">AHT20 temperature / humidity sensor I²C pin (BCM)</label>
+                <div class="text-muted small mb-2">AHT20 uses I²C — connect to GPIO 2 (SDA) and GPIO 3 (SCL).</div>
                 {% if is_admin %}
                 <select class="form-select w-auto" name="temp_sensor_dht_pin">
                   {% for pin_num, pin_label in gpio_pins %}

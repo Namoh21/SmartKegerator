@@ -309,13 +309,11 @@ async def settings_save_recognition(
 
 @router.post("/sensors", response_class=RedirectResponse)
 async def settings_save_sensors(
-    temp_sensor_power_pin: int = Form(17),
-    temp_sensor_dht_pin:   int = Form(22),
+    temp_sensor_dht_pin: int = Form(22),
 ):
     cfg = _read_yaml()
     cfg.setdefault("hardware", {})
-    cfg["hardware"]["temp_sensor_power_pin"] = temp_sensor_power_pin
-    cfg["hardware"]["temp_sensor_dht_pin"]   = temp_sensor_dht_pin
+    cfg["hardware"]["temp_sensor_dht_pin"] = temp_sensor_dht_pin
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=sensors", status_code=303)
 
