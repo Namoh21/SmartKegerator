@@ -22,7 +22,7 @@
         </select>
       </div>
       <div class="col-sm-4">
-        <label class="form-label small text-muted">Keg / Beer</label>
+        <label class="form-label small text-muted">Keg</label>
         <select class="form-select form-select-sm" name="keg_id">
           <option value="0" {% if selected_keg == 0 %}selected{% endif %}>All kegs</option>
           {% for keg in all_kegs %}
@@ -41,7 +41,12 @@
         </select>
       </div>
       <div class="col-sm-2">
-        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Apply</button>
+        <div class="d-flex gap-1">
+          <button type="submit" class="btn btn-sm btn-outline-secondary flex-grow-1">Apply</button>
+          <a href="/pours/" class="btn btn-sm btn-outline-secondary" title="Clear filters">
+            <i class="bi bi-x-lg"></i>
+          </a>
+        </div>
       </div>
     </div>
   </div>

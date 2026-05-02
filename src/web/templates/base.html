@@ -105,6 +105,7 @@
 
 <footer class="text-center py-3" style="border-top: 1px solid #2a2a4e; color: var(--sk-muted); font-size: .8rem;">
   {{ site_name }} &nbsp;·&nbsp; {{ current_year }}
+  {% if app_version %}&nbsp;·&nbsp; v{{ app_version }}{% endif %}
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" nonce="{{ csp_nonce }}"></script>

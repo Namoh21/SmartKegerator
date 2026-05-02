@@ -39,10 +39,16 @@
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
     <div class="card text-center py-3">
-      <div class="fs-4 fw-bold {% if stats.balance > 0 %}text-danger{% else %}text-success{% endif %}">
-        {{ stats.balance | usd }}
-      </div>
-      <div class="text-muted small">Balance owed</div>
+      {% if stats.balance > 0.005 %}
+      <div class="fs-4 fw-bold text-danger">{{ stats.balance | usd }}</div>
+      <div class="text-muted small">Owes</div>
+      {% elif stats.balance < -0.005 %}
+      <div class="fs-4 fw-bold text-success">{{ (stats.balance * -1) | usd }}</div>
+      <div class="text-muted small">Credit</div>
+      {% else %}
+      <div class="fs-4 fw-bold text-success">Settled ✓</div>
+      <div class="text-muted small">Balance</div>
+      {% endif %}
     </div>
   </div>
   <div class="col-6 col-md-3">
@@ -69,7 +75,10 @@
   <!-- ── Pour history ────────────────────────────────────────────────── -->
   <div class="col-lg-8">
     <div class="card">
-      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Pour History</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-clock-history me-2"></i>Pour History</span>
+    <span class="text-muted small">{{ total_pours }} total</span>
+  </div>
       <div class="card-body p-0">
         {% if enriched_pours %}
         <div class="table-responsive">
@@ -98,6 +107,32 @@
         <p class="text-muted p-3 mb-0">No pours recorded yet.</p>
         {% endif %}
       </div>
+      {% if total_pages > 1 %}
+      <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top border-secondary">
+        <span class="text-muted small">
+          {{ (page-1)*page_size + 1 }}–{{ [page*page_size, total_pours]|min }} of {{ total_pours }}
+        </span>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+              <a class="page-link" href="?page={{ page - 1 }}">‹</a>
+            </li>
+            {% for p in range(1, total_pages + 1) %}
+              {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+              <li class="page-item {% if p == page %}active{% endif %}">
+                <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+              </li>
+              {% elif p == page - 3 or p == page + 3 %}
+              <li class="page-item disabled"><span class="page-link">…</span></li>
+              {% endif %}
+            {% endfor %}
+            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+              <a class="page-link" href="?page={{ page + 1 }}">›</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
     </div>
   </div>
 

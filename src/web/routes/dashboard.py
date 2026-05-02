@@ -33,9 +33,13 @@ async def dashboard(request: Request):
 
     tap_stats, tap_names = _build_tap_stats(db, taps, config)
 
-    # Recent pours (last 20)
-    all_pours = db.get_pours_since(time.time() - 30 * 86400)
-    recent    = sorted(all_pours, key=lambda p: p.time, reverse=True)[:20]
+    now         = time.time()
+    from datetime import datetime as _dt
+    today_start = _dt.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+    all_pours   = db.get_pours_since(now - 30 * 86400)
+    today_pours = [p for p in all_pours if p.time >= today_start]
+    recent      = sorted(all_pours, key=lambda p: p.time, reverse=True)[:20]
 
     users          = {u.id: u.name for u in db.get_all_users()}
     keg_beer_cache: dict[int, str] = {}
@@ -55,7 +59,10 @@ async def dashboard(request: Request):
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        ctx(request, tap_stats=tap_stats, tap_names=tap_names, enriched_pours=enriched_pours),
+        ctx(request, tap_stats=tap_stats, tap_names=tap_names, enriched_pours=enriched_pours,
+            today_count=len(today_pours),
+            today_oz=round(sum(p.ounces for p in today_pours), 1),
+            today_revenue=sum(p.price for p in today_pours)),
     )
 
 

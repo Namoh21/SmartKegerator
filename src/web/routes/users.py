@@ -4,7 +4,7 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Form, Request, Response
+from fastapi import APIRouter, Form, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from data.models import User, UNKNOWN_USER_ID
@@ -34,18 +34,26 @@ async def user_list(request: Request):
     )
 
 
+_DETAIL_PAGE_SIZE = 25
+
+
 @router.get("/{user_id}", response_class=HTMLResponse)
-async def user_detail(user_id: int, request: Request):
+async def user_detail(user_id: int, request: Request, page: int = Query(default=1, ge=1)):
     db   = get_db()
     user = db.get_user(user_id)
     if not user:
         return RedirectResponse("/users/", status_code=302)
 
-    stats  = user_stats(db, user_id)
-    pours  = sorted(db.get_pours_for_user(user_id), key=lambda p: p.time, reverse=True)
-    pays   = sorted(db.get_payments_for_user(user_id), key=lambda p: p.time, reverse=True)
+    stats = user_stats(db, user_id)
+    pays  = sorted(db.get_payments_for_user(user_id), key=lambda p: p.time, reverse=True)
 
-    # Enrich pours with beer names
+    # Paginated pours for this user
+    since = 0.0
+    pours_page, total_pours = db.get_pours_filtered(
+        since, user_id=user_id, limit=_DETAIL_PAGE_SIZE, offset=(page - 1) * _DETAIL_PAGE_SIZE
+    )
+    total_pages = max(1, (total_pours + _DETAIL_PAGE_SIZE - 1) // _DETAIL_PAGE_SIZE)
+
     keg_beer_cache: dict[int, str] = {}
     def beer_for_keg(keg_id: int) -> str:
         if keg_id not in keg_beer_cache:
@@ -54,10 +62,8 @@ async def user_detail(user_id: int, request: Request):
             keg_beer_cache[keg_id] = beer.name if beer else "Unknown"
         return keg_beer_cache[keg_id]
 
-    enriched = [{"pour": p, "beer_name": beer_for_keg(p.keg_id)} for p in pours]
+    enriched = [{"pour": p, "beer_name": beer_for_keg(p.keg_id)} for p in pours_page]
 
-    # Build (path, url) pairs for the template
-    photos_dir = Path(get_config()["data"]["user_photos_dir"])
     photo_items = [
         (p, f"/photos/{user_id}/{Path(p).name}")
         for p in user.image_paths
@@ -68,7 +74,9 @@ async def user_detail(user_id: int, request: Request):
         "user_detail.html",
         ctx(request, user=user, stats=stats, enriched_pours=enriched,
             payments=pays, photo_items=photo_items,
-            is_unknown_user=(user_id == UNKNOWN_USER_ID)),
+            is_unknown_user=(user_id == UNKNOWN_USER_ID),
+            page=page, total_pages=total_pages, total_pours=total_pours,
+            page_size=_DETAIL_PAGE_SIZE),
     )
 
 

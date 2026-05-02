@@ -12,34 +12,24 @@
 </div>
 
 {% if is_admin %}
+<!-- ── Low keg warnings ──────────────────────────────────────────────── -->
+{% for s in stats %}{% if s.keg.percent_remaining <= 5 %}
+<div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-2" role="alert">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <span><strong>{{ s.beer.name if s.beer else "Keg #" + s.keg.id|string }}</strong> is almost empty — {{ s.keg.percent_remaining | int }}% remaining ({{ "%.1f"|format(s.keg.liters_remaining) }} L).</span>
+</div>
+{% elif s.keg.percent_remaining <= 15 %}
+<div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-2" role="alert">
+  <i class="bi bi-exclamation-circle-fill fs-5"></i>
+  <span><strong>{{ s.beer.name if s.beer else "Keg #" + s.keg.id|string }}</strong> is running low — {{ s.keg.percent_remaining | int }}% remaining.</span>
+</div>
+{% endif %}{% endfor %}
+
 <!-- ── Tap Assignment Panel ─────────────────────────────────────────── -->
 <div class="card mb-4">
   <div class="card-header"><i class="bi bi-diagram-3 me-2"></i>Tap Assignments</div>
-  <div class="card-body">
-    <div class="row g-3">
-      {% for tap_id, tap_display in configured_taps %}
-      {% set current_keg_id = taps.get_keg_id(tap_id) %}
-      <div class="col-md-{{ (12 // configured_taps|length) }}">
-        <form method="post" action="/kegs/assign-tap" class="d-flex gap-2 align-items-end">
-          <input type="hidden" name="tap" value="{{ tap_id }}">
-          <div class="flex-grow-1">
-            <label class="form-label tap-label">{{ tap_display | upper }}</label>
-            <select class="form-select" name="keg_id">
-              <option value="none" {% if current_keg_id is none %}selected{% endif %}>— Empty —</option>
-              {% for keg in all_kegs %}
-              {% set b = namespace(name="Unknown") %}
-              {% for s in stats %}{% if s.keg.id == keg.id %}{% set b.name = s.beer.name if s.beer else "Unknown" %}{% endif %}{% endfor %}
-              <option value="{{ keg.id }}" {% if keg.id == current_keg_id %}selected{% endif %}>
-                #{{ keg.id }} · {{ b.name }} ({{ keg.percent_remaining | pct }} left)
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <button type="submit" class="btn btn-sm btn-outline-secondary">Set</button>
-        </form>
-      </div>
-      {% endfor %}
-    </div>
+  <div class="card-body" id="tap-assignment-panel">
+    {% include "partials/tap_assignment_panel.html" %}
   </div>
 </div>
 

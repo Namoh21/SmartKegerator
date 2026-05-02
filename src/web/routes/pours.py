@@ -69,8 +69,8 @@ async def pour_history(
     total_oz    = sum(p.ounces for p in all_pours)
     total_price = sum(p.price  for p in all_pours)
 
-    # Chart data: oz poured per day (last 30 days max)
-    chart_days = min(days or 30, 30)
+    # Chart data: oz poured per day (capped at 90 days for readability)
+    chart_days = min(days or 90, 90)
     now_dt     = datetime.now()
     day_labels = [
         (now_dt - __import__("datetime").timedelta(days=i)).strftime("%b %d")

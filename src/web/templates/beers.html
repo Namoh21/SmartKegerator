@@ -12,6 +12,12 @@
 </div>
 
 <div class="card">
+  {% if beers %}
+  <div class="card-header p-2">
+    <input type="search" id="beer-search" class="form-control form-control-sm"
+           placeholder="Search beers, brewery, style…" autocomplete="off">
+  </div>
+  {% endif %}
   <div class="card-body p-0">
     {% if beers %}
     <div class="table-responsive">
@@ -73,7 +79,13 @@
       </table>
     </div>
     {% else %}
-    <p class="text-muted p-3">No beers yet — use the beer search to add one.</p>
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-list-ul fs-1 d-block mb-2"></i>
+      No beers yet.
+      {% if is_admin %}
+      <div class="mt-2 small">Click <strong>Add Beer</strong> above and search the catalog to get started.</div>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
 </div>
@@ -168,5 +180,17 @@ document.addEventListener('click', function(e) {
 document.addEventListener('beerSearchWarning', function(e) {
   alert(e.detail?.value || 'catalog.beer API key not configured. Go to Settings → Beer DB to add it.');
 });
+
+// Client-side beer table filter
+(function() {
+  const input = document.getElementById('beer-search');
+  if (!input) return;
+  input.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('tbody tr').forEach(function(row) {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+})();
 </script>
 {% endblock %}

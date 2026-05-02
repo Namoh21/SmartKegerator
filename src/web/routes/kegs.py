@@ -97,12 +97,29 @@ async def keg_delete(keg_id: int):
     return RedirectResponse("/kegs/", status_code=303)
 
 
-@router.post("/assign-tap", response_class=RedirectResponse)
+@router.post("/assign-tap", response_class=HTMLResponse)
 async def assign_tap(
-    tap:    str = Form(...),
-    keg_id: str = Form(...),
+    request: Request,
+    tap:     str = Form(...),
+    keg_id:  str = Form(...),
 ):
     db         = get_db()
+    config     = get_config()
     keg_id_int = int(keg_id) if keg_id and keg_id != "none" else None
     db.set_tap(tap, keg_id_int)
+
+    if request.headers.get("HX-Request"):
+        taps     = db.get_tap_assignments()
+        all_kegs = db.get_all_kegs()
+        keg_tap_map: dict[int, str] = {}
+        for tap_id, display_name in get_configured_taps(config):
+            kid = taps.get_keg_id(tap_id)
+            if kid is not None:
+                keg_tap_map[kid] = display_name
+        stats = [keg_stats(db, k, tap=keg_tap_map.get(k.id)) for k in all_kegs]
+        return templates.TemplateResponse(
+            request, "partials/tap_assignment_panel.html",
+            ctx(request, taps=taps, all_kegs=all_kegs, stats=stats,
+                configured_taps=get_configured_taps(config)),
+        )
     return RedirectResponse("/kegs/", status_code=303)

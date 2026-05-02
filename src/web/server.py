@@ -455,6 +455,13 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 _setup_templates(templates)
 
 
+def _app_version() -> str:
+    try:
+        return (Path(__file__).parent.parent / "VERSION").read_text().strip()
+    except Exception:
+        return ""
+
+
 def ctx(request: Request, **kwargs) -> dict:
     """Build a base template context dict (always includes is_admin)."""
     try:
@@ -472,6 +479,7 @@ def ctx(request: Request, **kwargs) -> dict:
         "site_name":      _site_name(_config),
         "theme_vars":     _css_vars(_config),
         "csp_nonce":      nonce,
+        "app_version":    _app_version(),
         **kwargs,
     }
 
