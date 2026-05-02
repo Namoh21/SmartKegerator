@@ -666,13 +666,23 @@ async def check_updates(request: Request):
             f'Could not reach GitHub: {exc}</span>'
         )
 
+    # Fetch remote VERSION file so we can show the version number, not a commit hash
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            ver_resp = await client.get(
+                f"https://raw.githubusercontent.com/{_GITHUB_OWNER}/{_GITHUB_REPO}/{branch}/src/VERSION"
+            )
+        remote_version = ver_resp.text.strip() if ver_resp.status_code == 200 else remote_sha
+    except Exception:
+        remote_version = remote_sha
+
     if remote_sha and local_hash != "unknown" and remote_sha == local_hash:
         return HTMLResponse(
             '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Up to date.</span>'
         )
     return HTMLResponse(
         f'<span class="text-info"><i class="bi bi-arrow-down-circle me-1"></i>'
-        f'Update available on <strong>{branch}</strong> (remote: <code>{remote_sha}</code>). '
+        f'Version <strong>{remote_version}</strong> available on <strong>{branch}</strong>. '
         f'Click <strong>Update Now</strong> to apply.</span>'
     )
 
