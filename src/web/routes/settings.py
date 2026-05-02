@@ -698,9 +698,36 @@ _UPDATE_LOG  = Path("/tmp/sk-update.log")
 _UPDATE_DONE = Path("/tmp/sk-update.done")
 
 
+def _run_update_thread() -> None:
+    """Run update.sh in a background thread, writing output to a log file."""
+    import time as _t
+    _t.sleep(0.5)
+    try:
+        with open(_UPDATE_LOG, "wb") as f:
+            proc = subprocess.Popen(
+                ["sudo", "bash", str(_UPDATE_SCRIPT)],
+                stdout=f,
+                stderr=subprocess.STDOUT,
+                env=_wayland_env(),
+            )
+            proc.wait()
+    except Exception as exc:
+        try:
+            with open(_UPDATE_LOG, "ab") as f:
+                f.write(f"\n[ERROR] {exc}\n".encode())
+        except Exception:
+            pass
+    # Write done marker — may not be read if service restarts first
+    try:
+        _UPDATE_DONE.write_text("done")
+    except Exception:
+        pass
+
+
 @router.post("/update-now", response_class=HTMLResponse)
 async def update_now(request: Request):
-    """Start update.sh, stream its output via SSE."""
+    """Start update.sh in a thread and return an SSE log panel."""
+    import threading
     admin = request.session.get("admin_username", "unknown")
     log.warning("System update requested by admin=%s from %s", admin,
                 request.client.host if request.client else "unknown")
@@ -717,28 +744,8 @@ async def update_now(request: Request):
         except FileNotFoundError:
             pass
 
-    async def _run():
-        await asyncio.sleep(0.5)
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "sudo", "bash", str(_UPDATE_SCRIPT),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=_wayland_env(),
-            )
-            with open(_UPDATE_LOG, "wb") as f:
-                async for line in proc.stdout:
-                    f.write(line)
-                    f.flush()
-            await proc.wait()
-        except Exception as exc:
-            with open(_UPDATE_LOG, "ab") as f:
-                f.write(f"\n[ERROR] {exc}\n".encode())
-        _UPDATE_DONE.write_text("done")
+    threading.Thread(target=_run_update_thread, daemon=True).start()
 
-    asyncio.create_task(_run())
-
-    from fastapi.responses import HTMLResponse as _HR
     resp = templates.TemplateResponse(
         request, "partials/update_log.html", ctx(request),
     )
@@ -748,25 +755,26 @@ async def update_now(request: Request):
 
 @router.get("/update-stream")
 async def update_stream():
-    """SSE endpoint — streams the running update log to the browser."""
+    """SSE endpoint — tails the update log file and pushes lines to the browser."""
+    import time as _t
     from fastapi.responses import StreamingResponse
 
     async def generate():
         pos      = 0
-        deadline = asyncio.get_event_loop().time() + 600
+        deadline = _t.monotonic() + 600   # 10-minute safety cutoff
         ka_tick  = 0
 
-        while asyncio.get_event_loop().time() < deadline:
-            # Send new log content
+        while _t.monotonic() < deadline:
+            # Push any new log bytes
             if _UPDATE_LOG.exists():
-                text = _UPDATE_LOG.read_bytes()
-                if len(text) > pos:
-                    chunk = text[pos:].decode(errors="replace")
-                    pos   = len(text)
+                raw = _UPDATE_LOG.read_bytes()
+                if len(raw) > pos:
+                    chunk = raw[pos:].decode(errors="replace")
+                    pos   = len(raw)
                     for line in chunk.splitlines():
                         yield f"data: {line}\n\n"
 
-            # Signal completion if done file appeared
+            # Signal clean completion
             if _UPDATE_DONE.exists():
                 yield "event: complete\ndata: done\n\n"
                 try:
@@ -775,7 +783,7 @@ async def update_stream():
                     pass
                 return
 
-            # Keepalive every ~15 s so proxies don't close idle connections
+            # Keepalive comment every ~15 s to prevent proxy timeouts
             ka_tick += 1
             if ka_tick % 50 == 0:
                 yield ": keepalive\n\n"

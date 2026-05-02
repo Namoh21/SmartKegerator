@@ -921,8 +921,7 @@
                       hx-post="/settings/update-now"
                       hx-target="#update-now-result"
                       hx-swap="innerHTML"
-                      hx-disabled-elt="this"
-                      hx-on::before-request="if(!confirm('This will pull the latest code and restart services. Continue?')){htmx.trigger(this,'cancel');return false;}">
+                      hx-confirm="This will pull the latest code and restart services. Continue?">
                 <i class="bi bi-cloud-download me-1"></i>Update Now
               </button>
             </div>
