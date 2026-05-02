@@ -3,45 +3,25 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from web.server import get_db, templates
+from web.server import get_db
 
 router = APIRouter()
 
-_ERRORS = {
-    "empty":  "A display name is required.",
-    "taken":  "That name is already taken — choose a different one.",
-}
-
 
 # ---------------------------------------------------------------------------
-# Self-registration — creates a user profile (no password required).
-# Identity on the touchscreen is handled by facial recognition.
+# /register — previously public self-registration.
+# Redirected to admin login; user creation is now admin-only on the web.
+# Touchscreen self-registration is handled in the Qt UsersWindow.
 # ---------------------------------------------------------------------------
 
-@router.get("/register", response_class=HTMLResponse)
+@router.get("/register", response_class=RedirectResponse)
 async def register_page(request: Request):
-    error = _ERRORS.get(request.query_params.get("error", ""))
-    return templates.TemplateResponse(
-        request, "register.html",
-        {"request": request, "error": error, "csp_nonce": getattr(request.state, "csp_nonce", "")},
-    )
+    return RedirectResponse("/admin/login?next=/users/", status_code=303)
 
 
 @router.post("/register", response_class=RedirectResponse)
-async def register_submit(
-    request: Request,
-    name:    str = Form(...),
-):
-    name = name.strip()
-    if not name:
-        return RedirectResponse("/register?error=empty", status_code=303)
-
-    db   = get_db()
-    user = db.register_user(name)
-    if user is None:
-        return RedirectResponse("/register?error=taken", status_code=303)
-
-    return RedirectResponse("/users/", status_code=303)
+async def register_submit(request: Request, name: str = Form(...)):
+    return RedirectResponse("/admin/login?next=/users/", status_code=303)
 
 
 # ---------------------------------------------------------------------------

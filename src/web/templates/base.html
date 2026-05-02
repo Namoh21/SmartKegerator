@@ -87,9 +87,6 @@
         </li>
         {% else %}
         <li class="nav-item d-flex align-items-center gap-2">
-          <a href="/register" class="btn btn-sm btn-outline-info" title="Create a user profile">
-            <i class="bi bi-person-plus me-1"></i>Add me
-          </a>
           <a href="/admin/login?next={{ request.url.path | urlencode }}"
              class="btn btn-sm btn-outline-secondary btn-sm" style="font-size:.75rem;">
             Admin
