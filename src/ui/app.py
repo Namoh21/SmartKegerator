@@ -167,6 +167,12 @@ class App(QObject):
         # Main window navigation
         self._main_window.settings_requested.connect(self._open_settings)
 
+        # Dashboard auto-refresh (stats + recent pours) every 60 s
+        self._dashboard_timer = QTimer(self)
+        self._dashboard_timer.setInterval(60_000)
+        self._dashboard_timer.timeout.connect(self._main_window.refresh)
+        self._dashboard_timer.start()
+
         # Web-initiated camera capture (DB polling IPC)
         self._capture_timer = QTimer(self)
         self._capture_timer.setInterval(2000)
