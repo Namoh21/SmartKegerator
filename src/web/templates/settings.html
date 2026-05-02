@@ -1156,7 +1156,7 @@ document.body.addEventListener('startUpdateStream', function() {
     if (badge) { badge.className = 'badge bg-success'; badge.textContent = 'Complete'; }
     output.textContent += '\n✓ Update complete. Reloading page…\n';
     output.scrollTop = output.scrollHeight;
-    setTimeout(() => location.reload(), 2000);
+    setTimeout(() => location.assign('/settings/?tab=updates'), 2000);
   });
 
   // Connection dropped — services restarting
@@ -1167,12 +1167,12 @@ document.body.addEventListener('startUpdateStream', function() {
     output.scrollTop = output.scrollHeight;
 
     function poll() {
-      fetch('/settings/')
+      fetch('/settings/?tab=updates')
         .then(function(r) {
           if (r.ok) {
             output.textContent += '✓ Server is back. Reloading…\n';
             output.scrollTop = output.scrollHeight;
-            setTimeout(() => location.reload(), 1500);
+            setTimeout(() => location.assign('/settings/?tab=updates'), 1500);
           } else {
             setTimeout(poll, 2000);
           }
