@@ -481,6 +481,7 @@ if [[ "${REPO_SRC}" != "${SRC_DIR}" ]]; then
     section "Copying source files to ${SRC_DIR}"
     cp -r "${REPO_SRC}/." "${SRC_DIR}/"
     chown -R "${REAL_USER}:${REAL_USER}" "${SRC_DIR}"
+    chown "${REAL_USER}:${REAL_USER}" "${INSTALL_DIR}"
     info "Source files copied."
 fi
 

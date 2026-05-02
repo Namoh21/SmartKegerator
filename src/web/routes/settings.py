@@ -592,6 +592,13 @@ _CHANNEL_FILE   = Path("/opt/smartkegerator/update_channel")
 
 
 def _read_channel() -> str:
+    # DB is the primary store; file is a fallback written for update.sh
+    try:
+        v = get_db().get_setting("update_channel", "")
+        if v in ("master", "dev"):
+            return v
+    except Exception:
+        pass
     if _CHANNEL_FILE.exists():
         v = _CHANNEL_FILE.read_text().strip()
         if v in ("master", "dev"):
@@ -600,11 +607,16 @@ def _read_channel() -> str:
 
 
 def _write_channel(channel: str) -> None:
+    # Always save to DB (web service has write access)
     try:
-        _CHANNEL_FILE.parent.mkdir(parents=True, exist_ok=True)
+        get_db().set_setting("update_channel", channel)
+    except Exception as exc:
+        log.warning("Could not save update_channel to DB: %s", exc)
+    # Also write the file that update.sh reads directly
+    try:
         _CHANNEL_FILE.write_text(channel + "\n")
     except Exception as exc:
-        log.warning("Could not write channel file: %s", exc)
+        log.warning("Could not write channel file (update.sh fallback): %s", exc)
 
 
 def _read_version() -> str:
@@ -648,49 +660,34 @@ async def save_update_channel(channel: str = Form("master")):
 
 @router.get("/check-updates", response_class=HTMLResponse)
 async def check_updates(request: Request):
-    """HTMX endpoint — compares local commit to GitHub latest on the selected branch."""
-    local_hash = _read_git_hash()
-    channel    = _read_channel()
-    branch     = "master" if channel == "master" else "dev"
+    """HTMX endpoint — compares local VERSION file to remote branch on GitHub."""
+    channel       = _read_channel()
+    branch        = "master" if channel == "master" else "dev"
+    local_version = _read_version()
+
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                f"https://api.github.com/repos/{_GITHUB_OWNER}/{_GITHUB_REPO}/commits/{branch}",
-                headers={"Accept": "application/vnd.github.v3+json"},
+                f"https://raw.githubusercontent.com/{_GITHUB_OWNER}/{_GITHUB_REPO}/{branch}/src/VERSION",
+                headers={"Cache-Control": "no-cache"},
             )
         resp.raise_for_status()
-        remote_sha = resp.json().get("sha", "")[:7]
+        remote_version = resp.text.strip()
     except Exception as exc:
         return HTMLResponse(
             f'<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>'
             f'Could not reach GitHub: {exc}</span>'
         )
 
-    # Fetch remote VERSION file so we can show the version number, not a commit hash
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            ver_resp = await client.get(
-                f"https://raw.githubusercontent.com/{_GITHUB_OWNER}/{_GITHUB_REPO}/{branch}/src/VERSION"
-            )
-        remote_version = ver_resp.text.strip() if ver_resp.status_code == 200 else remote_sha
-    except Exception:
-        remote_version = remote_sha
-
-    local_version = _read_version()
-
-    # Up to date if git hashes match OR version strings match
-    hashes_match  = bool(remote_sha and local_hash != "unknown" and remote_sha == local_hash)
-    versions_match = bool(remote_version and local_version and remote_version == local_version)
-
-    if hashes_match or versions_match:
+    if remote_version == local_version:
         return HTMLResponse(
             f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
-            f'Up to date — v{local_version}.</span>'
+            f'Up to date — v{local_version} on <strong>{branch}</strong>.</span>'
         )
     return HTMLResponse(
         f'<span class="text-info"><i class="bi bi-arrow-down-circle me-1"></i>'
-        f'Version <strong>{remote_version}</strong> available on <strong>{branch}</strong>. '
-        f'Click <strong>Update Now</strong> to apply.</span>'
+        f'Version <strong>{remote_version}</strong> available on <strong>{branch}</strong> '
+        f'(current: v{local_version}). Click <strong>Update Now</strong> to apply.</span>'
     )
 
 

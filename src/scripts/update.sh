@@ -37,9 +37,17 @@ if [[ ! -d "${REPO_DIR}/.git" ]]; then
 fi
 REPO_SRC="${REPO_DIR}/src"
 CHANNEL_FILE="${INSTALL_DIR}/update_channel"
+DB_PATH="${INSTALL_DIR}/data/smartkegerator.db"
 BRANCH="master"
+# Prefer the channel file; fall back to the DB setting (written by the web UI)
 if [[ -f "${CHANNEL_FILE}" ]]; then
     BRANCH=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
+elif [[ -f "${DB_PATH}" ]] && command -v sqlite3 &>/dev/null; then
+    BRANCH=$(sqlite3 "${DB_PATH}" \
+        "SELECT value FROM settings WHERE key='update_channel' LIMIT 1;" 2>/dev/null || echo "master")
+    BRANCH=$(echo "${BRANCH}" | tr -d '[:space:]')
+    # Write the file for next time so we don't need sqlite3
+    echo "${BRANCH}" > "${CHANNEL_FILE}" 2>/dev/null || true
 fi
 [[ "${BRANCH}" == "dev" || "${BRANCH}" == "master" ]] || BRANCH="master"
 info "Update channel: ${BRANCH}"
