@@ -108,6 +108,57 @@ async def add_payment(user_id: int, amount: float = Form(...)):
 
 
 # ---------------------------------------------------------------------------
+# User thumbnail — server-side center-cropped square JPEG
+# ---------------------------------------------------------------------------
+
+@router.get("/{user_id}/thumbnail")
+async def user_thumbnail(user_id: int):
+    """Return an 80×80 center-cropped JPEG thumbnail for the user's first photo.
+    Generated on the fly from the original training photo using OpenCV."""
+    import io
+    import cv2
+    import numpy as np
+
+    db   = get_db()
+    user = db.get_user(user_id)
+    if not user or not user.image_paths:
+        return Response(status_code=204)
+
+    # Use the most recent photo
+    img_path = user.image_paths[-1]
+    if not Path(img_path).exists():
+        return Response(status_code=204)
+
+    try:
+        img = cv2.imread(img_path)
+        if img is None:
+            return Response(status_code=204)
+
+        h, w = img.shape[:2]
+        # Crop to a center square
+        side = min(h, w)
+        x = (w - side) // 2
+        y = (h - side) // 2
+        cropped = img[y:y + side, x:x + side]
+
+        # Resize to 80×80
+        thumb = cv2.resize(cropped, (80, 80), interpolation=cv2.INTER_AREA)
+
+        # Encode as JPEG
+        ok, buf = cv2.imencode(".jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not ok:
+            return Response(status_code=204)
+
+        return Response(
+            content=bytes(buf),
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+    except Exception:
+        return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
 # Camera preview (served from the JPEG the Qt app writes periodically)
 # ---------------------------------------------------------------------------
 
