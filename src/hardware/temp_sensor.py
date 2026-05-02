@@ -20,18 +20,22 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 log = logging.getLogger(__name__)
 
+import os
+from hardware.pi_model import pi_generation as _pi_gen
+
+# adafruit-blinka selects its GPIO backend at import time via environment
+# variables.  On Pi 5 the RPi.GPIO backend doesn't exist; BLINKA_LGPIO=1
+# tells blinka to use the lgpio C library instead.  This must be set
+# before any adafruit/blinka import occurs.
+if _pi_gen() == 5:
+    os.environ.setdefault("BLINKA_LGPIO", "1")
+    log.debug("Pi 5 detected — using lgpio backend for adafruit_dht")
+
 try:
     import adafruit_dht
     import board as _board
     _DHT_AVAILABLE = True
-    # Log which GPIO backend adafruit_blinka resolved to so Pi 5 issues are
-    # visible in the log without having to read the source.
-    try:
-        import adafruit_blinka.microcontroller.generic_linux.libgpiod_pin as _gp
-        _backend = "lgpio/libgpiod"
-    except Exception:
-        _backend = "RPi.GPIO or unknown"
-    log.debug("adafruit_dht available (backend: %s)", _backend)
+    log.debug("adafruit_dht imported successfully")
 except ImportError:
     _DHT_AVAILABLE = False
     log.warning("adafruit_dht not available — DHT22 readings will be stubbed (dev/non-Pi mode)")

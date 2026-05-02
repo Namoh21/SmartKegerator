@@ -420,6 +420,7 @@ fi
 REMAINING_PKGS=(
     "numpy<2"
     "pyqtgraph"
+    "lgpio"
     "rpi-lgpio"
     "adafruit-circuitpython-dht"
     "fastapi>=0.110"
