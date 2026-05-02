@@ -49,6 +49,16 @@ else
 fi
 info "Source files updated (config.yaml, database, and photos unchanged)."
 
+# Strip Windows CRLF line endings from all text source files.
+# .gitattributes enforces eol=lf in the repo, but rsync from a Windows
+# working tree can still carry CRLF into /opt. CRLF in a bash shebang
+# (#!/usr/bin/env bash\r) causes systemd exit code 203/EXEC.
+info "Stripping CRLF from source files…"
+find "${SRC_DIR}" \( -name "*.sh" -o -name "*.py" -o -name "*.html" \
+    -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" \
+    -o -name "*.md"  -o -name "*.txt" -o -name "*.conf" \) \
+    -exec sed -i 's/\r$//' {} \;
+
 # ---------------------------------------------------------------------------
 # 2b. Ensure sudoers rule exists for web-initiated reboot
 # ---------------------------------------------------------------------------

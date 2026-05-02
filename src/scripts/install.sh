@@ -483,6 +483,14 @@ if [[ "${REPO_SRC}" != "${SRC_DIR}" ]]; then
     info "Source files copied."
 fi
 
+# Strip Windows CRLF line endings — CRLF in a bash shebang causes
+# systemd exit code 203/EXEC and prevents services from starting.
+info "Stripping CRLF from source files…"
+find "${SRC_DIR}" \( -name "*.sh" -o -name "*.py" -o -name "*.html" \
+    -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" \
+    -o -name "*.md"  -o -name "*.txt" -o -name "*.conf" \) \
+    -exec sed -i 's/\r$//' {} \;
+
 # config.yaml — always recreate from template on install so settings are reset.
 # The database is preserved (backed up and restored below).
 CONFIG="${SRC_DIR}/config.yaml"
