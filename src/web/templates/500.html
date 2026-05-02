@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}500 — Server Error{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <i class="bi bi-exclamation-triangle" style="font-size:4rem;color:var(--sk-accent);"></i>
+  <h2 class="mt-3">Something Went Wrong</h2>
+  <p class="text-muted">An internal error occurred. Check the service logs for details.</p>
+  <a href="/" class="btn btn-accent mt-2"><i class="bi bi-house me-1"></i>Go Home</a>
+</div>
+{% endblock %}

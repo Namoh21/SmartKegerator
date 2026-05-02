@@ -108,6 +108,66 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" nonce="{{ csp_nonce }}"></script>
+
+{% if is_admin and config.get('web', {}).get('admin_timeout_minutes') %}
+{% set _timeout_ms = (config['web']['admin_timeout_minutes'] * 60 * 1000) | int %}
+<!-- Session timeout warning — warns 60 s before expiry -->
+<div class="modal fade" id="sessionWarningModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content" style="background:var(--sk-card);">
+      <div class="modal-body text-center py-4">
+        <i class="bi bi-clock-history text-warning" style="font-size:2rem;"></i>
+        <p class="mt-2 mb-1 fw-semibold">Session expiring soon</p>
+        <p class="text-muted small mb-3">You will be logged out in <span id="session-countdown">60</span>s.</p>
+        <form method="post" action="/settings/ping" class="d-inline">
+          <button type="submit" class="btn btn-accent btn-sm">Stay logged in</button>
+        </form>
+        <form method="post" action="/admin/logout" class="d-inline ms-2">
+          <button type="submit" class="btn btn-secondary btn-sm">Log out now</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script nonce="{{ csp_nonce }}">
+(function() {
+  var timeoutMs  = {{ _timeout_ms }};
+  var warnBefore = 60000;   // warn 60 s before expiry
+  var warnAt     = timeoutMs - warnBefore;
+  var modal, countdown, tick;
+
+  function showWarning() {
+    modal     = new bootstrap.Modal(document.getElementById('sessionWarningModal'));
+    countdown = document.getElementById('session-countdown');
+    var secs  = 60;
+    countdown.textContent = secs;
+    tick = setInterval(function() {
+      secs--;
+      if (countdown) countdown.textContent = secs;
+      if (secs <= 0) {
+        clearInterval(tick);
+        location.assign('/admin/login?error=expired');
+      }
+    }, 1000);
+    modal.show();
+  }
+
+  // Reset timer on any user activity
+  var timer;
+  function reset() {
+    clearTimeout(timer);
+    if (modal) { modal.hide(); clearInterval(tick); modal = null; }
+    timer = setTimeout(showWarning, warnAt);
+  }
+
+  ['click','keydown','mousemove','touchstart'].forEach(function(ev) {
+    document.addEventListener(ev, reset, { passive: true });
+  });
+  reset();
+})();
+</script>
+{% endif %}
+
 {% block scripts %}{% endblock %}
 </body>
 </html>

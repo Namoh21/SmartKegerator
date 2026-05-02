@@ -437,7 +437,12 @@ app.add_middleware(
 app.add_middleware(_RateLimitMiddleware)
 app.add_middleware(_SecurityHeaders)
 app.add_middleware(_AdminAuthMiddleware)
-app.add_middleware(SessionMiddleware, secret_key=_SESSION_SECRET, https_only=False)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_SESSION_SECRET,
+    https_only=False,   # set True in prod when SSL is enabled
+    same_site="lax",    # blocks CSRF from cross-site POSTs; lax allows top-level nav
+)
 
 # ---------------------------------------------------------------------------
 # Templates + context helper
@@ -472,6 +477,28 @@ def ctx(request: Request, **kwargs) -> dict:
 from web.routes import dashboard, beers, kegs, users, pours, settings, catalog_beer  # noqa: E402
 from web.routes import admin, auth                                                     # noqa: E402
 from web.routes.api import router as api_router                                        # noqa: E402
+
+from starlette.exceptions import HTTPException as StarletteHTTPException   # noqa: E402
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        return templates.TemplateResponse(
+            request, "404.html", ctx(request), status_code=404
+        )
+    if exc.status_code == 500:
+        return templates.TemplateResponse(
+            request, "500.html", ctx(request), status_code=500
+        )
+    return Response(str(exc.detail), status_code=exc.status_code)
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    import logging as _log
+    _log.getLogger(__name__).exception("Unhandled exception on %s", request.url.path)
+    return templates.TemplateResponse(
+        request, "500.html", ctx(request), status_code=500
+    )
 
 app.include_router(dashboard.router)
 app.include_router(beers.router)

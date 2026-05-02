@@ -29,8 +29,14 @@ def _extract_items(data) -> list:
     return []
 
 
+def _is_admin(request: Request) -> bool:
+    return bool(request.session.get("admin_username"))
+
+
 @router.get("/beers/search", response_class=HTMLResponse)
 async def search(request: Request, catalog_q: str = Query("")):
+    if not _is_admin(request):
+        return HTMLResponse("", status_code=403)
     q = catalog_q.strip()
     if len(q) < 2:
         return HTMLResponse("")
@@ -122,8 +128,10 @@ async def test_connection(request: Request):
 
 
 @router.get("/beers/brewery-location", response_class=JSONResponse)
-async def brewery_location(name: str = Query("")):
+async def brewery_location(request: Request, name: str = Query("")):
     """Proxy to OpenBreweryDB — returns city/state for a brewery name."""
+    if not _is_admin(request):
+        return JSONResponse({}, status_code=403)
     name = name.strip()
     if not name:
         return JSONResponse({})

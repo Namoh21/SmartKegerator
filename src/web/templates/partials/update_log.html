@@ -7,9 +7,12 @@
     </span>
   </div>
   <pre id="update-log-output"
-       data-stream="true"
+       hx-get="/settings/update-log"
+       hx-trigger="every 1s"
+       hx-target="this"
+       hx-swap="innerHTML"
        style="background:#0d1117;color:#58a6ff;font-size:.72rem;height:220px;
               overflow-y:auto;border-radius:6px;padding:.6rem;margin:0;
-              white-space:pre-wrap;word-break:break-all;">Connecting to update stream…
+              white-space:pre-wrap;word-break:break-all;">Starting update…
 </pre>
 </div>

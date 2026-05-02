@@ -10,6 +10,7 @@ Admins set their PIN through the web Settings → Administrators page.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Optional
 
 from PyQt6.QtCore import Qt
@@ -25,6 +26,10 @@ from ui.theme import get as _get_theme
 log = logging.getLogger(__name__)
 
 
+_PIN_MAX_ATTEMPTS = 5
+_PIN_LOCKOUT_SECS = 300   # 5 minutes
+
+
 class PinLoginDialog(QDialog):
     """Two-step modal: pick your name → enter PIN."""
 
@@ -37,6 +42,8 @@ class PinLoginDialog(QDialog):
         self._pin    = ""
         self._auth_user_id: Optional[int]  = None
         self._auth_admin:   Optional[dict] = None
+        self._fail_count: int   = 0
+        self._locked_until: float = 0.0
 
         self.setWindowTitle("Admin Login")
         self.setModal(True)
@@ -236,6 +243,16 @@ class PinLoginDialog(QDialog):
         try:
             if not self._selected or not self._pin:
                 return
+
+            # Lockout check
+            now = time.monotonic()
+            if now < self._locked_until:
+                remaining = int(self._locked_until - now)
+                self._lbl_error.setText(f"Too many attempts — wait {remaining}s.")
+                self._pin = ""
+                self._refresh_dots()
+                return
+
             stored = (self._selected.get("pin_hash") or "").strip()
             if not stored:
                 self._lbl_error.setText(
@@ -247,17 +264,30 @@ class PinLoginDialog(QDialog):
 
             from web.auth import verify_password
             if verify_password(self._pin, stored):
+                self._fail_count   = 0
+                self._locked_until = 0.0
                 self._auth_user_id = self._selected.get("user_id")
                 self._auth_admin   = self._selected
                 self._ok_btn.setText("✓")
                 QApplication.processEvents()
                 self.accept()
             else:
-                self._lbl_error.setText("Incorrect PIN — try again.")
+                self._fail_count += 1
                 self._pin = ""
                 self._refresh_dots()
                 self._ok_btn.setText("OK")
                 self._ok_btn.setEnabled(True)
+                if self._fail_count >= _PIN_MAX_ATTEMPTS:
+                    self._locked_until = time.monotonic() + _PIN_LOCKOUT_SECS
+                    self._fail_count   = 0
+                    mins = _PIN_LOCKOUT_SECS // 60
+                    self._lbl_error.setText(f"Too many attempts — locked for {mins} min.")
+                    log.warning("PIN login locked after %d failures", _PIN_MAX_ATTEMPTS)
+                else:
+                    remaining = _PIN_MAX_ATTEMPTS - self._fail_count
+                    self._lbl_error.setText(
+                        f"Incorrect PIN — {remaining} attempt{'s' if remaining != 1 else ''} left."
+                    )
         except Exception as exc:
             log.error("PIN check error: %s", exc)
             self._lbl_error.setText("Login error — see service log.")

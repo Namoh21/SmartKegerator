@@ -33,7 +33,9 @@
     {% endif %}
 
     <!-- ── Tab navigation ────────────────────────────────────────────── -->
-    <ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
+    <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto" id="settingsTabs" role="tablist"
+        style="scrollbar-width:none;-ms-overflow-style:none;">
+      <style nonce="{{ csp_nonce }}">#settingsTabs::-webkit-scrollbar{display:none}</style>
       {% for tab_id, tab_icon, tab_label in [
           ('appearance', 'bi-palette',     'Appearance'),
           ('taps',       'bi-diagram-3',   'Taps'),
@@ -1121,51 +1123,32 @@ document.addEventListener('click', function(e) {
   if (form && !confirm(form.dataset.confirm)) e.preventDefault();
 });
 
-// Update log stream — starts whenever the log panel is swapped into the page
+// Auto-scroll update log as new lines arrive
 document.body.addEventListener('htmx:afterSwap', function(e) {
   const output = document.getElementById('update-log-output');
-  if (!output || output.dataset.stream !== 'true' || output.dataset.streaming) return;
-  output.dataset.streaming = 'true';   // prevent double-start
-  const badge  = document.getElementById('update-status-badge');
+  if (output) output.scrollTop = output.scrollHeight;
+});
 
-  const es = new EventSource('/settings/update-stream');
-
-  es.onmessage = function(e) {
-    output.textContent += e.data + '\n';
-    output.scrollTop = output.scrollHeight;
-  };
-
-  // Server signals clean completion (update finished without restarting)
-  es.addEventListener('complete', function() {
-    es.close();
-    if (badge) { badge.className = 'badge bg-success'; badge.textContent = 'Complete'; }
-    output.textContent += '\n✓ Update complete. Reloading page…\n';
-    output.scrollTop = output.scrollHeight;
-    setTimeout(() => location.assign('/settings/?tab=updates'), 2000);
-  });
-
-  // Connection dropped — services restarting
-  es.onerror = function() {
-    es.close();
-    if (badge) { badge.className = 'badge bg-info'; badge.textContent = 'Restarting…'; }
-    output.textContent += '\n⟳ Services restarting — waiting for server…\n';
-    output.scrollTop = output.scrollHeight;
-
-    function poll() {
-      fetch('/settings/?tab=updates')
-        .then(function(r) {
-          if (r.ok) {
-            output.textContent += '✓ Server is back. Reloading…\n';
-            output.scrollTop = output.scrollHeight;
-            setTimeout(() => location.assign('/settings/?tab=updates'), 1500);
-          } else {
-            setTimeout(poll, 2000);
-          }
-        })
-        .catch(function() { setTimeout(poll, 2000); });
-    }
-    setTimeout(poll, 4000);
-  };
+// Update complete — fired by HX-Trigger from /settings/update-log when done
+document.body.addEventListener('updateComplete', function() {
+  const badge = document.getElementById('update-status-badge');
+  if (badge) { badge.className = 'badge bg-success'; badge.textContent = 'Complete'; }
+  // Stop HTMX polling by removing the trigger attribute
+  const output = document.getElementById('update-log-output');
+  if (output) {
+    output.removeAttribute('hx-trigger');
+    htmx.process(output);
+  }
+  // Services will restart; poll until back then reload
+  function waitForServer() {
+    fetch('/settings/?tab=updates')
+      .then(function(r) {
+        if (r.ok) setTimeout(function() { location.assign('/settings/?tab=updates'); }, 1000);
+        else setTimeout(waitForServer, 2000);
+      })
+      .catch(function() { setTimeout(waitForServer, 2000); });
+  }
+  setTimeout(waitForServer, 3000);
 });
 </script>
 {% endblock %}

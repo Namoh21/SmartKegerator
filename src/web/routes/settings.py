@@ -477,6 +477,15 @@ async def admin_set_pin(
 # Service restart
 # ---------------------------------------------------------------------------
 
+@router.post("/ping", response_class=HTMLResponse)
+async def session_ping(request: Request):
+    """Refresh the server-side session timestamp to prevent timeout."""
+    import time as _t
+    if request.session.get("admin_username"):
+        request.session["login_time"] = _t.time()
+    return HTMLResponse("", status_code=204)
+
+
 @router.post("/restart", response_class=HTMLResponse)
 async def restart_services(request: Request):
     """Schedule a service restart 2 seconds after responding."""
@@ -550,9 +559,15 @@ async def settings_save_log_level(level: str = Form("high")):
 _VALID_LOGS = {"gui", "web"}
 
 
+def _require_admin(request: Request) -> bool:
+    return bool(request.session.get("admin_username"))
+
+
 @router.get("/logs/{which}", response_class=HTMLResponse)
-async def view_log(which: str):
+async def view_log(which: str, request: Request):
     """Return the last 300 lines of a log file as pre-formatted HTML (HTMX target)."""
+    if not _require_admin(request):
+        return HTMLResponse("<span class='text-danger'>Admin login required.</span>", status_code=403)
     if which not in _VALID_LOGS:
         return HTMLResponse("<span class='text-danger'>Unknown log.</span>")
     log_file = log_dir_for(get_config()) / f"smartkegerator-{which}.log"
@@ -565,8 +580,11 @@ async def view_log(which: str):
 
 
 @router.get("/logs/{which}/download")
-async def download_log(which: str):
-    """Download the full log file."""
+async def download_log(which: str, request: Request):
+    """Download the full log file — admin only."""
+    if not _require_admin(request):
+        from fastapi.responses import RedirectResponse as _RR
+        return _RR(f"/admin/login?next=/settings/?tab=admins", status_code=303)
     if which not in _VALID_LOGS:
         return HTMLResponse("Unknown log.", status_code=404)
     log_file = log_dir_for(get_config()) / f"smartkegerator-{which}.log"
@@ -636,6 +654,8 @@ def _read_git_hash() -> str:
 @router.get("/version", response_class=HTMLResponse)
 async def version_info(request: Request):
     """HTMX endpoint — returns current version info snippet."""
+    if not _require_admin(request):
+        return HTMLResponse("", status_code=403)
     version = _read_version()
     git_hash = _read_git_hash()
     return HTMLResponse(
@@ -659,6 +679,8 @@ async def save_update_channel(channel: str = Form("master")):
 @router.get("/check-updates", response_class=HTMLResponse)
 async def check_updates(request: Request):
     """HTMX endpoint — compares local VERSION file to remote branch on GitHub."""
+    if not _require_admin(request):
+        return HTMLResponse("", status_code=403)
     channel       = _read_channel()
     branch        = "master" if channel == "master" else "dev"
     local_version = _read_version()
@@ -746,46 +768,26 @@ async def update_now(request: Request):
     )
 
 
-@router.get("/update-stream")
-async def update_stream():
-    """SSE endpoint — tails the update log file and pushes lines to the browser."""
-    import time as _t
-    from fastapi.responses import StreamingResponse
+@router.get("/update-log", response_class=HTMLResponse)
+async def update_log_poll(request: Request):
+    """HTMX polling endpoint — returns current update log content as escaped HTML."""
+    if not _require_admin(request):
+        return HTMLResponse("", status_code=403)
 
-    async def generate():
-        yield "data: [stream connected — waiting for update output…]\n\n"
-        pos      = 0
-        deadline = _t.monotonic() + 600   # 10-minute safety cutoff
-        ka_tick  = 0
+    content = ""
+    if _UPDATE_LOG.exists():
+        content = _UPDATE_LOG.read_bytes().decode(errors="replace")
 
-        while _t.monotonic() < deadline:
-            # Push any new log bytes
-            if _UPDATE_LOG.exists():
-                raw = _UPDATE_LOG.read_bytes()
-                if len(raw) > pos:
-                    chunk = raw[pos:].decode(errors="replace")
-                    pos   = len(raw)
-                    for line in chunk.splitlines():
-                        yield f"data: {line}\n\n"
+    escaped = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-            # Signal clean completion
-            if _UPDATE_DONE.exists():
-                yield "event: complete\ndata: done\n\n"
-                try:
-                    _UPDATE_DONE.unlink()
-                except Exception:
-                    pass
-                return
+    done = _UPDATE_DONE.exists()
+    if done:
+        try:
+            _UPDATE_DONE.unlink()
+        except Exception:
+            pass
 
-            # Keepalive comment every ~15 s to prevent proxy timeouts
-            ka_tick += 1
-            if ka_tick % 50 == 0:
-                yield ": keepalive\n\n"
-
-            await asyncio.sleep(0.3)
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    resp = HTMLResponse(escaped or "Starting update…")
+    if done:
+        resp.headers["HX-Trigger"] = "updateComplete"
+    return resp
