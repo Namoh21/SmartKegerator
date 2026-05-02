@@ -40,7 +40,12 @@ async def search(request: Request, q: str = Query("")):
                 auth=httpx.BasicAuth(api_key, ""),
             )
         resp.raise_for_status()
-        items = resp.json().get("result", [])
+        data = resp.json()
+        # catalog.beer may return {"result": [...]} or a bare list
+        if isinstance(data, list):
+            items = data
+        else:
+            items = data.get("result", data.get("results", data.get("beers", [])))
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
             return HTMLResponse(

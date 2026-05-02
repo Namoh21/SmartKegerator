@@ -129,16 +129,26 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 function _fillBeerForm(btn) {
-  document.getElementById('bf-name').value         = btn.dataset.name        || '';
-  document.getElementById('bf-company').value      = btn.dataset.company     || '';
-  document.getElementById('bf-location').value     = btn.dataset.location    || '';
-  document.getElementById('bf-style').value        = btn.dataset.style       || '';
-  document.getElementById('bf-abv').value          = btn.dataset.abv         || '0.0';
-  document.getElementById('bf-ibu').value          = btn.dataset.ibu         || '0';
-  document.getElementById('bf-description').value  = btn.dataset.description || '';
-  document.getElementById('bf-catalog-id').value   = btn.dataset.catalogId   || '';
-  document.getElementById('bf-label-url').value    = btn.dataset.labelUrl    || '';
-  document.getElementById('catalog-beer-results').innerHTML = '';
+  // Scope to the modal that contains this button so Add and Edit modals
+  // don't overwrite each other's fields when multiple modals are on the page.
+  const scope = btn.closest('.modal-body') || document;
+  const f = id => scope.querySelector('#' + id);
+
+  f('bf-name').value        = btn.dataset.name        || '';
+  f('bf-company').value     = btn.dataset.company     || '';
+  f('bf-location').value    = btn.dataset.location    || '';
+  f('bf-style').value       = btn.dataset.style       || '';
+  f('bf-abv').value         = btn.dataset.abv         || '0.0';
+  f('bf-ibu').value         = btn.dataset.ibu         || '0';
+  f('bf-description').value = btn.dataset.description || '';
+  f('bf-catalog-id').value  = btn.dataset.catalogId   || '';
+  f('bf-label-url').value   = btn.dataset.labelUrl    || '';
+
+  // Clear results and search input after selection
+  const results = scope.querySelector('#catalog-beer-results');
+  if (results) results.innerHTML = '';
+  const searchInput = scope.querySelector('#catalog-search-input');
+  if (searchInput) searchInput.value = f('bf-name').value;
 }
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('.js-fill-beer');
