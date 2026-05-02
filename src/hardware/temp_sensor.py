@@ -31,6 +31,10 @@ except ImportError:
 _READ_INTERVAL_SECONDS = 30.0
 _MAX_DELTA_F = 20.0      # ignore readings that jump more than this between samples
 _RETRY_LIMIT  = 3        # attempts per reading cycle before giving up
+_MIN_SANE_F   = 14.0     # -10°C — below this is a bad reading (kegerator is indoors)
+_MAX_SANE_F   = 120.0    # 49°C — above this is a bad reading
+_MIN_SANE_HUM = 1.0      # % — below this is a bad reading
+_MAX_SANE_HUM = 100.0
 
 
 class TempSensorManager(QObject):
@@ -129,18 +133,39 @@ class TempSensorManager(QObject):
 
                 temp_f = _c_to_f(temp_c)
 
+                # Hard sanity range — reject physically impossible values
+                # before they reach the UI or database.
+                if not (_MIN_SANE_F <= temp_f <= _MAX_SANE_F):
+                    log.warning(
+                        "DHT22: rejecting out-of-range reading %.1f°F (%.1f°C) "
+                        "— check wiring and pull-up resistor",
+                        temp_f, temp_c,
+                    )
+                    time.sleep(2.0)
+                    continue
+
+                if not (_MIN_SANE_HUM <= humidity <= _MAX_SANE_HUM):
+                    log.warning(
+                        "DHT22: rejecting out-of-range humidity %.1f%% "
+                        "— check wiring and pull-up resistor",
+                        humidity,
+                    )
+                    time.sleep(2.0)
+                    continue
+
+                # Delta filter — ignore sudden jumps between successive reads
                 if self._prev_ambient_f is not None:
                     if abs(temp_f - self._prev_ambient_f) > _MAX_DELTA_F:
                         log.warning(
-                            "DHT22: ignoring suspicious reading %.1f°F (prev %.1f°F)",
-                            temp_f, self._prev_ambient_f,
+                            "DHT22: ignoring suspicious jump %.1f°F → %.1f°F",
+                            self._prev_ambient_f, temp_f,
                         )
                         return
 
                 self.ambient_f       = temp_f
                 self.humidity        = humidity
                 self._prev_ambient_f = temp_f
-                log.debug("DHT22: %.1f°F, %.1f%%", temp_f, humidity)
+                log.debug("DHT22: %.1f°F (%.1f°C), %.1f%%", temp_f, temp_c, humidity)
                 return
 
             except RuntimeError as exc:
