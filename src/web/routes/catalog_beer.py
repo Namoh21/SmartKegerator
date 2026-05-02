@@ -74,7 +74,7 @@ async def test_connection(request: Request):
         async with httpx.AsyncClient(timeout=6.0) as client:
             resp = await client.get(
                 f"{_API_BASE}/beer/search",
-                params={"q": "IPA", "count": 1},
+                params={"q": "sam adams boston lager", "count": 1},
                 auth=httpx.BasicAuth(api_key, ""),
             )
         resp.raise_for_status()
