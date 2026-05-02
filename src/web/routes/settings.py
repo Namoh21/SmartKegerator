@@ -676,9 +676,16 @@ async def check_updates(request: Request):
     except Exception:
         remote_version = remote_sha
 
-    if remote_sha and local_hash != "unknown" and remote_sha == local_hash:
+    local_version = _read_version()
+
+    # Up to date if git hashes match OR version strings match
+    hashes_match  = bool(remote_sha and local_hash != "unknown" and remote_sha == local_hash)
+    versions_match = bool(remote_version and local_version and remote_version == local_version)
+
+    if hashes_match or versions_match:
         return HTMLResponse(
-            '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Up to date.</span>'
+            f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
+            f'Up to date — v{local_version}.</span>'
         )
     return HTMLResponse(
         f'<span class="text-info"><i class="bi bi-arrow-down-circle me-1"></i>'
