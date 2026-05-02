@@ -10,7 +10,8 @@ from web.server import get_db, templates, ctx
 
 router = APIRouter(prefix="/pours")
 
-_PERIODS = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+_PERIODS   = {"7d": 7, "30d": 30, "90d": 90, "all": None}
+_PAGE_SIZE = 50
 
 
 @router.post("/{pour_id}/delete", response_class=RedirectResponse)
@@ -22,27 +23,31 @@ async def pour_delete(pour_id: int, request: Request):
 
 @router.get("/", response_class=HTMLResponse)
 async def pour_history(
-    request:   Request,
-    user_id:   int = Query(default=0),   # 0 = all users
-    period:    str = Query(default="30d"),
-    keg_id:    int = Query(default=0),   # 0 = all kegs
+    request: Request,
+    user_id: int = Query(default=0),
+    period:  str = Query(default="30d"),
+    keg_id:  int = Query(default=0),
+    page:    int = Query(default=1, ge=1),
 ):
     db    = get_db()
     days  = _PERIODS.get(period, 30)
     since = (time.time() - days * 86400) if days else 0.0
 
-    pours = db.get_pours_since(since)
+    offset       = (page - 1) * _PAGE_SIZE
+    pours, total = db.get_pours_filtered(
+        since,
+        user_id=user_id or None,
+        keg_id=keg_id or None,
+        limit=_PAGE_SIZE,
+        offset=offset,
+    )
 
-    if user_id:
-        pours = [p for p in pours if p.user_id == user_id]
-    if keg_id:
-        pours = [p for p in pours if p.keg_id == keg_id]
-
-    pours = sorted(pours, key=lambda p: p.time, reverse=True)
+    total_pages = max(1, (total + _PAGE_SIZE - 1) // _PAGE_SIZE)
 
     # Build lookup caches
     users = {u.id: u.name for u in db.get_all_users()}
     keg_beer: dict[int, str] = {}
+
     def beer_for_keg(kid: int) -> str:
         if kid not in keg_beer:
             keg  = db.get_keg(kid)
@@ -59,17 +64,20 @@ async def pour_history(
         for p in pours
     ]
 
-    # Summary stats
-    total_oz    = sum(p.ounces for p in pours)
-    total_price = sum(p.price  for p in pours)
+    # Summary stats (across full filtered set, not just this page)
+    all_pours, _ = db.get_pours_filtered(since, user_id=user_id or None, keg_id=keg_id or None, limit=10_000, offset=0)
+    total_oz    = sum(p.ounces for p in all_pours)
+    total_price = sum(p.price  for p in all_pours)
 
     # Chart data: oz poured per day (last 30 days max)
-    chart_days   = min(days or 30, 30)
-    now_dt       = datetime.now()
-    day_labels   = [(now_dt - __import__("datetime").timedelta(days=i)).strftime("%b %d")
-                    for i in range(chart_days - 1, -1, -1)]
+    chart_days = min(days or 30, 30)
+    now_dt     = datetime.now()
+    day_labels = [
+        (now_dt - __import__("datetime").timedelta(days=i)).strftime("%b %d")
+        for i in range(chart_days - 1, -1, -1)
+    ]
     day_buckets: dict[int, float] = {}
-    for p in pours:
+    for p in all_pours:
         age = int((time.time() - p.time) / 86400)
         if age < chart_days:
             idx = chart_days - 1 - age
@@ -89,7 +97,10 @@ async def pour_history(
             selected_period=period,
             total_oz=total_oz,
             total_price=total_price,
-            pour_count=len(pours),
+            pour_count=total,
+            page=page,
+            total_pages=total_pages,
+            page_size=_PAGE_SIZE,
             chart_labels=day_labels,
             chart_oz=day_oz,
             show_user_filter=True,

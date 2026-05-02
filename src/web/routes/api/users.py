@@ -36,6 +36,16 @@ class TrainStatusResponse(BaseModel):
     error:    str | None  = None
 
 
+class UserDetailResponse(BaseModel):
+    id:           int
+    name:         str
+    photo_count:  int
+    balance:      float
+    pour_count:   int
+    total_oz:     float
+    train_status: str
+
+
 @router.get("/users", response_model=list[UserResponse], dependencies=[Depends(require_admin)])
 async def list_users():
     """All registered users with their current balance."""
@@ -50,6 +60,51 @@ async def list_users():
         for u in db.get_all_users()
         if u.id != UNKNOWN_USER_ID
     ]
+
+
+@router.get("/users/{user_id}", response_model=UserDetailResponse,
+            dependencies=[Depends(require_admin)])
+async def get_user(user_id: int):
+    """Return detailed info for a single user."""
+    db   = get_db()
+    user = db.get_user(user_id)
+    if not user or user_id == UNKNOWN_USER_ID:
+        raise HTTPException(404, "User not found")
+    pours     = db.get_pours_for_user(user_id)
+    total_oz  = sum(p.ounces for p in pours)
+    raw_train = db.get_setting(f"train_status_{user_id}", "") or "idle"
+    status    = raw_train if raw_train in ("idle", "pending") else (
+        "done" if raw_train.startswith("done:") else "error"
+    )
+    return UserDetailResponse(
+        id          = user.id,
+        name        = user.name,
+        photo_count = len(user.image_paths),
+        balance     = db.balance_for_user(user_id),
+        pour_count  = len(pours),
+        total_oz    = round(total_oz, 1),
+        train_status = status,
+    )
+
+
+@router.put("/users/{user_id}", response_model=UserResponse,
+            dependencies=[Depends(require_admin)])
+async def rename_user(user_id: int, body: UserRequest):
+    """Rename a user. Admin only."""
+    db   = get_db()
+    user = db.get_user(user_id)
+    if not user or user_id == UNKNOWN_USER_ID:
+        raise HTTPException(404, "User not found")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "Name is required")
+    user.name = name
+    db.save_user(user)
+    return UserResponse(
+        id=user.id, name=user.name,
+        photo_count=len(user.image_paths),
+        balance=db.balance_for_user(user_id),
+    )
 
 
 @router.post("/users", response_model=UserResponse, dependencies=[Depends(require_admin)])

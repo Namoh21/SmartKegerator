@@ -275,10 +275,13 @@ class UsersWindow(QDialog):
         reg_btn.clicked.connect(self._register_user)
         layout.addWidget(reg_btn)
 
-        # Delete + Close on bottom row
+        # Rename / Delete / Close on bottom row
         bottom = QHBoxLayout()
         bottom.setSpacing(6)
         if self._is_admin:
+            self._rename_btn = QPushButton("Rename")
+            self._rename_btn.clicked.connect(self._rename_user)
+            bottom.addWidget(self._rename_btn)
             self._del_user_btn = QPushButton("Delete")
             self._del_user_btn.setObjectName("danger")
             self._del_user_btn.clicked.connect(self._delete_user)
@@ -575,6 +578,34 @@ class UsersWindow(QDialog):
             + ("Ask an admin to add your photo for face recognition."
                if not self._is_admin else
                "Use the camera panel to capture training photos."))
+
+    def _rename_user(self) -> None:
+        if not self._selected_user:
+            QMessageBox.warning(self, "No User Selected", "Select a user first.")
+            return
+        if self._selected_user.id == UNKNOWN_USER_ID:
+            return
+        new_name, ok = QInputDialog.getText(
+            self, "Rename User",
+            f"New name for '{self._selected_user.name}':",
+            text=self._selected_user.name,
+        )
+        if not ok or not new_name.strip():
+            return
+        new_name = new_name.strip()
+        taken = [u for u in self._db.get_all_users()
+                 if u.name.lower() == new_name.lower() and u.id != self._selected_user.id]
+        if taken:
+            QMessageBox.warning(self, "Name Taken", f"'{new_name}' is already in use.")
+            return
+        self._selected_user.name = new_name
+        self._db.save_user(self._selected_user)
+        log.info("Renamed user %d to %s", self._selected_user.id, new_name)
+        self._load_users()
+        for i in range(self._user_list.count()):
+            if self._user_list.item(i).data(Qt.ItemDataRole.UserRole) == self._selected_user.id:
+                self._user_list.setCurrentRow(i)
+                break
 
     def _view_history(self) -> None:
         if not self._selected_user:

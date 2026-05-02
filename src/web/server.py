@@ -425,12 +425,15 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-# CORS — allows the Android app and any external API consumers to reach /api/v1/*
+# CORS — allows the Android app to reach /api/v1/* from any origin.
+# All /api/v1/* endpoints require a Bearer token so wildcard origin is
+# acceptable; the token is the actual security boundary.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
+    allow_credentials=False,   # no cookies over CORS — token auth only
 )
 
 # Order matters: last add_middleware = outermost = runs first on requests

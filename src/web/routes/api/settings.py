@@ -40,20 +40,18 @@ def _write_yaml(data: dict) -> None:
 # ---------------------------------------------------------------------------
 
 class SettingsResponse(BaseModel):
-    # Identity
     site_name:             str
-    # Taps
     tap_count:             int
     ticks_per_liter:       int
     tick_threshold:        int
     end_pour_seconds:      float
     log_pours:             bool
-    # Recognition
     recognition_enabled:   bool
     confidence_threshold:  float
     detection_model:       str
-    # Logging
     log_level:             str
+    theme:                 str
+    display_rotation:      int
 
 
 class SettingsPatch(BaseModel):
@@ -67,6 +65,8 @@ class SettingsPatch(BaseModel):
     confidence_threshold:  Optional[float] = None
     detection_model:       Optional[str]   = None
     log_level:             Optional[str]   = None
+    theme:                 Optional[str]   = None
+    display_rotation:      Optional[int]   = None
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +84,7 @@ async def get_settings():
     rec = cfg.get("recognition", {})
     taps = cfg.get("taps",       {})
 
+    disp = cfg.get("display", {})
     return SettingsResponse(
         site_name            = ui.get("name",                   "SmartKegerator"),
         tap_count            = int(taps.get("count",            3)),
@@ -95,6 +96,8 @@ async def get_settings():
         confidence_threshold = float(rec.get("confidence_threshold", 0.55)),
         detection_model      = rec.get("detection_model",       "hog"),
         log_level            = db.get_setting("log_level",      "high"),
+        theme                = ui.get("theme",                  "dark_blue"),
+        display_rotation     = int(disp.get("rotation",         90)),
     )
 
 
@@ -144,6 +147,18 @@ async def update_settings(body: SettingsPatch):
             raise HTTPException(400, f"log_level must be one of: {list(LEVELS)}")
         db.set_setting("log_level", body.log_level)
         apply_level(body.log_level)
+
+    if body.theme is not None:
+        from ui.theme import THEMES
+        if body.theme not in THEMES:
+            raise HTTPException(400, f"theme must be one of: {list(THEMES)}")
+        cfg["ui"]["theme"] = body.theme
+
+    if body.display_rotation is not None:
+        if body.display_rotation not in (0, 90, 180, 270):
+            raise HTTPException(400, "display_rotation must be 0, 90, 180, or 270")
+        cfg.setdefault("display", {})
+        cfg["display"]["rotation"] = body.display_rotation
 
     _write_yaml(cfg)
     return await get_settings()

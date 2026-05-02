@@ -490,6 +490,33 @@ class Database:
             cur.execute("SELECT * FROM pours WHERE time >= ? ORDER BY time", (since,))
             return [_row_to_pour(r) for r in cur.fetchall()]
 
+    def get_pours_filtered(
+        self,
+        since: float,
+        user_id: int | None = None,
+        keg_id: int | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[Pour], int]:
+        """Return paginated pours and total count matching the filters."""
+        conditions = ["time >= ?"]
+        params: list = [since]
+        if user_id is not None:
+            conditions.append("user_id = ?")
+            params.append(user_id)
+        if keg_id is not None:
+            conditions.append("keg_id = ?")
+            params.append(keg_id)
+        where = " AND ".join(conditions)
+        with self._cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) FROM pours WHERE {where}", params)
+            total = cur.fetchone()[0]
+            cur.execute(
+                f"SELECT * FROM pours WHERE {where} ORDER BY time DESC LIMIT ? OFFSET ?",
+                params + [limit, offset],
+            )
+            return [_row_to_pour(r) for r in cur.fetchall()], total
+
     def add_pour(self, pour: Pour) -> Pour:
         with self._cursor() as cur:
             cur.execute(
