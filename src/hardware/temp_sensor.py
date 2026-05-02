@@ -24,6 +24,14 @@ try:
     import adafruit_dht
     import board as _board
     _DHT_AVAILABLE = True
+    # Log which GPIO backend adafruit_blinka resolved to so Pi 5 issues are
+    # visible in the log without having to read the source.
+    try:
+        import adafruit_blinka.microcontroller.generic_linux.libgpiod_pin as _gp
+        _backend = "lgpio/libgpiod"
+    except Exception:
+        _backend = "RPi.GPIO or unknown"
+    log.debug("adafruit_dht available (backend: %s)", _backend)
 except ImportError:
     _DHT_AVAILABLE = False
     log.warning("adafruit_dht not available — DHT22 readings will be stubbed (dev/non-Pi mode)")

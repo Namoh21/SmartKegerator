@@ -417,6 +417,7 @@ fi
 REMAINING_PKGS=(
     "numpy<2"
     "pyqtgraph"
+    "rpi-lgpio"
     "adafruit-circuitpython-dht"
     "fastapi>=0.110"
     "uvicorn[standard]>=0.27"
