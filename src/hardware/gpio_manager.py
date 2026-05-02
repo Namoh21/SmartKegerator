@@ -21,7 +21,8 @@ except ImportError:
     _GPIOD_AVAILABLE = False
     log.warning("gpiod not available — GPIO calls will be no-ops (dev/non-Pi mode)")
 
-_CHIP = "/dev/gpiochip0"
+from hardware.pi_model import default_gpio_chip as _default_gpio_chip
+_CHIP = _default_gpio_chip()   # Pi 5 → gpiochip4, Pi 3/4 → gpiochip0
 
 
 class GPIOManager:

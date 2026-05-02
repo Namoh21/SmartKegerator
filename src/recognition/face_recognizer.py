@@ -69,6 +69,16 @@ class FaceRecognizer(QObject):
         self._threshold  = rec.get("confidence_threshold", 0.55)
         self._model      = rec.get("detection_model", "hog")   # "hog" or "cnn"
 
+        # CNN is ~10× slower than HOG and exceeds Pi 3's RAM + CPU budget.
+        # Auto-downgrade to HOG so the app remains usable on low-memory boards.
+        from hardware.pi_model import is_low_memory
+        if self._model == "cnn" and is_low_memory():
+            log.warning(
+                "FaceRecognizer: detection_model 'cnn' is not viable on 1 GB Pi — "
+                "switching to 'hog'. Change detection_model in Settings to suppress this warning."
+            )
+            self._model = "hog"
+
         self._db = db
 
         # Parallel lists — index i links a user_id to its encoding

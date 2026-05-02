@@ -300,8 +300,11 @@ else
         rm -f "${WHEEL_PATH}"   # remove partial download
         warn "Pre-built wheel not available — building dlib from source."
         if [[ "${LOW_MEM}" == "true" ]]; then
-            info "Low-memory mode: single-threaded build (~60-90 min on Pi 3)."
-            BUILD_JOBS=1
+            # Pi 3 has 4 cores but each parallel compile job uses ~300 MB.
+            # 2 jobs = ~600 MB peak which fits in 1 GB + swap without thrashing.
+            # 1 job is ~60-90 min; 2 jobs cuts that to ~40-55 min.
+            BUILD_JOBS=2
+            info "Low-memory mode: 2-job build to balance speed vs RAM (~40-55 min on Pi 3)."
         else
             info "This takes ~10-15 min on Pi 5, ~25-30 min on Pi 4."
             BUILD_JOBS=$(nproc)

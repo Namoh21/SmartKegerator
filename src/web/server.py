@@ -192,6 +192,26 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         self._login_failures: dict[str, int]         = defaultdict(int)
         self._login_lockout:  dict[str, float]        = {}
         self._api_window:     dict[str, list[float]]  = defaultdict(list)
+        self._last_cleanup:   float                   = time.time()
+
+    def _maybe_cleanup(self, now: float) -> None:
+        """Purge stale entries every 5 minutes to keep memory bounded on Pi 3."""
+        if now - self._last_cleanup < 300:
+            return
+        self._last_cleanup = now
+        cutoff = now - self._WINDOW
+        for ip in list(self._login_window):
+            self._login_window[ip] = [t for t in self._login_window[ip] if t > cutoff]
+            if not self._login_window[ip]:
+                del self._login_window[ip]
+        for ip in list(self._api_window):
+            self._api_window[ip] = [t for t in self._api_window[ip] if t > cutoff]
+            if not self._api_window[ip]:
+                del self._api_window[ip]
+        expired = [ip for ip, until in self._login_lockout.items() if until < now]
+        for ip in expired:
+            del self._login_lockout[ip]
+            self._login_failures.pop(ip, None)
 
     @staticmethod
     def _client_ip(request: Request) -> str:
@@ -221,6 +241,7 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         now = time.time()
 
         with self._lock:
+            self._maybe_cleanup(now)
             is_login = (path == self._LOGIN_PATH and request.method == "POST")
 
             if is_login:
