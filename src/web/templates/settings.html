@@ -1137,11 +1137,12 @@ document.addEventListener('click', function(e) {
   if (form && !confirm(form.dataset.confirm)) e.preventDefault();
 });
 
-// Update log stream — fired by HX-Trigger: startUpdateStream
-document.body.addEventListener('startUpdateStream', function() {
+// Update log stream — starts whenever the log panel is swapped into the page
+document.body.addEventListener('htmx:afterSwap', function(e) {
   const output = document.getElementById('update-log-output');
+  if (!output || output.dataset.stream !== 'true' || output.dataset.streaming) return;
+  output.dataset.streaming = 'true';   // prevent double-start
   const badge  = document.getElementById('update-status-badge');
-  if (!output) return;
 
   const es = new EventSource('/settings/update-stream');
 

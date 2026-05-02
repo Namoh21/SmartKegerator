@@ -705,7 +705,7 @@ def _run_update_thread() -> None:
     try:
         with open(_UPDATE_LOG, "wb") as f:
             proc = subprocess.Popen(
-                ["sudo", "bash", str(_UPDATE_SCRIPT)],
+                ["sudo", "/bin/bash", str(_UPDATE_SCRIPT)],
                 stdout=f,
                 stderr=subprocess.STDOUT,
                 env=_wayland_env(),
@@ -746,11 +746,9 @@ async def update_now(request: Request):
 
     threading.Thread(target=_run_update_thread, daemon=True).start()
 
-    resp = templates.TemplateResponse(
+    return templates.TemplateResponse(
         request, "partials/update_log.html", ctx(request),
     )
-    resp.headers["HX-Trigger"] = "startUpdateStream"
-    return resp
 
 
 @router.get("/update-stream")
@@ -760,6 +758,7 @@ async def update_stream():
     from fastapi.responses import StreamingResponse
 
     async def generate():
+        yield "data: [stream connected — waiting for update output…]\n\n"
         pos      = 0
         deadline = _t.monotonic() + 600   # 10-minute safety cutoff
         ka_tick  = 0
