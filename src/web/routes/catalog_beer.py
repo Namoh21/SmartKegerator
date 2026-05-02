@@ -16,8 +16,8 @@ def _api_key(db) -> str:
 
 
 @router.get("/beers/search", response_class=HTMLResponse)
-async def search(request: Request, q: str = Query("")):
-    q = q.strip()
+async def search(request: Request, catalog_q: str = Query("")):
+    q = catalog_q.strip()
     if len(q) < 2:
         return HTMLResponse("")
 
@@ -25,12 +25,9 @@ async def search(request: Request, q: str = Query("")):
     api_key = _api_key(db)
 
     if not api_key:
-        return HTMLResponse(
-            '<p class="text-warning small mt-2">'
-            'catalog.beer API key not configured — go to '
-            '<a href="/settings/?tab=beer-db">Settings</a> to add it.'
-            "</p>"
-        )
+        resp = HTMLResponse("")
+        resp.headers["HX-Trigger"] = '{"beerSearchWarning": "catalog.beer API key not configured. Go to Settings → Beer DB to add it."}'
+        return resp
 
     try:
         async with httpx.AsyncClient(timeout=6.0) as client:

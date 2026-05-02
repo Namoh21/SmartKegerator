@@ -156,5 +156,8 @@ document.addEventListener('click', function(e) {
   const form = e.target.closest('form.js-confirm');
   if (form && !confirm(form.dataset.confirm)) e.preventDefault();
 });
+document.addEventListener('beerSearchWarning', function(e) {
+  alert(e.detail?.value || 'catalog.beer API key not configured. Go to Settings → Beer DB to add it.');
+});
 </script>
 {% endblock %}
