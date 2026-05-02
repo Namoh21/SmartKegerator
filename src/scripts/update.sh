@@ -25,14 +25,17 @@ SRC_DIR="${INSTALL_DIR}/src"
 REAL_USER="${SUDO_USER:-$(whoami)}"
 REAL_HOME=$(getent passwd "${REAL_USER}" | cut -d: -f6)
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_SRC="$(dirname "${SCRIPT_DIR}")"   # parent of scripts/ = src/
-
 # ---------------------------------------------------------------------------
 # 1. Pull latest code
 # ---------------------------------------------------------------------------
 info "Pulling latest code…"
-REPO_DIR="$(dirname "${REPO_SRC}")"
+# The git clone lives in the real user's home, not /opt (which is the rsync target)
+REPO_DIR="${REAL_HOME}/SmartKegerator"
+if [[ ! -d "${REPO_DIR}/.git" ]]; then
+    echo "ERROR: Git repo not found at ${REPO_DIR}" >&2
+    exit 1
+fi
+REPO_SRC="${REPO_DIR}/src"
 CHANNEL_FILE="${INSTALL_DIR}/update_channel"
 BRANCH="master"
 if [[ -f "${CHANNEL_FILE}" ]]; then
