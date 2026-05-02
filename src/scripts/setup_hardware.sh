@@ -238,6 +238,44 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# DHT22 on Pi 5 — use kernel IIO driver via dtoverlay
+#
+# adafruit_dht bit-banging relies on microsecond GPIO timing.  Pi 5's RP1
+# chip has ~5-10µs GPIO latency (vs ~1µs on BCM), making bit-banging
+# unreliable.  The kernel dht11 IIO driver uses hardware interrupts and
+# works correctly on all Pi models including Pi 5.
+#
+# After reboot, readings appear in:
+#   /sys/bus/iio/devices/iio:deviceN/in_temp_input          (millidegrees C)
+#   /sys/bus/iio/devices/iio:deviceN/in_humidityrelative_input  (milli %)
+# ---------------------------------------------------------------------------
+if echo "${PI_MODEL}" | grep -qi "Raspberry Pi 5"; then
+    echo ""
+    echo "── DHT22 kernel IIO driver (Pi 5) ──"
+
+    # Read DHT pin from config.yaml; fall back to 22
+    DHT_PIN=22
+    if [[ -f "${CONFIG_YAML}" ]]; then
+        _pin=$(python3 -c "
+import yaml
+cfg = yaml.safe_load(open('${CONFIG_YAML}'))
+print(cfg.get('hardware', {}).get('temp_sensor_dht_pin', 22))
+" 2>/dev/null) && DHT_PIN="${_pin}"
+    fi
+
+    OVERLAY_LINE="dtoverlay=dht11,gpiopin=${DHT_PIN}"
+    if grep -qF "${OVERLAY_LINE}" "${CONFIG}" 2>/dev/null; then
+        ok "dht11 dtoverlay already set for GPIO ${DHT_PIN}"
+    else
+        # Remove any stale dht11 overlay with a different pin first
+        sed -i '/^dtoverlay=dht11/d' "${CONFIG}"
+        echo "${OVERLAY_LINE}" >> "${CONFIG}"
+        info "Added ${OVERLAY_LINE} to ${CONFIG} (Pi 5 kernel DHT22 driver)"
+        REBOOT_NEEDED=true
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Display rotation — managed via web UI (Settings → Appearance)
 #    Remove any rotation line written by older versions of this script.
 # ---------------------------------------------------------------------------

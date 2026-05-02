@@ -11,34 +11,40 @@ and automatically queued to the main thread by Qt.
 
 from __future__ import annotations
 
+import glob
 import logging
+import os
 import threading
 import time
+from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
 log = logging.getLogger(__name__)
 
+import glob
 import os
 from hardware.pi_model import pi_generation as _pi_gen
 
-# adafruit-blinka selects its GPIO backend at import time via environment
-# variables.  On Pi 5 the RPi.GPIO backend doesn't exist; BLINKA_LGPIO=1
-# tells blinka to use the lgpio C library instead.  This must be set
-# before any adafruit/blinka import occurs.
-if _pi_gen() == 5:
-    os.environ.setdefault("BLINKA_LGPIO", "1")
-    log.debug("Pi 5 detected — using lgpio backend for adafruit_dht")
+_PI_GEN = _pi_gen()
 
-try:
-    import adafruit_dht
-    import board as _board
-    _DHT_AVAILABLE = True
-    log.debug("adafruit_dht imported successfully")
-except ImportError:
-    _DHT_AVAILABLE = False
-    log.warning("adafruit_dht not available — DHT22 readings will be stubbed (dev/non-Pi mode)")
+# On Pi 5 use the kernel dht11 IIO driver (sysfs) instead of adafruit_dht.
+# adafruit_dht bit-banging requires ~1µs GPIO timing; Pi 5's RP1 chip has
+# ~5-10µs latency which makes every read fail.  The IIO driver uses kernel
+# hardware interrupts and is reliable on all Pi models.
+_USE_IIO = (_PI_GEN == 5)
+
+if _USE_IIO:
+    log.info("Pi 5 detected — DHT22 will use kernel IIO driver (sysfs)")
+else:
+    try:
+        import adafruit_dht
+        import board as _board
+        _DHT_AVAILABLE = True
+    except ImportError:
+        _DHT_AVAILABLE = False
+        log.warning("adafruit_dht not available — DHT22 readings will be stubbed (dev/non-Pi mode)")
 
 _READ_INTERVAL_SECONDS = 30.0
 _MAX_DELTA_F = 20.0      # ignore readings that jump more than this between samples
@@ -108,6 +114,18 @@ class TempSensorManager(QObject):
     # ------------------------------------------------------------------
 
     def _init_dht(self) -> None:
+        if _USE_IIO:
+            self._iio_dev = self._find_iio_device()
+            if self._iio_dev:
+                log.info("DHT22 IIO device: %s", self._iio_dev)
+            else:
+                log.warning(
+                    "DHT22 IIO device not found — add 'dtoverlay=dht11,gpiopin=%d' "
+                    "to /boot/firmware/config.txt and reboot",
+                    self._dht_pin_num,
+                )
+            return
+
         if not _DHT_AVAILABLE:
             return
         try:
@@ -116,6 +134,15 @@ class TempSensorManager(QObject):
         except Exception as exc:
             log.error("Failed to initialise DHT22 on pin %d: %s", self._dht_pin_num, exc)
             self._dht_device = None
+
+    @staticmethod
+    def _find_iio_device() -> Optional[str]:
+        """Locate the sysfs IIO device created by the dht11 dtoverlay."""
+        for dev in sorted(glob.glob("/sys/bus/iio/devices/iio:device*")):
+            if (os.path.exists(f"{dev}/in_temp_input") and
+                    os.path.exists(f"{dev}/in_humidityrelative_input")):
+                return dev
+        return None
 
     # ------------------------------------------------------------------
     # Poll loop (background thread)
@@ -128,10 +155,13 @@ class TempSensorManager(QObject):
             time.sleep(self._interval)
 
     # ------------------------------------------------------------------
-    # DHT22 (ambient temperature + humidity)
+    # DHT22 — IIO sysfs (Pi 5) or adafruit_dht bit-bang (Pi 3/4)
     # ------------------------------------------------------------------
 
     def _read_dht22(self) -> None:
+        if _USE_IIO:
+            self._read_dht22_iio()
+            return
         if self._dht_device is None:
             return
 
@@ -189,6 +219,45 @@ class TempSensorManager(QObject):
                 return
 
         log.warning("DHT22: all %d read attempts failed", _RETRY_LIMIT)
+
+    def _read_dht22_iio(self) -> None:
+        """Read from kernel IIO sysfs (Pi 5 + dht11 dtoverlay)."""
+        # Re-scan for the device in case it appeared since startup
+        if not getattr(self, "_iio_dev", None):
+            self._iio_dev = self._find_iio_device()
+        if not self._iio_dev:
+            log.warning(
+                "DHT22 IIO: device not found — reboot required after adding "
+                "dtoverlay=dht11,gpiopin=%d to /boot/firmware/config.txt",
+                self._dht_pin_num,
+            )
+            return
+        try:
+            temp_milli_c  = int(Path(f"{self._iio_dev}/in_temp_input").read_text().strip())
+            hum_milli_pct = int(Path(f"{self._iio_dev}/in_humidityrelative_input").read_text().strip())
+        except Exception as exc:
+            log.warning("DHT22 IIO read error: %s", exc)
+            return
+
+        temp_c   = temp_milli_c  / 1000.0
+        temp_f   = _c_to_f(temp_c)
+        humidity = hum_milli_pct / 1000.0
+
+        if not (_MIN_SANE_F <= temp_f <= _MAX_SANE_F):
+            log.warning("DHT22 IIO: out-of-range temp %.1f°F (%.1f°C) — check wiring", temp_f, temp_c)
+            return
+        if not (_MIN_SANE_HUM <= humidity <= _MAX_SANE_HUM):
+            log.warning("DHT22 IIO: out-of-range humidity %.1f%% — check wiring", humidity)
+            return
+
+        if self._prev_ambient_f is not None and abs(temp_f - self._prev_ambient_f) > _MAX_DELTA_F:
+            log.warning("DHT22 IIO: ignoring suspicious jump %.1f°F → %.1f°F", self._prev_ambient_f, temp_f)
+            return
+
+        self.ambient_f       = temp_f
+        self.humidity        = humidity
+        self._prev_ambient_f = temp_f
+        log.debug("DHT22 IIO: %.1f°F (%.1f°C), %.1f%%", temp_f, temp_c, humidity)
 
     def _reset_dht(self) -> None:
         """Power-cycle the sensor via the GPIO power pin and reinitialise."""
