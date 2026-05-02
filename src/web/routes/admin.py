@@ -24,6 +24,7 @@ _SETUP_ERRORS = {
 _LOGIN_ERRORS = {
     "1":       "Invalid username or password.",
     "expired": "Your session has timed out. Please log in again.",
+    "locked":  "Too many failed attempts — account locked. Try again later.",
 }
 
 

@@ -179,6 +179,7 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
     """
 
     _LOGIN_PATH     = "/api/v1/auth/login"
+    _WEB_LOGIN_PATH = "/admin/login"
     _LOGIN_RPM      = 5     # max login attempts per 60-second window
     _LOGIN_FAILURES = 10    # cumulative failures before lockout
     _LOCKOUT_SECS   = 900   # 15 minutes
@@ -223,7 +224,7 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
     def _prune(self, window: list[float], now: float) -> list[float]:
         return [t for t in window if now - t < self._WINDOW]
 
-    def _reject(self, message: str, retry_after: int) -> Response:
+    def _reject_api(self, message: str, retry_after: int) -> Response:
         import json
         return Response(
             content=json.dumps({"detail": message}),
@@ -232,8 +233,50 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
             headers={"Retry-After": str(retry_after)},
         )
 
+    def _reject_web(self, minutes: int) -> Response:
+        return RedirectResponse(
+            f"/admin/login?error=locked&minutes={minutes}",
+            status_code=303,
+        )
+
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
+
+        # Rate-limit the web admin login form
+        if path == self._WEB_LOGIN_PATH and request.method == "POST":
+            ip  = self._client_ip(request)
+            now = time.time()
+            with self._lock:
+                self._maybe_cleanup(now)
+                until = self._login_lockout.get(ip, 0)
+                if now < until:
+                    mins = max(1, int((until - now) / 60) + 1)
+                    return self._reject_web(mins)
+                self._login_window[ip] = self._prune(self._login_window[ip], now)
+                if len(self._login_window[ip]) >= self._LOGIN_RPM:
+                    return self._reject_web(1)
+                self._login_window[ip].append(now)
+
+            response = await call_next(request)
+
+            # Track failures — web login redirects to ?error=1 on failure
+            with self._lock:
+                if response.status_code in (302, 303):
+                    loc = response.headers.get("location", "")
+                    if "error=1" in loc:
+                        self._login_failures[ip] += 1
+                        if self._login_failures[ip] >= self._LOGIN_FAILURES:
+                            self._login_lockout[ip] = now + self._LOCKOUT_SECS
+                            self._login_failures[ip] = 0
+                            import logging as _log
+                            _log.getLogger(__name__).warning(
+                                "Web login: IP %s locked out after %d failures", ip, self._LOGIN_FAILURES
+                            )
+                    elif "error" not in loc:
+                        self._login_failures[ip] = 0
+                        self._login_lockout.pop(ip, None)
+            return response
+
         if not path.startswith("/api/"):
             return await call_next(request)
 
@@ -249,7 +292,7 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
                 until = self._login_lockout.get(ip, 0)
                 if now < until:
                     secs = int(until - now)
-                    return self._reject(
+                    return self._reject_api(
                         f"Too many failed login attempts — locked out for "
                         f"{secs // 60 + 1} more minute(s).",
                         retry_after=secs,
@@ -257,7 +300,7 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
                 # Rate limit
                 self._login_window[ip] = self._prune(self._login_window[ip], now)
                 if len(self._login_window[ip]) >= self._LOGIN_RPM:
-                    return self._reject(
+                    return self._reject_api(
                         "Too many login attempts — wait 1 minute and try again.",
                         retry_after=self._WINDOW,
                     )
@@ -266,7 +309,7 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
             else:
                 self._api_window[ip] = self._prune(self._api_window[ip], now)
                 if len(self._api_window[ip]) >= self._API_RPM:
-                    return self._reject(
+                    return self._reject_api(
                         "API rate limit exceeded — slow down and try again.",
                         retry_after=self._WINDOW,
                     )
