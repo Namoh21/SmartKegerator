@@ -431,6 +431,54 @@ async def upload_ssl(
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
+@router.post("/generate-ssl", response_class=HTMLResponse)
+async def generate_ssl(request: Request):
+    """Generate a self-signed certificate using the server's local IP."""
+    _SSL_DIR.mkdir(parents=True, exist_ok=True)
+    cert_path = _SSL_DIR / "server.crt"
+    key_path  = _SSL_DIR / "server.key"
+    ip        = _get_local_ip()
+
+    result = subprocess.run(
+        [
+            "openssl", "req", "-x509", "-newkey", "rsa:2048",
+            "-keyout", str(key_path),
+            "-out",    str(cert_path),
+            "-days",   "825",
+            "-nodes",
+            "-subj",   f"/CN={ip}",
+            "-addext", f"subjectAltName=IP:{ip},DNS:smartkegerator",
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+
+    if result.returncode != 0:
+        log.error("openssl failed: %s", result.stderr)
+        return HTMLResponse(
+            f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+            f'Failed to generate certificate: {result.stderr[:200]}</span>'
+        )
+
+    try:
+        key_path.chmod(0o600)
+    except Exception:
+        pass
+
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    cfg["web"].setdefault("ssl", {})
+    cfg["web"]["ssl"]["certfile"] = str(cert_path)
+    cfg["web"]["ssl"]["keyfile"]  = str(key_path)
+    _write_yaml(cfg)
+    log.info("Self-signed certificate generated for IP %s", ip)
+
+    return HTMLResponse(
+        f'<span class="text-success"><i class="bi bi-shield-check me-1"></i>'
+        f'Self-signed certificate generated for <strong>{ip}</strong>. '
+        f'Enable HTTPS above and save to apply.</span>'
+    )
+
+
 # ---------------------------------------------------------------------------
 # Web server port
 # ---------------------------------------------------------------------------
