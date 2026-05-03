@@ -189,6 +189,10 @@ apt-get install -y python3-yaml
 # authbind — lets non-root user services bind to ports 80 and 443
 apt-get install -y authbind
 
+# certbot — Let's Encrypt certificate management (optional; graceful if unavailable)
+apt-get install -y certbot 2>/dev/null || \
+    warn "certbot not available — Let's Encrypt option in web UI will prompt for manual install"
+
 # picamera2 — Pi Camera Module support on Trixie / Bookworm
 # (system package; the venv inherits it via --system-site-packages)
 apt-get install -y python3-picamera2 2>/dev/null || \
@@ -750,25 +754,19 @@ chmod 440 "${SUDOERS_FILE}"
 info "Sudoers rules written."
 
 # ---------------------------------------------------------------------------
-# certbot — install if available, set up auto-renewal cron
+# certbot auto-renewal cron
 # ---------------------------------------------------------------------------
-section "certbot (Let's Encrypt auto-renewal)"
-if apt-get install -y certbot 2>/dev/null; then
-    info "certbot installed."
-    # Add a daily renewal cron that stops the web service, renews, restarts
-    CRON_FILE="/etc/cron.d/smartkegerator-certbot"
-    cat > "${CRON_FILE}" << CRONEOF
+section "certbot auto-renewal cron"
+CRON_FILE="/etc/cron.d/smartkegerator-certbot"
+cat > "${CRON_FILE}" << CRONEOF
 # SmartKegerator — daily Let's Encrypt certificate renewal
-# Runs at 03:30 AM; only takes action when cert expires within 30 days
+# Runs at 03:30 AM; only acts when cert expires within 30 days
 30 3 * * * root systemctl --user stop smartkegerator-web 2>/dev/null; \
-  certbot renew --quiet --standalone; \
+  certbot renew --quiet --standalone 2>/dev/null; \
   systemctl --user start smartkegerator-web 2>/dev/null
 CRONEOF
-    chmod 644 "${CRON_FILE}"
-    info "certbot auto-renewal cron installed at /etc/cron.d/smartkegerator-certbot."
-else
-    warn "certbot not available in apt — Let's Encrypt option will prompt user to install it manually."
-fi
+chmod 644 "${CRON_FILE}"
+info "certbot auto-renewal cron installed at ${CRON_FILE}."
 
 # ---------------------------------------------------------------------------
 # Restore database backup (preserved from before install)
