@@ -740,12 +740,35 @@ section "Sudoers rule for web-initiated reboot"
 SUDOERS_FILE="/etc/sudoers.d/smartkegerator-reboot"
 SUDOERS_REBOOT="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
 SUDOERS_UPDATE="${REAL_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SRC_DIR}/scripts/update.sh"
+SUDOERS_CERTBOT="${REAL_USER} ALL=(ALL) NOPASSWD: /usr/bin/certbot"
 {
     echo "${SUDOERS_REBOOT}"
     echo "${SUDOERS_UPDATE}"
+    echo "${SUDOERS_CERTBOT}"
 } > "${SUDOERS_FILE}"
 chmod 440 "${SUDOERS_FILE}"
-info "Sudoers rules written: ${REAL_USER} may run sudo reboot and sudo bash update.sh without password."
+info "Sudoers rules written."
+
+# ---------------------------------------------------------------------------
+# certbot — install if available, set up auto-renewal cron
+# ---------------------------------------------------------------------------
+section "certbot (Let's Encrypt auto-renewal)"
+if apt-get install -y certbot 2>/dev/null; then
+    info "certbot installed."
+    # Add a daily renewal cron that stops the web service, renews, restarts
+    CRON_FILE="/etc/cron.d/smartkegerator-certbot"
+    cat > "${CRON_FILE}" << CRONEOF
+# SmartKegerator — daily Let's Encrypt certificate renewal
+# Runs at 03:30 AM; only takes action when cert expires within 30 days
+30 3 * * * root systemctl --user stop smartkegerator-web 2>/dev/null; \
+  certbot renew --quiet --standalone; \
+  systemctl --user start smartkegerator-web 2>/dev/null
+CRONEOF
+    chmod 644 "${CRON_FILE}"
+    info "certbot auto-renewal cron installed at /etc/cron.d/smartkegerator-certbot."
+else
+    warn "certbot not available in apt — Let's Encrypt option will prompt user to install it manually."
+fi
 
 # ---------------------------------------------------------------------------
 # Restore database backup (preserved from before install)

@@ -726,14 +726,43 @@
                 <div id="ssl-result" class="mt-2 small"></div>
               </div>
 
-              <!-- Option 2: Upload your own -->
-              <div class="mt-2">
+              <!-- Option 2: Let's Encrypt -->
+              <div class="mt-3 mb-3">
                 <div class="fw-semibold small mb-1">
-                  <i class="bi bi-upload me-1"></i>Option 2 — Upload your own certificate
+                  <i class="bi bi-lock me-1"></i>Option 2 — Let's Encrypt (fully trusted)
                 </div>
                 <div class="text-muted small mb-2">
-                  Use a certificate from Let's Encrypt or another CA for full trust.
-                  You need both the certificate and its private key.
+                  Provides a free, browser-trusted certificate with no security warnings.
+                  <strong>Requires:</strong> a public domain name pointing to this device
+                  and port 80 forwarded from your router. Not suitable for LAN-only installs.
+                </div>
+                <div class="d-flex gap-2 align-items-end flex-wrap">
+                  <div>
+                    <label class="form-label small text-muted mb-1">Domain name</label>
+                    <input type="text" class="form-control form-control-sm font-monospace"
+                           id="le-domain" placeholder="kegerator.example.com" style="width:240px;">
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm"
+                          hx-post="/settings/letsencrypt"
+                          hx-target="#ssl-result"
+                          hx-swap="innerHTML"
+                          hx-disabled-elt="this"
+                          hx-include="#le-domain"
+                          hx-vals="js:{domain: document.getElementById('le-domain').value}"
+                          hx-on::before-request="this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Requesting…'"
+                          hx-on::after-request="this.innerHTML='<i class=\'bi bi-lock me-1\'></i>Get Certificate'">
+                    <i class="bi bi-lock me-1"></i>Get Certificate
+                  </button>
+                </div>
+              </div>
+
+              <!-- Option 3: Upload your own -->
+              <div class="mt-2">
+                <div class="fw-semibold small mb-1">
+                  <i class="bi bi-upload me-1"></i>Option 3 — Upload your own certificate
+                </div>
+                <div class="text-muted small mb-2">
+                  Use an existing certificate from any CA. Requires both the certificate and private key.
                 </div>
                 <form method="post" action="/settings/upload-ssl"
                       enctype="multipart/form-data"

@@ -433,7 +433,7 @@ async def upload_ssl(
 
 @router.post("/generate-ssl", response_class=HTMLResponse)
 async def generate_ssl(request: Request):
-    """Generate a self-signed certificate using the server's local IP."""
+    """Generate a self-signed certificate, enable HTTPS on port 443, and restart."""
     _SSL_DIR.mkdir(parents=True, exist_ok=True)
     cert_path = _SSL_DIR / "server.crt"
     key_path  = _SSL_DIR / "server.key"
@@ -464,18 +464,105 @@ async def generate_ssl(request: Request):
     except Exception:
         pass
 
+    # Enable HTTPS on port 443 and restart the web service
     cfg = _read_yaml()
     cfg.setdefault("web", {})
+    cfg["web"]["port"] = 443
     cfg["web"].setdefault("ssl", {})
+    cfg["web"]["ssl"]["enabled"]  = True
     cfg["web"]["ssl"]["certfile"] = str(cert_path)
     cfg["web"]["ssl"]["keyfile"]  = str(key_path)
     _write_yaml(cfg)
-    log.info("Self-signed certificate generated for IP %s", ip)
+    log.info("Self-signed certificate generated for IP %s, HTTPS enabled on 443", ip)
+
+    async def _restart():
+        await asyncio.sleep(2)
+        subprocess.run(
+            ["systemctl", "--user", "restart", "smartkegerator-web"],
+            check=False, env=_wayland_env(),
+        )
+    asyncio.create_task(_restart())
 
     return HTMLResponse(
         f'<span class="text-success"><i class="bi bi-shield-check me-1"></i>'
-        f'Self-signed certificate generated for <strong>{ip}</strong>. '
-        f'Enable HTTPS above and save to apply.</span>'
+        f'Certificate generated for <strong>{ip}</strong>. '
+        f'HTTPS enabled on port 443 — web service restarting. '
+        f'Reconnect at <strong>https://{ip}</strong></span>'
+    )
+
+
+@router.post("/letsencrypt", response_class=HTMLResponse)
+async def letsencrypt(request: Request, domain: str = Form("")):
+    """Run certbot to obtain a Let's Encrypt certificate for a public domain."""
+    domain = domain.strip().lower()
+    if not domain:
+        return HTMLResponse(
+            '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+            'A domain name is required.</span>'
+        )
+
+    # certbot must be installed
+    certbot = subprocess.run(["which", "certbot"], capture_output=True, text=True)
+    if certbot.returncode != 0:
+        return HTMLResponse(
+            '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+            'certbot is not installed. Run: <code>sudo apt install certbot</code></span>'
+        )
+
+    # Stop web service temporarily for standalone challenge
+    subprocess.run(
+        ["systemctl", "--user", "stop", "smartkegerator-web"],
+        check=False, env=_wayland_env(),
+    )
+
+    result = subprocess.run(
+        [
+            "sudo", "certbot", "certonly", "--standalone",
+            "--non-interactive", "--agree-tos",
+            "--register-unsafely-without-email",
+            "-d", domain,
+        ],
+        capture_output=True, text=True, timeout=120,
+    )
+
+    if result.returncode != 0:
+        # Restart web service even on failure
+        subprocess.run(
+            ["systemctl", "--user", "start", "smartkegerator-web"],
+            check=False, env=_wayland_env(),
+        )
+        log.error("certbot failed: %s", result.stderr)
+        return HTMLResponse(
+            f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+            f'certbot failed: {result.stdout[-300:] or result.stderr[-300:]}</span>'
+        )
+
+    cert_path = Path(f"/etc/letsencrypt/live/{domain}/fullchain.pem")
+    key_path  = Path(f"/etc/letsencrypt/live/{domain}/privkey.pem")
+
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    cfg["web"]["port"] = 443
+    cfg["web"].setdefault("ssl", {})
+    cfg["web"]["ssl"]["enabled"]  = True
+    cfg["web"]["ssl"]["certfile"] = str(cert_path)
+    cfg["web"]["ssl"]["keyfile"]  = str(key_path)
+    _write_yaml(cfg)
+    log.info("Let's Encrypt certificate obtained for %s", domain)
+
+    # Restart web service with new cert
+    async def _restart():
+        await asyncio.sleep(1)
+        subprocess.run(
+            ["systemctl", "--user", "restart", "smartkegerator-web"],
+            check=False, env=_wayland_env(),
+        )
+    asyncio.create_task(_restart())
+
+    return HTMLResponse(
+        f'<span class="text-success"><i class="bi bi-shield-check me-1"></i>'
+        f'Certificate obtained for <strong>{domain}</strong>. '
+        f'HTTPS enabled — reconnect at <strong>https://{domain}</strong></span>'
     )
 
 
