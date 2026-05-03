@@ -191,6 +191,61 @@
 </div>
 
 {% if is_admin and not is_unknown_user %}
+<!-- ── Admin access ──────────────────────────────────────────────────── -->
+<div class="card mt-4">
+  <div class="card-header"><i class="bi bi-shield-lock me-2"></i><strong>Administrator Access</strong></div>
+  <div class="card-body">
+    {% if user_is_admin %}
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <span class="badge bg-warning text-dark me-2"><i class="bi bi-shield-fill-check me-1"></i>Administrator</span>
+        <span class="text-muted small">Login username: <code>{{ user_admin_username }}</code></span>
+      </div>
+      {% if user_admin_id != current_admin_id %}
+      <form method="post" action="/users/{{ user.id }}/admin/demote"
+            onsubmit="return confirm('Remove administrator access from {{ user.name }}? They will keep their user account and pour history.')">
+        <button type="submit" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-shield-minus me-1"></i>Remove Admin Access
+        </button>
+      </form>
+      {% else %}
+      <span class="text-muted small"><i class="bi bi-lock me-1"></i>Cannot remove your own admin access here</span>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted small mb-3">
+      This user does not have administrator access. Grant access to allow them to log into the admin panel,
+      manage kegs, users, and settings.
+    </p>
+    <form method="post" action="/users/{{ user.id }}/admin/promote" autocomplete="off">
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-4">
+          <label class="form-label small">Admin login username</label>
+          <input type="text" class="form-control form-control-sm" name="username"
+                 placeholder="username" required autocomplete="off">
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label small">Password</label>
+          <div class="input-group input-group-sm">
+            <input type="password" class="form-control form-control-sm" name="password" id="promotePass"
+                   placeholder="≥ 8 characters" required autocomplete="new-password">
+            <button class="btn btn-outline-secondary" type="button"
+                    onclick="var i=document.getElementById('promotePass');i.type=i.type==='password'?'text':'password'">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-sm-auto">
+          <button type="submit" class="btn btn-accent btn-sm">
+            <i class="bi bi-shield-plus me-1"></i>Grant Admin Access
+          </button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
 <!-- ── Face Recognition Photos ───────────────────────────────────────── -->
 <div class="card mt-4">
   <div class="card-header d-flex align-items-center gap-2">

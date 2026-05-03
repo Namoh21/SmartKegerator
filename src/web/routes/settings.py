@@ -176,6 +176,28 @@ async def settings_page(request: Request):
     ssl_keyfile  = ssl_cfg.get("keyfile", "")
     current_level = db.get_setting("log_level", "high")
     from hardware.pi_model import pi_generation
+    from notifications.email_sender import PRESETS as EMAIL_PRESETS
+    # Notification settings (read from DB)
+    notif = {k: db.get_setting(k, v) for k, v in {
+        "notif_email_enabled":       "0",
+        "notif_email_preset":        "custom",
+        "notif_email_smtp_host":     "",
+        "notif_email_smtp_port":     "587",
+        "notif_email_smtp_security": "starttls",
+        "notif_email_smtp_user":     "",
+        "notif_email_from":          "",
+        "notif_email_to":            "",
+        "notif_email_on_pour":       "0",
+        "notif_email_on_keg_low":    "0",
+        "notif_email_keg_low_pct":   "15",
+        "notif_email_on_keg_empty":  "0",
+        "notif_email_on_temp_alert": "0",
+        "notif_email_on_new_user":   "0",
+        "notif_push_on_pour":        "0",
+        "notif_push_on_keg_low":     "0",
+        "notif_push_on_keg_empty":   "0",
+        "notif_push_on_temp_alert":  "0",
+    }.items()}
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -186,6 +208,7 @@ async def settings_page(request: Request):
             log_levels=LEVEL_LABELS, current_log_level=current_level,
             app_version=_read_version(), app_git_hash=_read_git_hash(),
             update_channel=_read_channel(),
+            notif=notif, email_presets=EMAIL_PRESETS,
             pi_gen=pi_generation()),
     )
 
@@ -382,6 +405,142 @@ async def settings_save_admin_timeout(
 
 
 # ---------------------------------------------------------------------------
+# SSL certificate upload
+# ---------------------------------------------------------------------------
+
+_SSL_DIR = Path("/opt/smartkegerator/ssl")
+
+
+@router.post("/upload-ssl", response_class=RedirectResponse)
+async def upload_ssl(
+    request:  Request,
+    certfile: Optional[object] = None,
+    keyfile:  Optional[object] = None,
+):
+    from fastapi import UploadFile
+    import shutil
+
+    _SSL_DIR.mkdir(parents=True, exist_ok=True)
+
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    cfg["web"].setdefault("ssl", {})
+
+    # Accept UploadFile objects from the form
+    form   = await request.form()
+    cert   = form.get("certfile")
+    key    = form.get("keyfile")
+
+    if cert and hasattr(cert, "filename") and cert.filename:
+        dest = _SSL_DIR / "server.crt"
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(cert.file, f)
+        cfg["web"]["ssl"]["certfile"] = str(dest)
+        log.info("SSL certificate uploaded to %s", dest)
+
+    if key and hasattr(key, "filename") and key.filename:
+        dest = _SSL_DIR / "server.key"
+        dest.chmod(0o600) if dest.exists() else None
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(key.file, f)
+        try:
+            dest.chmod(0o600)
+        except Exception:
+            pass
+        cfg["web"]["ssl"]["keyfile"] = str(dest)
+        log.info("SSL key uploaded to %s", dest)
+
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+@router.get("/ssl-info", response_class=HTMLResponse)
+async def ssl_info(request: Request):
+    """HTMX endpoint — returns installed certificate details."""
+    cfg      = _read_yaml()
+    certfile = cfg.get("web", {}).get("ssl", {}).get("certfile", "")
+    if not certfile or not Path(certfile).exists():
+        return HTMLResponse(
+            '<div class="text-muted small py-1">'
+            '<i class="bi bi-shield-slash me-1"></i>No certificate installed.</div>'
+        )
+    try:
+        result = subprocess.run(
+            ["openssl", "x509", "-in", certfile, "-noout",
+             "-subject", "-issuer", "-startdate", "-enddate"],
+            capture_output=True, text=True, timeout=10,
+        )
+        # Parse: each line is "key=value" where value may contain "="
+        parsed: dict[str, str] = {}
+        for line in result.stdout.splitlines():
+            if "=" in line:
+                key, _, val = line.partition("=")
+                parsed[key.strip()] = val.strip()
+
+        subject    = parsed.get("subject",   "—")
+        issuer     = parsed.get("issuer",    "—")
+        not_before = parsed.get("notBefore", "—")
+        not_after  = parsed.get("notAfter",  "—")
+
+        # Extract CN for a friendly "issued to" name
+        def _cn(field: str) -> str:
+            for part in field.split(","):
+                part = part.strip()
+                if part.upper().startswith("CN"):
+                    return part.split("=", 1)[-1].strip()
+            return field
+
+        issued_to  = _cn(subject)
+        issued_by  = _cn(issuer)
+        self_signed = issued_to == issued_by or "Internet Widgits" in issuer
+        cert_type  = "Self-signed" if self_signed else "CA-signed (Let's Encrypt / CA)"
+
+        # Days remaining
+        from datetime import datetime as _dt
+        days_html = ""
+        try:
+            expiry = _dt.strptime(not_after, "%b %d %H:%M:%S %Y %Z")
+            days   = (expiry - _dt.utcnow()).days
+            if days < 0:
+                days_html = f'<span class="badge bg-danger ms-2">EXPIRED {abs(days)}d ago</span>'
+            elif days <= 14:
+                days_html = f'<span class="badge bg-warning text-dark ms-2">{days}d remaining</span>'
+            elif days <= 30:
+                days_html = f'<span class="badge bg-info text-dark ms-2">{days}d remaining</span>'
+            else:
+                days_html = f'<span class="badge bg-success ms-2">{days}d remaining</span>'
+        except Exception:
+            pass
+
+        icon  = "shield-check" if not self_signed else "shield-exclamation"
+        color = "success" if not self_signed else "warning"
+
+        return HTMLResponse(f"""
+<div class="border rounded p-3" style="background:var(--sk-bg);">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <i class="bi bi-{icon} text-{color} fs-5"></i>
+    <strong>Installed Certificate</strong>
+    <span class="badge bg-secondary">{cert_type}</span>
+  </div>
+  <div class="row g-1 small">
+    <div class="col-sm-3 text-muted">Issued to</div>
+    <div class="col-sm-9 font-monospace">{issued_to}</div>
+    <div class="col-sm-3 text-muted">Issued by</div>
+    <div class="col-sm-9 font-monospace">{issued_by}</div>
+    <div class="col-sm-3 text-muted">Valid from</div>
+    <div class="col-sm-9">{not_before}</div>
+    <div class="col-sm-3 text-muted">Expires</div>
+    <div class="col-sm-9">{not_after}{days_html}</div>
+  </div>
+</div>""")
+    except Exception as exc:
+        return HTMLResponse(
+            f'<div class="text-warning small"><i class="bi bi-exclamation-triangle me-1"></i>'
+            f'Could not read certificate: {exc}</div>'
+        )
+
+
+# ---------------------------------------------------------------------------
 # Web server port
 # ---------------------------------------------------------------------------
 
@@ -438,6 +597,40 @@ async def admin_add(
     if db.get_admin_by_username(username):
         return RedirectResponse("/settings/?error=taken&tab=admins", status_code=303)
     db.add_admin(username, hash_password(password), display_name=display_name)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+@router.post("/admins/promote", response_class=RedirectResponse)
+async def admin_promote(
+    user_id:  int = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    db       = get_db()
+    username = username.strip()
+    if not username or not password:
+        return RedirectResponse("/settings/?error=empty&tab=admins", status_code=303)
+    if len(password) < 8:
+        return RedirectResponse("/settings/?error=short&tab=admins", status_code=303)
+    if db.get_admin_by_username(username):
+        return RedirectResponse("/settings/?error=taken&tab=admins", status_code=303)
+    user = db.get_user(user_id)
+    if not user:
+        return RedirectResponse("/settings/?error=nouser&tab=admins", status_code=303)
+    if db.is_user_admin(user_id):
+        return RedirectResponse("/settings/?error=already&tab=admins", status_code=303)
+    db.promote_user_to_admin(user_id, username, hash_password(password))
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+@router.post("/admins/demote", response_class=RedirectResponse)
+async def admin_demote(request: Request, admin_id: int = Form(...)):
+    db = get_db()
+    if db.admin_count() <= 1:
+        return RedirectResponse("/settings/?error=last&tab=admins", status_code=303)
+    if request.session.get("admin_id") == admin_id:
+        return RedirectResponse("/settings/?error=self&tab=admins", status_code=303)
+    db.delete_admin(admin_id)
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
@@ -796,3 +989,112 @@ async def update_log_poll(request: Request):
     if done:
         resp.headers["HX-Trigger"] = "updateComplete"
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+@router.post("/notifications", response_class=RedirectResponse)
+async def settings_save_notifications(
+    # Email master switch
+    notif_email_enabled:      Optional[str] = Form(None),
+    notif_email_preset:       str           = Form("custom"),
+    notif_email_smtp_host:    str           = Form(""),
+    notif_email_smtp_port:    str           = Form("587"),
+    notif_email_smtp_security:str           = Form("starttls"),
+    notif_email_smtp_user:    str           = Form(""),
+    notif_email_smtp_password:str           = Form(""),
+    notif_email_from:         str           = Form(""),
+    notif_email_to:           str           = Form(""),
+    # Email event toggles
+    notif_email_on_pour:      Optional[str] = Form(None),
+    notif_email_on_keg_low:   Optional[str] = Form(None),
+    notif_email_keg_low_pct:  str           = Form("15"),
+    notif_email_on_keg_empty: Optional[str] = Form(None),
+    notif_email_on_temp_alert:Optional[str] = Form(None),
+    notif_email_on_new_user:  Optional[str] = Form(None),
+    # Push event toggles (server-side preferences)
+    notif_push_on_pour:       Optional[str] = Form(None),
+    notif_push_on_keg_low:    Optional[str] = Form(None),
+    notif_push_on_keg_empty:  Optional[str] = Form(None),
+    notif_push_on_temp_alert: Optional[str] = Form(None),
+):
+    db = get_db()
+    def _bool(v): return "1" if v is not None else "0"
+
+    db.set_setting("notif_email_enabled",       _bool(notif_email_enabled))
+    db.set_setting("notif_email_preset",         notif_email_preset.strip())
+    db.set_setting("notif_email_smtp_host",      notif_email_smtp_host.strip())
+    db.set_setting("notif_email_smtp_port",      notif_email_smtp_port.strip() or "587")
+    db.set_setting("notif_email_smtp_security",  notif_email_smtp_security.strip())
+    db.set_setting("notif_email_smtp_user",      notif_email_smtp_user.strip())
+    db.set_setting("notif_email_from",           notif_email_from.strip())
+    db.set_setting("notif_email_to",             notif_email_to.strip())
+    db.set_setting("notif_email_on_pour",        _bool(notif_email_on_pour))
+    db.set_setting("notif_email_on_keg_low",     _bool(notif_email_on_keg_low))
+    db.set_setting("notif_email_keg_low_pct",    notif_email_keg_low_pct.strip() or "15")
+    db.set_setting("notif_email_on_keg_empty",   _bool(notif_email_on_keg_empty))
+    db.set_setting("notif_email_on_temp_alert",  _bool(notif_email_on_temp_alert))
+    db.set_setting("notif_email_on_new_user",    _bool(notif_email_on_new_user))
+    db.set_setting("notif_push_on_pour",         _bool(notif_push_on_pour))
+    db.set_setting("notif_push_on_keg_low",      _bool(notif_push_on_keg_low))
+    db.set_setting("notif_push_on_keg_empty",    _bool(notif_push_on_keg_empty))
+    db.set_setting("notif_push_on_temp_alert",   _bool(notif_push_on_temp_alert))
+    # Only overwrite password if a new one was submitted
+    if notif_email_smtp_password.strip():
+        db.set_setting("notif_email_smtp_password", notif_email_smtp_password.strip())
+
+    return RedirectResponse("/settings/?saved=1&tab=notifications", status_code=303)
+
+
+@router.post("/notifications/test-email", response_class=HTMLResponse)
+async def test_email(request: Request):
+    """Send a test email with current SMTP settings — admin only."""
+    if not _require_admin(request):
+        return HTMLResponse('<span class="text-danger">Not authorised.</span>', status_code=403)
+
+    from notifications.email_sender import send_email, _wrap
+
+    db       = get_db()
+    host     = db.get_setting("notif_email_smtp_host", "")
+    port_str = db.get_setting("notif_email_smtp_port", "587")
+    security = db.get_setting("notif_email_smtp_security", "starttls")
+    user     = db.get_setting("notif_email_smtp_user", "")
+    password = db.get_setting("notif_email_smtp_password", "")
+    from_    = db.get_setting("notif_email_from", "") or user
+    to       = db.get_setting("notif_email_to", "")
+
+    if not host or not to:
+        return HTMLResponse(
+            '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>'
+            'SMTP host and recipient address are required. Save settings first.</span>'
+        )
+
+    try:
+        port = int(port_str)
+    except ValueError:
+        port = 587
+
+    html = _wrap(
+        "<h2 style='margin-top:0;color:#1a1a3e;'>Test Notification</h2>"
+        "<p>If you're reading this, your SmartKegerator email notifications are configured correctly.</p>"
+    )
+    text = "SmartKegerator test notification — email is configured correctly."
+
+    ok, err = send_email(
+        host=host, port=port, username=user, password=password,
+        security=security, from_address=from_, to_address=to,
+        subject="✅ SmartKegerator — Test Notification",
+        body_html=html, body_text=text,
+    )
+
+    if ok:
+        return HTMLResponse(
+            f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
+            f'Test email sent to <strong>{to}</strong>.</span>'
+        )
+    return HTMLResponse(
+        f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+        f'{err}</span>'
+    )

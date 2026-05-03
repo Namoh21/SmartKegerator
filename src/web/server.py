@@ -403,7 +403,7 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
                 login_time = request.session.get("login_time", 0)
                 if time.time() - login_time > timeout_mins * 60:
                     request.session.clear()
-                    return RedirectResponse("/admin/login?expired=1", status_code=303)
+                    return RedirectResponse("/?expired=1", status_code=303)
                 else:
                     request.session["login_time"] = time.time()
 
@@ -527,8 +527,49 @@ app.include_router(api_router)
 # Entry point
 # ---------------------------------------------------------------------------
 
+def _make_redirect_app(https_port: int):
+    """Minimal ASGI app that redirects all HTTP traffic to HTTPS."""
+    async def redirect_app(scope, receive, send):
+        if scope["type"] == "http":
+            host = dict(scope.get("headers", [])).get(b"host", b"").decode().split(":")[0]
+            path = scope.get("path", "/")
+            qs   = scope.get("query_string", b"").decode()
+            url  = f"https://{host}:{https_port}{path}"
+            if qs:
+                url += f"?{qs}"
+            await send({
+                "type": "http.response.start",
+                "status": 301,
+                "headers": [[b"location", url.encode()], [b"content-length", b"0"]],
+            })
+            await send({"type": "http.response.body", "body": b""})
+    return redirect_app
+
+
 if __name__ == "__main__":
-    port = int(_config.get("web", {}).get("port", 8080)) if _config else 8080
+    import threading as _threading
+
+    web_cfg     = _config.get("web", {}) if _config else {}
+    port        = int(web_cfg.get("port", 8080))
+    ssl_cfg     = web_cfg.get("ssl", {})
+    ssl_enabled = bool(ssl_cfg.get("enabled", False))
+    certfile    = ssl_cfg.get("certfile", "") if ssl_enabled else None
+    keyfile     = ssl_cfg.get("keyfile",  "") if ssl_enabled else None
+
+    # When HTTPS is active, spin up a lightweight HTTP→HTTPS redirect on port 80
+    if ssl_enabled and certfile and keyfile:
+        def _run_redirect():
+            import uvicorn as _uv
+            _uv.run(
+                _make_redirect_app(port),
+                host="0.0.0.0",
+                port=80,
+                log_level="warning",
+                server_header=False,
+            )
+        t = _threading.Thread(target=_run_redirect, daemon=True)
+        t.start()
+
     uvicorn.run(
         "web.server:app",
         host="0.0.0.0",
@@ -536,4 +577,6 @@ if __name__ == "__main__":
         reload=False,
         log_level="info",
         server_header=False,
+        ssl_certfile=certfile or None,
+        ssl_keyfile=keyfile or None,
     )

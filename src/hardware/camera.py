@@ -212,20 +212,38 @@ class Camera(QObject):
             return False
         try:
             picam = Picamera2()
-            # Use RGB888 explicitly so we always know what we're getting,
-            # then convert to BGR for OpenCV consistency.  BGR888 is
-            # ambiguous across Pi Camera generations and can deliver RGB
-            # data on some sensors, causing red/blue to appear swapped.
-            cfg   = picam.create_preview_configuration(
-                main={"size": (self._width, self._height), "format": "RGB888"}
+
+            # Video configuration gives lower latency than preview configuration
+            # and is the recommended path for continuous capture on Pi 5.
+            # RGB888 is explicit so we always know the channel order; we convert
+            # to BGR ourselves rather than relying on the ambiguous BGR888 format
+            # which delivers RGB on some sensor generations.
+            cfg = picam.create_video_configuration(
+                main={"size": (self._width, self._height), "format": "RGB888"},
+                buffer_count=2,
             )
             picam.configure(cfg)
+
+            # Camera Module 3 has phase-detect autofocus — enable continuous AF.
+            # This is a no-op on sensors that don't support it (older modules, USB).
+            try:
+                from libcamera import controls as _lc_controls
+                picam.set_controls({
+                    "AfMode":  _lc_controls.AfModeEnum.Continuous,
+                    "AfSpeed": _lc_controls.AfSpeedEnum.Fast,
+                })
+                log.info("Camera: continuous autofocus enabled (Camera Module 3)")
+            except Exception:
+                pass  # sensor doesn't support AF controls — safe to ignore
+
             picam.start()
             time.sleep(0.5)   # let the sensor stabilise before first capture
 
             # Grab one frame immediately so latest_frame is never None
-            # from the moment start() returns
+            # from the moment start() returns.
+            # picamera2 with RGB888 returns RGB data — convert to BGR for OpenCV.
             first = picam.capture_array("main")
+            first = first[:, :, ::-1]  # RGB→BGR
             with self._lock:
                 self._latest = first
 
@@ -247,6 +265,7 @@ class Camera(QObject):
             try:
                 frame = self._picam.capture_array("main")
                 if frame.ndim == 3 and frame.shape[2] == 3:
+                    frame = frame[:, :, ::-1]  # RGB→BGR for OpenCV consistency
                     self._emit(frame)
                 else:
                     time.sleep(0.05)

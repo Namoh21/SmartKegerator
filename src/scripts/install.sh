@@ -745,7 +745,7 @@ SUDOERS_UPDATE="${REAL_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SRC_DIR}/scripts/up
     echo "${SUDOERS_UPDATE}"
 } > "${SUDOERS_FILE}"
 chmod 440 "${SUDOERS_FILE}"
-info "Sudoers rules written: ${REAL_USER} may run sudo reboot and sudo bash update.sh without password."
+info "Sudoers rules written."
 
 # ---------------------------------------------------------------------------
 # Restore database backup (preserved from before install)
@@ -753,8 +753,14 @@ info "Sudoers rules written: ${REAL_USER} may run sudo reboot and sudo bash upda
 if [[ -n "${DB_BACKUP:-}" && -f "${DB_BACKUP}" ]]; then
     cp "${DB_BACKUP}" "${DB_PATH}"
     chown "${REAL_USER}:${REAL_USER}" "${DB_PATH}"
+    chmod 600 "${DB_PATH}"
     rm -f "${DB_BACKUP}"
     info "Database restored."
+fi
+
+# Ensure database file permissions are locked down (owner read/write only)
+if [[ -f "${DB_PATH}" ]]; then
+    chmod 600 "${DB_PATH}"
 fi
 
 section "Installation complete"

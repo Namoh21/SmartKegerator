@@ -5,7 +5,8 @@
     <form hx-post="/kegs/assign-tap"
           hx-target="#tap-assignment-panel"
           hx-swap="innerHTML"
-          hx-indicator="#tap-spinner-{{ loop.index }}"
+          hx-on::before-request="let b=this.querySelector('button[type=submit]');b.disabled=true;b.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Setting…'"
+          hx-on::after-request="let b=this.querySelector('button[type=submit]');b.disabled=false;b.innerHTML='Set'"
           class="d-flex gap-2 align-items-end">
       <input type="hidden" name="tap" value="{{ tap_id }}">
       <div class="flex-grow-1">
@@ -21,10 +22,7 @@
           {% endfor %}
         </select>
       </div>
-      <button type="submit" class="btn btn-sm btn-outline-secondary">
-        <span id="tap-spinner-{{ loop.index }}" class="htmx-indicator spinner-border spinner-border-sm"></span>
-        Set
-      </button>
+      <button type="submit" class="btn btn-sm btn-accent">Set</button>
     </form>
   </div>
   {% endfor %}

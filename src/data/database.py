@@ -135,8 +135,13 @@ class Database:
     def __init__(self, path: str) -> None:
         self._path = path
         self._local = threading.local()
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        db_path = Path(path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
+        try:
+            db_path.chmod(0o600)
+        except OSError:
+            pass
 
     # ------------------------------------------------------------------
     # Connection management
@@ -235,6 +240,13 @@ class Database:
         try:
             with self._cursor() as cur:
                 cur.execute("ALTER TABLE admins ADD COLUMN pin_hash TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
+        # Track initial fill percentage for kegs tapped partially used
+        try:
+            with self._cursor() as cur:
+                cur.execute("ALTER TABLE kegs ADD COLUMN initial_fill_pct REAL NOT NULL DEFAULT 100.0")
         except sqlite3.OperationalError:
             pass  # column already exists
 
@@ -351,19 +363,20 @@ class Database:
 
     def save_keg(self, keg: Keg) -> Keg:
         date_str = keg.date_bought.strftime("%Y-%m-%d")
+        fill_pct  = max(0.0, min(100.0, keg.initial_fill_pct))
         with self._cursor() as cur:
             if keg.id is None:
                 cur.execute(
-                    "INSERT INTO kegs (beer_id, date_bought, liters_capacity, price, warmest_temp) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp),
+                    "INSERT INTO kegs (beer_id, date_bought, liters_capacity, price, warmest_temp, initial_fill_pct) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp, fill_pct),
                 )
                 keg.id = cur.lastrowid
             else:
                 cur.execute(
-                    "INSERT OR REPLACE INTO kegs (id, beer_id, date_bought, liters_capacity, price, warmest_temp) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (keg.id, keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp),
+                    "INSERT OR REPLACE INTO kegs (id, beer_id, date_bought, liters_capacity, price, warmest_temp, initial_fill_pct) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (keg.id, keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp, fill_pct),
                 )
         return keg
 
@@ -621,6 +634,16 @@ class Database:
             cur.execute("SELECT user_id FROM admins WHERE user_id IS NOT NULL")
             return {r["user_id"] for r in cur.fetchall()}
 
+    def get_admin_by_user_id(self, user_id: int) -> Optional[dict]:
+        """Return the admin row linked to a drinking user, or None."""
+        with self._cursor() as cur:
+            cur.execute(
+                "SELECT id, username, user_id FROM admins WHERE user_id = ?",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
     def get_admin_by_username(self, username: str) -> Optional[dict]:
         with self._cursor() as cur:
             cur.execute(
@@ -648,6 +671,15 @@ class Database:
                 cur.execute("INSERT INTO users (name) VALUES (?)", (name,))
                 user_id = cur.lastrowid
         # Create the admin record
+        with self._cursor() as cur:
+            cur.execute(
+                "INSERT INTO admins (username, password_hash, created_at, user_id) VALUES (?, ?, ?, ?)",
+                (username, password_hash, time.time(), user_id),
+            )
+            return cur.lastrowid
+
+    def promote_user_to_admin(self, user_id: int, username: str, password_hash: str) -> int:
+        """Grant admin access to an existing user account."""
         with self._cursor() as cur:
             cur.execute(
                 "INSERT INTO admins (username, password_hash, created_at, user_id) VALUES (?, ?, ?, ?)",
@@ -758,6 +790,7 @@ def _row_to_keg(row: sqlite3.Row) -> Keg:
         price=row["price"],
         warmest_temp=row["warmest_temp"],
         liters_poured=row["liters_poured"],
+        initial_fill_pct=row["initial_fill_pct"] if "initial_fill_pct" in row.keys() else 100.0,
     )
 
 

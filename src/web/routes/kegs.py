@@ -46,11 +46,12 @@ async def keg_list(request: Request):
 
 @router.post("/add", response_class=RedirectResponse)
 async def keg_add(
-    beer_id:      int   = Form(...),
-    capacity:     float = Form(...),
-    price:        float = Form(...),
-    date_bought:  str   = Form(""),
-    warmest_temp: float = Form(0.0),
+    beer_id:          int   = Form(...),
+    capacity:         float = Form(...),
+    price:            float = Form(...),
+    date_bought:      str   = Form(""),
+    warmest_temp:     float = Form(0.0),
+    initial_fill_pct: float = Form(100.0),
 ):
     db = get_db()
     try:
@@ -61,6 +62,7 @@ async def keg_add(
     keg = Keg(
         id=None, beer_id=beer_id, date_bought=date,
         liters_capacity=capacity, price=price, warmest_temp=warmest_temp,
+        initial_fill_pct=max(0.0, min(100.0, initial_fill_pct)),
     )
     db.save_keg(keg)
     return RedirectResponse("/kegs/", status_code=303)
@@ -68,12 +70,13 @@ async def keg_add(
 
 @router.post("/{keg_id}/edit", response_class=RedirectResponse)
 async def keg_edit(
-    keg_id:       int,
-    beer_id:      int   = Form(...),
-    capacity:     float = Form(...),
-    price:        float = Form(...),
-    date_bought:  str   = Form(""),
-    warmest_temp: float = Form(0.0),
+    keg_id:           int,
+    beer_id:          int   = Form(...),
+    capacity:         float = Form(...),
+    price:            float = Form(...),
+    date_bought:      str   = Form(""),
+    warmest_temp:     float = Form(0.0),
+    initial_fill_pct: float = Form(100.0),
 ):
     db  = get_db()
     keg = db.get_keg(keg_id)
@@ -82,10 +85,11 @@ async def keg_edit(
             keg.date_bought = datetime.strptime(date_bought, "%Y-%m-%d") if date_bought else keg.date_bought
         except ValueError:
             pass
-        keg.beer_id        = beer_id
-        keg.liters_capacity = capacity
-        keg.price          = price
-        keg.warmest_temp   = warmest_temp
+        keg.beer_id          = beer_id
+        keg.liters_capacity  = capacity
+        keg.price            = price
+        keg.warmest_temp     = warmest_temp
+        keg.initial_fill_pct = max(0.0, min(100.0, initial_fill_pct))
         db.save_keg(keg)
     return RedirectResponse("/kegs/", status_code=303)
 

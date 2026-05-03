@@ -31,7 +31,7 @@
         {% else %}{% set bar_cls = "level-empty" %}{% endif %}
 
         <div class="progress my-2" style="height:22px;">
-          <div class="progress-bar {{ bar_cls }}" style="width:{{ pct }}%;">{{ pct }}%</div>
+          <div class="progress-bar {{ bar_cls }} js-pct-bar" data-pct="{{ pct }}">{{ pct }}%</div>
         </div>
 
         <div class="row g-1 small">
