@@ -1149,7 +1149,7 @@
     var p = this.closest('form').querySelector('[name=port]');
     if (!p) return;
     if (this.checked && (p.value === '80' || p.value === '8080')) p.value = '443';
-    else if (!this.checked && p.value === '443') p.value = '80';
+    else if (!this.checked && p.value === '443') p.value = '8080';
   });
 })();
 
