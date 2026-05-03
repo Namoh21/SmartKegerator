@@ -469,14 +469,46 @@
           <div class="card-header"><i class="bi bi-thermometer me-2"></i><strong>Temperature Sensors</strong></div>
           <div class="card-body">
             {% set hw = yaml_config.get('hardware', {}) %}
+
+            {% if pi_gen == 5 %}
+            {# ── Pi 5: DHT22 not supported — I²C pins are fixed ── #}
+            <div class="d-flex align-items-start gap-2 mb-2">
+              <i class="bi bi-info-circle text-info mt-1"></i>
+              <div>
+                <div class="fw-semibold">AHT20 temperature / humidity sensor</div>
+                <div class="text-muted small mt-1">
+                  Raspberry Pi 5 uses the AHT20 via I²C. The I²C bus pins are
+                  fixed by the hardware — no configuration required.<br>
+                  Connect: <strong>SDA → GPIO 2 (Pin 3)</strong> &nbsp;·&nbsp;
+                  <strong>SCL → GPIO 3 (Pin 5)</strong> &nbsp;·&nbsp;
+                  <strong>VCC → 3.3 V (Pin 1)</strong> &nbsp;·&nbsp;
+                  <strong>GND → GND (Pin 6)</strong>
+                </div>
+              </div>
+            </div>
+            {% else %}
+            {# ── Pi 3 / 4 (or unknown): DHT22 bit-bang OR AHT20 I²C ── #}
             {% if is_admin %}
             <form method="post" action="/settings/sensors">
             {% endif %}
 
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Sensor type</label>
+                <div class="text-muted small mb-2">
+                  Pi 3 / Pi 4 supports both DHT22 (bit-bang) and AHT20 (I²C).<br>
+                  AHT20 is recommended — more reliable and uses fixed I²C pins
+                  (GPIO 2 SDA, GPIO 3 SCL). Set <code>temp_sensor_type: aht20</code>
+                  in <code>config.yaml</code> to use it without any GPIO config here.
+                </div>
+              </div>
 
               <div class="mb-2">
-                <label class="form-label fw-semibold">AHT20 temperature / humidity sensor I²C pin (BCM)</label>
-                <div class="text-muted small mb-2">AHT20 uses I²C — connect to GPIO 2 (SDA) and GPIO 3 (SCL).</div>
+                <label class="form-label fw-semibold">DHT22 data pin (BCM)</label>
+                <div class="text-muted small mb-2">
+                  Only used when <code>temp_sensor_type: dht22</code> is set in
+                  <code>config.yaml</code>. Connect the DHT22 DATA wire to the
+                  selected GPIO pin.
+                </div>
                 {% if is_admin %}
                 <select class="form-select w-auto" name="temp_sensor_dht_pin">
                   {% for pin_num, pin_label in gpio_pins %}
@@ -497,6 +529,7 @@
               </button>
             </form>
             {% endif %}
+            {% endif %}{# pi_gen #}
           </div>
         </div>
       </div>

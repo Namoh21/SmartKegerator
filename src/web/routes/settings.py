@@ -175,6 +175,7 @@ async def settings_page(request: Request):
     ssl_certfile = ssl_cfg.get("certfile", "")
     ssl_keyfile  = ssl_cfg.get("keyfile", "")
     current_level = db.get_setting("log_level", "high")
+    from hardware.pi_model import pi_generation
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -184,7 +185,8 @@ async def settings_page(request: Request):
             ssl_enabled=ssl_enabled, ssl_certfile=ssl_certfile, ssl_keyfile=ssl_keyfile,
             log_levels=LEVEL_LABELS, current_log_level=current_level,
             app_version=_read_version(), app_git_hash=_read_git_hash(),
-            update_channel=_read_channel()),
+            update_channel=_read_channel(),
+            pi_gen=pi_generation()),
     )
 
 
@@ -311,9 +313,12 @@ async def settings_save_recognition(
 async def settings_save_sensors(
     temp_sensor_dht_pin: int = Form(22),
 ):
+    from hardware.pi_model import pi_generation
     cfg = _read_yaml()
     cfg.setdefault("hardware", {})
-    cfg["hardware"]["temp_sensor_dht_pin"] = temp_sensor_dht_pin
+    # Only save DHT22 pin on Pi 3/4 — Pi 5 uses fixed I²C, no GPIO config needed
+    if pi_generation() != 5:
+        cfg["hardware"]["temp_sensor_dht_pin"] = temp_sensor_dht_pin
     _write_yaml(cfg)
     return RedirectResponse("/settings/?saved=1&tab=sensors", status_code=303)
 
