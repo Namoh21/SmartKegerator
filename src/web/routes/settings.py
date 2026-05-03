@@ -821,16 +821,24 @@ def _read_channel() -> str:
 
 
 def _write_channel(channel: str) -> None:
-    # Always save to DB (web service has write access)
+    # DB is the authoritative store — update.sh reads this first.
     try:
         get_db().set_setting("update_channel", channel)
+        log.info("update_channel saved to DB: %s", channel)
     except Exception as exc:
-        log.warning("Could not save update_channel to DB: %s", exc)
-    # Also write the file that update.sh reads directly
+        log.error("Could not save update_channel to DB: %s", exc)
+    # Best-effort sync to file so update.sh has it even without sqlite3.
+    # update.sh chowns this file to REAL_USER after each run so we can write it.
     try:
         _CHANNEL_FILE.write_text(channel + "\n")
+        log.info("update_channel file updated: %s", _CHANNEL_FILE)
+    except PermissionError:
+        log.warning(
+            "Cannot write %s (owned by root — update.sh will fix ownership on next run). "
+            "DB value '%s' will be used by update.sh.", _CHANNEL_FILE, channel,
+        )
     except Exception as exc:
-        log.warning("Could not write channel file (update.sh fallback): %s", exc)
+        log.warning("Could not write channel file: %s", exc)
 
 
 def _read_version() -> str:
