@@ -99,6 +99,8 @@ async def user_add(name: str = Form(...)):
     db   = get_db()
     user = User(id=None, name=name.strip())
     db.save_user(user)
+    from notifications.email_sender import notify_new_user
+    notify_new_user(db=db, user_name=user.name)
     return RedirectResponse("/users/", status_code=303)
 
 

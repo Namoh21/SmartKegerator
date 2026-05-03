@@ -824,12 +824,19 @@
                   </div>
                 </div>
                 <div class="col-sm-6">
-                  <div class="form-check">
+                  <div class="form-check d-flex align-items-center gap-2 flex-wrap">
                     <input class="form-check-input" type="checkbox" name="notif_email_on_temp_alert"
                            id="email_temp" value="1" {% if notif.notif_email_on_temp_alert == '1' %}checked{% endif %}>
                     <label class="form-check-label" for="email_temp">
-                      <i class="bi bi-thermometer-high me-1 text-danger"></i>Temperature exceeds threshold
+                      <i class="bi bi-thermometer-high me-1 text-danger"></i>Temperature exceeds
                     </label>
+                    <div class="input-group input-group-sm" style="width:100px;">
+                      <input type="number" class="form-control form-control-sm text-center"
+                             name="notif_email_temp_alert_f"
+                             value="{{ notif.notif_email_temp_alert_f }}"
+                             min="32" max="120">
+                      <span class="input-group-text">°F</span>
+                    </div>
                   </div>
                 </div>
                 <div class="col-sm-6">
