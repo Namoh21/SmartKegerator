@@ -366,6 +366,32 @@ class App(QObject):
                 "Pour saved: tap=%s ticks=%d %.1f oz $%.2f user=%s",
                 tap, ticks, ounces, price, user_id,
             )
+
+            # --- email notifications (fire-and-forget daemon threads) ---
+            try:
+                from notifications.email_sender import (
+                    notify_pour, notify_keg_low, notify_keg_empty,
+                )
+                beer = self._db.get_beer(keg.beer_id)
+                user = self._db.get_user(pour.user_id)
+                beer_name = beer.name if beer else "Unknown Beer"
+                user_name = user.name if user else "Unknown"
+
+                notify_pour(db=self._db, user_name=user_name,
+                            beer_name=beer_name, ounces=ounces, price=price)
+
+                # Reload keg to get updated liters_poured after this pour
+                updated_keg = self._db.get_keg(keg.id)
+                if updated_keg:
+                    pct = updated_keg.percent_remaining
+                    if pct <= 0:
+                        notify_keg_empty(db=self._db, beer_name=beer_name)
+                    else:
+                        notify_keg_low(db=self._db, beer_name=beer_name,
+                                       pct_remaining=pct)
+            except Exception as _ne:
+                log.debug("Notification error (non-fatal): %s", _ne)
+
         else:
             log.info("Pour finished with no ticks or no keg — nothing saved")
 
@@ -391,6 +417,21 @@ class App(QObject):
             self._db.set_setting("latest_temp_ts", f"{time.time():.0f}")
         except Exception as exc:
             log.debug("Temp DB store error: %s", exc)
+
+        # Temperature alert — only fires when crossing above threshold,
+        # then rate-limited to at most once per hour.
+        if ambient_f is not None:
+            try:
+                from notifications.email_sender import notify_temp_alert
+                threshold_str = self._db.get_setting("notif_email_temp_alert_f", "55")
+                threshold_f   = float(threshold_str) if threshold_str else 55.0
+                if ambient_f > threshold_f:
+                    last_ts = float(self._db.get_setting("notif_temp_alert_last_ts", "0") or 0)
+                    if time.time() - last_ts >= 3600:
+                        notify_temp_alert(db=self._db, temp_f=ambient_f, threshold_f=threshold_f)
+                        self._db.set_setting("notif_temp_alert_last_ts", f"{time.time():.0f}")
+            except Exception as _ne:
+                log.debug("Temp alert notification error (non-fatal): %s", _ne)
 
     # ------------------------------------------------------------------
     # Navigation

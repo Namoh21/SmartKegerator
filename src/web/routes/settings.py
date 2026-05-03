@@ -191,8 +191,9 @@ async def settings_page(request: Request):
         "notif_email_on_keg_low":    "0",
         "notif_email_keg_low_pct":   "15",
         "notif_email_on_keg_empty":  "0",
-        "notif_email_on_temp_alert": "0",
-        "notif_email_on_new_user":   "0",
+        "notif_email_on_temp_alert":  "0",
+        "notif_email_temp_alert_f":   "55",
+        "notif_email_on_new_user":    "0",
         "notif_push_on_pour":        "0",
         "notif_push_on_keg_low":     "0",
         "notif_push_on_keg_empty":   "0",
@@ -1020,8 +1021,9 @@ async def settings_save_notifications(
     notif_email_on_keg_low:   Optional[str] = Form(None),
     notif_email_keg_low_pct:  str           = Form("15"),
     notif_email_on_keg_empty: Optional[str] = Form(None),
-    notif_email_on_temp_alert:Optional[str] = Form(None),
-    notif_email_on_new_user:  Optional[str] = Form(None),
+    notif_email_on_temp_alert: Optional[str] = Form(None),
+    notif_email_temp_alert_f:  str           = Form("55"),
+    notif_email_on_new_user:   Optional[str] = Form(None),
     # Push event toggles (server-side preferences)
     notif_push_on_pour:       Optional[str] = Form(None),
     notif_push_on_keg_low:    Optional[str] = Form(None),
@@ -1044,6 +1046,7 @@ async def settings_save_notifications(
     db.set_setting("notif_email_keg_low_pct",    notif_email_keg_low_pct.strip() or "15")
     db.set_setting("notif_email_on_keg_empty",   _bool(notif_email_on_keg_empty))
     db.set_setting("notif_email_on_temp_alert",  _bool(notif_email_on_temp_alert))
+    db.set_setting("notif_email_temp_alert_f",   notif_email_temp_alert_f.strip() or "55")
     db.set_setting("notif_email_on_new_user",    _bool(notif_email_on_new_user))
     db.set_setting("notif_push_on_pour",         _bool(notif_push_on_pour))
     db.set_setting("notif_push_on_keg_low",      _bool(notif_push_on_keg_low))
