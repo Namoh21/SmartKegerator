@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from data.database import Database
-from data.models import Keg, UNKNOWN_USER_ID
+from data.models import Keg
 from ui.theme import get as _get_theme
 
 log = logging.getLogger(__name__)
