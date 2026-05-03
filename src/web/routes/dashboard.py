@@ -26,7 +26,7 @@ def _build_tap_stats(db, taps, config):
 
 
 @router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request, expired: str = None):
     db     = get_db()
     config = get_config()
     taps   = db.get_tap_assignments()
@@ -62,7 +62,8 @@ async def dashboard(request: Request):
         ctx(request, tap_stats=tap_stats, tap_names=tap_names, enriched_pours=enriched_pours,
             today_count=len(today_pours),
             today_oz=round(sum(p.ounces for p in today_pours), 1),
-            today_revenue=sum(p.price for p in today_pours)),
+            today_revenue=sum(p.price for p in today_pours),
+            session_expired=bool(expired)),
     )
 
 

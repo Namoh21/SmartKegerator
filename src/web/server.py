@@ -403,7 +403,7 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
                 login_time = request.session.get("login_time", 0)
                 if time.time() - login_time > timeout_mins * 60:
                     request.session.clear()
-                    return RedirectResponse("/admin/login?expired=1", status_code=303)
+                    return RedirectResponse("/?expired=1", status_code=303)
                 else:
                     request.session["login_time"] = time.time()
 

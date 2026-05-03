@@ -147,7 +147,7 @@
       if (countdown) countdown.textContent = secs;
       if (secs <= 0) {
         clearInterval(tick);
-        location.assign('/admin/login?error=expired');
+        location.assign('/?expired=1');
       }
     }, 1000);
     modal.show();
