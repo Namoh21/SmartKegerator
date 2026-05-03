@@ -167,6 +167,10 @@ async def settings_page(request: Request):
     settings = db.get_all_settings()
     cfg      = _read_yaml()
     admins   = db.get_all_admins() if request.session.get("admin_username") else []
+    all_users      = db.get_all_users() if request.session.get("admin_username") else []
+    admin_user_ids = db.get_admin_user_ids() if request.session.get("admin_username") else set()
+    non_admin_users  = [u for u in all_users if u.id not in admin_user_ids]
+    current_admin_id = request.session.get("admin_id")
     server_ip   = _get_local_ip()
     web_cfg     = cfg.get("web", {})
     server_port = int(web_cfg.get("port", 8080))
@@ -180,7 +184,8 @@ async def settings_page(request: Request):
         request,
         "settings.html",
         ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS,
-            admins=admins, themes=THEMES,
+            admins=admins, non_admin_users=non_admin_users,
+            current_admin_id=current_admin_id, themes=THEMES,
             server_ip=server_ip, server_port=server_port,
             ssl_enabled=ssl_enabled, ssl_certfile=ssl_certfile, ssl_keyfile=ssl_keyfile,
             log_levels=LEVEL_LABELS, current_log_level=current_level,
@@ -709,6 +714,40 @@ async def admin_add(
     if db.get_admin_by_username(username):
         return RedirectResponse("/settings/?error=taken&tab=admins", status_code=303)
     db.add_admin(username, hash_password(password), display_name=display_name)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+@router.post("/admins/promote", response_class=RedirectResponse)
+async def admin_promote(
+    user_id:  int = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    db       = get_db()
+    username = username.strip()
+    if not username or not password:
+        return RedirectResponse("/settings/?error=empty&tab=admins", status_code=303)
+    if len(password) < 8:
+        return RedirectResponse("/settings/?error=short&tab=admins", status_code=303)
+    if db.get_admin_by_username(username):
+        return RedirectResponse("/settings/?error=taken&tab=admins", status_code=303)
+    user = db.get_user(user_id)
+    if not user:
+        return RedirectResponse("/settings/?error=nouser&tab=admins", status_code=303)
+    if db.is_user_admin(user_id):
+        return RedirectResponse("/settings/?error=already&tab=admins", status_code=303)
+    db.promote_user_to_admin(user_id, username, hash_password(password))
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+@router.post("/admins/demote", response_class=RedirectResponse)
+async def admin_demote(request: Request, admin_id: int = Form(...)):
+    db = get_db()
+    if db.admin_count() <= 1:
+        return RedirectResponse("/settings/?error=last&tab=admins", status_code=303)
+    if request.session.get("admin_id") == admin_id:
+        return RedirectResponse("/settings/?error=self&tab=admins", status_code=303)
+    db.delete_admin(admin_id)
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 

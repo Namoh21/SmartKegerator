@@ -774,8 +774,14 @@ info "certbot auto-renewal cron installed at ${CRON_FILE}."
 if [[ -n "${DB_BACKUP:-}" && -f "${DB_BACKUP}" ]]; then
     cp "${DB_BACKUP}" "${DB_PATH}"
     chown "${REAL_USER}:${REAL_USER}" "${DB_PATH}"
+    chmod 600 "${DB_PATH}"
     rm -f "${DB_BACKUP}"
     info "Database restored."
+fi
+
+# Ensure database file permissions are locked down (owner read/write only)
+if [[ -f "${DB_PATH}" ]]; then
+    chmod 600 "${DB_PATH}"
 fi
 
 section "Installation complete"

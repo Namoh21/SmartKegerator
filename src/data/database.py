@@ -135,8 +135,13 @@ class Database:
     def __init__(self, path: str) -> None:
         self._path = path
         self._local = threading.local()
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        db_path = Path(path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
+        try:
+            db_path.chmod(0o600)
+        except OSError:
+            pass
 
     # ------------------------------------------------------------------
     # Connection management
@@ -648,6 +653,15 @@ class Database:
                 cur.execute("INSERT INTO users (name) VALUES (?)", (name,))
                 user_id = cur.lastrowid
         # Create the admin record
+        with self._cursor() as cur:
+            cur.execute(
+                "INSERT INTO admins (username, password_hash, created_at, user_id) VALUES (?, ?, ?, ?)",
+                (username, password_hash, time.time(), user_id),
+            )
+            return cur.lastrowid
+
+    def promote_user_to_admin(self, user_id: int, username: str, password_hash: str) -> int:
+        """Grant admin access to an existing user account."""
         with self._cursor() as cur:
             cur.execute(
                 "INSERT INTO admins (username, password_hash, created_at, user_id) VALUES (?, ?, ?, ?)",
