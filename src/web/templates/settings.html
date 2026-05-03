@@ -41,11 +41,12 @@
           ('taps',       'bi-diagram-3',   'Taps'),
           ('camera',     'bi-camera',      'Camera'),
           ('sensors',    'bi-thermometer', 'Sensors'),
-          ('beer-db',    'bi-database',    'Beer DB'),
-          ('admins',     'bi-shield-lock', 'Administrators'),
-          ('updates',    'bi-arrow-repeat', 'Updates'),
+          ('beer-db',       'bi-database',    'Beer DB'),
+          ('notifications', 'bi-bell',        'Notifications'),
+          ('admins',        'bi-shield-lock', 'Administrators'),
+          ('updates',       'bi-arrow-repeat', 'Updates'),
       ] %}
-      {% if tab_id not in ('admins', 'updates') or is_admin %}
+      {% if tab_id not in ('admins', 'updates', 'notifications') or is_admin %}
       <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == tab_id %}active{% endif %}"
                 data-bs-toggle="tab" data-bs-target="#pane-{{ tab_id }}" type="button">
@@ -607,6 +608,249 @@
           </div>
         </div>
       </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
+           TAB: NOTIFICATIONS (admin-only)
+           ══════════════════════════════════════════════════════════════ -->
+      {% if is_admin %}
+      <div class="tab-pane fade {% if active_tab == 'notifications' %}show active{% endif %}" id="pane-notifications">
+        <form method="post" action="/settings/notifications" autocomplete="off">
+
+          <!-- ── Push Notifications ──────────────────────────────────── -->
+          <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-phone me-2"></i><strong>Mobile App Push Notifications</strong></div>
+            <div class="card-body">
+              <p class="text-muted small mb-3">
+                Push notifications are delivered via the SmartKegerator Android app.
+                Choose which events trigger a push to registered devices.
+              </p>
+              <div class="row g-2">
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_push_on_pour"
+                           id="push_pour" value="1" {% if notif.notif_push_on_pour == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="push_pour">
+                      <i class="bi bi-cup-straw me-1 text-accent"></i>Pour recorded
+                    </label>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_push_on_keg_low"
+                           id="push_keg_low" value="1" {% if notif.notif_push_on_keg_low == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="push_keg_low">
+                      <i class="bi bi-exclamation-triangle me-1 text-warning"></i>Keg running low
+                    </label>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_push_on_keg_empty"
+                           id="push_keg_empty" value="1" {% if notif.notif_push_on_keg_empty == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="push_keg_empty">
+                      <i class="bi bi-archive me-1 text-danger"></i>Keg empty
+                    </label>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_push_on_temp_alert"
+                           id="push_temp" value="1" {% if notif.notif_push_on_temp_alert == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="push_temp">
+                      <i class="bi bi-thermometer-high me-1 text-danger"></i>Temperature alert
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="alert alert-secondary small mt-3 mb-0 py-2">
+                <i class="bi bi-info-circle me-1"></i>
+                Firebase Cloud Messaging credentials and per-device alert thresholds are
+                configured in the <strong>Mobile App Access</strong> section and within the Android app.
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Email Notifications ─────────────────────────────────── -->
+          <div class="card mb-3">
+            <div class="card-header d-flex align-items-center gap-3">
+              <i class="bi bi-envelope me-1"></i><strong>Email Notifications</strong>
+              <div class="form-check form-switch mb-0 ms-auto">
+                <input class="form-check-input" type="checkbox" role="switch"
+                       name="notif_email_enabled" id="emailEnabled" value="1"
+                       {% if notif.notif_email_enabled == '1' %}checked{% endif %}
+                       onchange="document.getElementById('emailBody').classList.toggle('d-none', !this.checked)">
+                <label class="form-check-label small" for="emailEnabled">Enable</label>
+              </div>
+            </div>
+            <div class="card-body {% if notif.notif_email_enabled != '1' %}d-none{% endif %}" id="emailBody">
+
+              <!-- Provider preset -->
+              <div class="mb-4">
+                <label class="form-label fw-semibold">Email provider</label>
+                <div class="row g-2" id="preset-cards">
+                  {% for pid, pmeta in email_presets.items() %}
+                  <div class="col-6 col-md-4 col-lg-3">
+                    <div class="card h-100 preset-card {% if notif.notif_email_preset == pid %}border-accent{% endif %}"
+                         style="cursor:pointer;" data-preset="{{ pid }}"
+                         onclick="selectPreset('{{ pid }}')">
+                      <div class="card-body py-2 px-3 text-center">
+                        <div class="fw-semibold small">{{ pmeta.label }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+                <input type="hidden" name="notif_email_preset" id="presetInput" value="{{ notif.notif_email_preset }}">
+
+                <!-- Per-preset setup note -->
+                {% for pid, pmeta in email_presets.items() %}
+                <div id="note-{{ pid }}" class="alert alert-info small mt-2 py-2 mb-0
+                     {% if notif.notif_email_preset != pid %}d-none{% endif %}">
+                  <i class="bi bi-info-circle me-1"></i>{{ pmeta.note | safe }}
+                </div>
+                {% endfor %}
+              </div>
+
+              <!-- SMTP fields -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label small">SMTP host</label>
+                  <input type="text" class="form-control form-control-sm font-monospace"
+                         name="notif_email_smtp_host" id="smtpHost"
+                         value="{{ notif.notif_email_smtp_host }}"
+                         placeholder="smtp.example.com">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Port</label>
+                  <input type="number" class="form-control form-control-sm font-monospace"
+                         name="notif_email_smtp_port" id="smtpPort"
+                         value="{{ notif.notif_email_smtp_port }}" min="1" max="65535">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small">Security</label>
+                  <select class="form-select form-select-sm" name="notif_email_smtp_security" id="smtpSecurity">
+                    <option value="starttls" {% if notif.notif_email_smtp_security == 'starttls' %}selected{% endif %}>STARTTLS (recommended)</option>
+                    <option value="ssl"      {% if notif.notif_email_smtp_security == 'ssl' %}selected{% endif %}>SSL / TLS</option>
+                    <option value="none"     {% if notif.notif_email_smtp_security == 'none' %}selected{% endif %}>None (not recommended)</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Username / email</label>
+                  <input type="text" class="form-control form-control-sm"
+                         name="notif_email_smtp_user" id="smtpUser"
+                         value="{{ notif.notif_email_smtp_user }}"
+                         placeholder="you@example.com" autocomplete="off">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Password / App Password</label>
+                  <div class="input-group input-group-sm">
+                    <input type="password" class="form-control form-control-sm"
+                           name="notif_email_smtp_password" id="smtpPass"
+                           placeholder="{% if notif.notif_email_smtp_user %}••••••••  (leave blank to keep){% else %}password{% endif %}"
+                           autocomplete="new-password">
+                    <button class="btn btn-outline-secondary" type="button"
+                            onclick="var i=document.getElementById('smtpPass');i.type=i.type==='password'?'text':'password'">
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">From address</label>
+                  <input type="email" class="form-control form-control-sm"
+                         name="notif_email_from" id="smtpFrom"
+                         value="{{ notif.notif_email_from }}"
+                         placeholder="smartkegerator@example.com">
+                  <div class="form-text">Shown as the sender. Leave blank to use the username above.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">Send alerts to</label>
+                  <input type="email" class="form-control form-control-sm"
+                         name="notif_email_to"
+                         value="{{ notif.notif_email_to }}"
+                         placeholder="admin@example.com" required>
+                  <div class="form-text">Email address that receives all notifications.</div>
+                </div>
+              </div>
+
+              <!-- Test email -->
+              <div class="mb-4 d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        hx-post="/settings/notifications/test-email"
+                        hx-target="#email-test-result"
+                        hx-swap="innerHTML"
+                        hx-on::before-request="this.disabled=true;this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Sending…'"
+                        hx-on::after-request="this.disabled=false;this.innerHTML='<i class=\'bi bi-send me-1\'></i>Send Test Email'">
+                  <i class="bi bi-send me-1"></i>Send Test Email
+                </button>
+                <span id="email-test-result" class="small"></span>
+              </div>
+              <hr class="border-secondary">
+
+              <!-- Email event toggles -->
+              <div class="fw-semibold small mb-2">Send an email when…</div>
+              <div class="row g-2">
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_email_on_pour"
+                           id="email_pour" value="1" {% if notif.notif_email_on_pour == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="email_pour">
+                      <i class="bi bi-cup-straw me-1 text-accent"></i>A pour is recorded
+                    </label>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-check d-flex align-items-center gap-2 flex-wrap">
+                    <input class="form-check-input" type="checkbox" name="notif_email_on_keg_low"
+                           id="email_keg_low" value="1" {% if notif.notif_email_on_keg_low == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="email_keg_low">
+                      <i class="bi bi-exclamation-triangle me-1 text-warning"></i>Keg drops below
+                    </label>
+                    <div class="input-group input-group-sm" style="width:90px;">
+                      <input type="number" class="form-control form-control-sm text-center"
+                             name="notif_email_keg_low_pct"
+                             value="{{ notif.notif_email_keg_low_pct }}"
+                             min="1" max="99">
+                      <span class="input-group-text">%</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_email_on_keg_empty"
+                           id="email_keg_empty" value="1" {% if notif.notif_email_on_keg_empty == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="email_keg_empty">
+                      <i class="bi bi-archive me-1 text-danger"></i>A keg is emptied
+                    </label>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_email_on_temp_alert"
+                           id="email_temp" value="1" {% if notif.notif_email_on_temp_alert == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="email_temp">
+                      <i class="bi bi-thermometer-high me-1 text-danger"></i>Temperature exceeds threshold
+                    </label>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="notif_email_on_new_user"
+                           id="email_new_user" value="1" {% if notif.notif_email_on_new_user == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="email_new_user">
+                      <i class="bi bi-person-plus me-1"></i>A new user registers
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-accent">
+            <i class="bi bi-save me-1"></i>Save Notification Settings
+          </button>
+        </form>
+      </div>
+      {% endif %}
 
       <!-- ══════════════════════════════════════════════════════════════
            TAB: ADMINISTRATORS (admin-only)
@@ -1290,5 +1534,25 @@ document.body.addEventListener('updateComplete', function() {
   }
   setTimeout(waitForServer, 3000);
 });
+
+// ── Email provider preset selector ──────────────────────────────────────
+var _presets = {{ email_presets | tojson }};
+
+function selectPreset(pid) {
+  document.getElementById('presetInput').value = pid;
+  document.querySelectorAll('.preset-card').forEach(function(c) {
+    c.classList.toggle('border-accent', c.dataset.preset === pid);
+  });
+  Object.keys(_presets).forEach(function(p) {
+    var n = document.getElementById('note-' + p);
+    if (n) n.classList.toggle('d-none', p !== pid);
+  });
+  var p = _presets[pid];
+  if (p && p.host) {
+    document.getElementById('smtpHost').value     = p.host;
+    document.getElementById('smtpPort').value     = p.port;
+    document.getElementById('smtpSecurity').value = p.security;
+  }
+}
 </script>
 {% endblock %}

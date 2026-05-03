@@ -180,6 +180,28 @@ async def settings_page(request: Request):
     ssl_keyfile  = ssl_cfg.get("keyfile", "")
     current_level = db.get_setting("log_level", "high")
     from hardware.pi_model import pi_generation
+    from notifications.email_sender import PRESETS as EMAIL_PRESETS
+    # Notification settings (read from DB)
+    notif = {k: db.get_setting(k, v) for k, v in {
+        "notif_email_enabled":       "0",
+        "notif_email_preset":        "custom",
+        "notif_email_smtp_host":     "",
+        "notif_email_smtp_port":     "587",
+        "notif_email_smtp_security": "starttls",
+        "notif_email_smtp_user":     "",
+        "notif_email_from":          "",
+        "notif_email_to":            "",
+        "notif_email_on_pour":       "0",
+        "notif_email_on_keg_low":    "0",
+        "notif_email_keg_low_pct":   "15",
+        "notif_email_on_keg_empty":  "0",
+        "notif_email_on_temp_alert": "0",
+        "notif_email_on_new_user":   "0",
+        "notif_push_on_pour":        "0",
+        "notif_push_on_keg_low":     "0",
+        "notif_push_on_keg_empty":   "0",
+        "notif_push_on_temp_alert":  "0",
+    }.items()}
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -191,6 +213,7 @@ async def settings_page(request: Request):
             log_levels=LEVEL_LABELS, current_log_level=current_level,
             app_version=_read_version(), app_git_hash=_read_git_hash(),
             update_channel=_read_channel(),
+            notif=notif, email_presets=EMAIL_PRESETS,
             pi_gen=pi_generation()),
     )
 
@@ -971,3 +994,112 @@ async def update_log_poll(request: Request):
     if done:
         resp.headers["HX-Trigger"] = "updateComplete"
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+@router.post("/notifications", response_class=RedirectResponse)
+async def settings_save_notifications(
+    # Email master switch
+    notif_email_enabled:      Optional[str] = Form(None),
+    notif_email_preset:       str           = Form("custom"),
+    notif_email_smtp_host:    str           = Form(""),
+    notif_email_smtp_port:    str           = Form("587"),
+    notif_email_smtp_security:str           = Form("starttls"),
+    notif_email_smtp_user:    str           = Form(""),
+    notif_email_smtp_password:str           = Form(""),
+    notif_email_from:         str           = Form(""),
+    notif_email_to:           str           = Form(""),
+    # Email event toggles
+    notif_email_on_pour:      Optional[str] = Form(None),
+    notif_email_on_keg_low:   Optional[str] = Form(None),
+    notif_email_keg_low_pct:  str           = Form("15"),
+    notif_email_on_keg_empty: Optional[str] = Form(None),
+    notif_email_on_temp_alert:Optional[str] = Form(None),
+    notif_email_on_new_user:  Optional[str] = Form(None),
+    # Push event toggles (server-side preferences)
+    notif_push_on_pour:       Optional[str] = Form(None),
+    notif_push_on_keg_low:    Optional[str] = Form(None),
+    notif_push_on_keg_empty:  Optional[str] = Form(None),
+    notif_push_on_temp_alert: Optional[str] = Form(None),
+):
+    db = get_db()
+    def _bool(v): return "1" if v is not None else "0"
+
+    db.set_setting("notif_email_enabled",       _bool(notif_email_enabled))
+    db.set_setting("notif_email_preset",         notif_email_preset.strip())
+    db.set_setting("notif_email_smtp_host",      notif_email_smtp_host.strip())
+    db.set_setting("notif_email_smtp_port",      notif_email_smtp_port.strip() or "587")
+    db.set_setting("notif_email_smtp_security",  notif_email_smtp_security.strip())
+    db.set_setting("notif_email_smtp_user",      notif_email_smtp_user.strip())
+    db.set_setting("notif_email_from",           notif_email_from.strip())
+    db.set_setting("notif_email_to",             notif_email_to.strip())
+    db.set_setting("notif_email_on_pour",        _bool(notif_email_on_pour))
+    db.set_setting("notif_email_on_keg_low",     _bool(notif_email_on_keg_low))
+    db.set_setting("notif_email_keg_low_pct",    notif_email_keg_low_pct.strip() or "15")
+    db.set_setting("notif_email_on_keg_empty",   _bool(notif_email_on_keg_empty))
+    db.set_setting("notif_email_on_temp_alert",  _bool(notif_email_on_temp_alert))
+    db.set_setting("notif_email_on_new_user",    _bool(notif_email_on_new_user))
+    db.set_setting("notif_push_on_pour",         _bool(notif_push_on_pour))
+    db.set_setting("notif_push_on_keg_low",      _bool(notif_push_on_keg_low))
+    db.set_setting("notif_push_on_keg_empty",    _bool(notif_push_on_keg_empty))
+    db.set_setting("notif_push_on_temp_alert",   _bool(notif_push_on_temp_alert))
+    # Only overwrite password if a new one was submitted
+    if notif_email_smtp_password.strip():
+        db.set_setting("notif_email_smtp_password", notif_email_smtp_password.strip())
+
+    return RedirectResponse("/settings/?saved=1&tab=notifications", status_code=303)
+
+
+@router.post("/notifications/test-email", response_class=HTMLResponse)
+async def test_email(request: Request):
+    """Send a test email with current SMTP settings — admin only."""
+    if not _require_admin(request):
+        return HTMLResponse('<span class="text-danger">Not authorised.</span>', status_code=403)
+
+    from notifications.email_sender import send_email, _wrap
+
+    db       = get_db()
+    host     = db.get_setting("notif_email_smtp_host", "")
+    port_str = db.get_setting("notif_email_smtp_port", "587")
+    security = db.get_setting("notif_email_smtp_security", "starttls")
+    user     = db.get_setting("notif_email_smtp_user", "")
+    password = db.get_setting("notif_email_smtp_password", "")
+    from_    = db.get_setting("notif_email_from", "") or user
+    to       = db.get_setting("notif_email_to", "")
+
+    if not host or not to:
+        return HTMLResponse(
+            '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>'
+            'SMTP host and recipient address are required. Save settings first.</span>'
+        )
+
+    try:
+        port = int(port_str)
+    except ValueError:
+        port = 587
+
+    html = _wrap(
+        "<h2 style='margin-top:0;color:#1a1a3e;'>Test Notification</h2>"
+        "<p>If you're reading this, your SmartKegerator email notifications are configured correctly.</p>"
+    )
+    text = "SmartKegerator test notification — email is configured correctly."
+
+    ok, err = send_email(
+        host=host, port=port, username=user, password=password,
+        security=security, from_address=from_, to_address=to,
+        subject="✅ SmartKegerator — Test Notification",
+        body_html=html, body_text=text,
+    )
+
+    if ok:
+        return HTMLResponse(
+            f'<span class="text-success"><i class="bi bi-check-circle me-1"></i>'
+            f'Test email sent to <strong>{to}</strong>.</span>'
+        )
+    return HTMLResponse(
+        f'<span class="text-danger"><i class="bi bi-x-circle me-1"></i>'
+        f'{err}</span>'
+    )
