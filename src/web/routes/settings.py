@@ -431,6 +431,92 @@ async def upload_ssl(
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
+@router.get("/ssl-info", response_class=HTMLResponse)
+async def ssl_info(request: Request):
+    """HTMX endpoint — returns installed certificate details."""
+    cfg      = _read_yaml()
+    certfile = cfg.get("web", {}).get("ssl", {}).get("certfile", "")
+    if not certfile or not Path(certfile).exists():
+        return HTMLResponse(
+            '<div class="text-muted small py-1">'
+            '<i class="bi bi-shield-slash me-1"></i>No certificate installed.</div>'
+        )
+    try:
+        result = subprocess.run(
+            ["openssl", "x509", "-in", certfile, "-noout",
+             "-subject", "-issuer", "-startdate", "-enddate"],
+            capture_output=True, text=True, timeout=10,
+        )
+        # Parse: each line is "key=value" where value may contain "="
+        parsed: dict[str, str] = {}
+        for line in result.stdout.splitlines():
+            if "=" in line:
+                key, _, val = line.partition("=")
+                parsed[key.strip()] = val.strip()
+
+        subject    = parsed.get("subject",   "—")
+        issuer     = parsed.get("issuer",    "—")
+        not_before = parsed.get("notBefore", "—")
+        not_after  = parsed.get("notAfter",  "—")
+
+        # Extract CN for a friendly "issued to" name
+        def _cn(field: str) -> str:
+            for part in field.split(","):
+                part = part.strip()
+                if part.upper().startswith("CN"):
+                    return part.split("=", 1)[-1].strip()
+            return field
+
+        issued_to  = _cn(subject)
+        issued_by  = _cn(issuer)
+        self_signed = issued_to == issued_by or "Internet Widgits" in issuer
+        cert_type  = "Self-signed" if self_signed else "CA-signed (Let's Encrypt / CA)"
+
+        # Days remaining
+        from datetime import datetime as _dt
+        days_html = ""
+        try:
+            expiry = _dt.strptime(not_after, "%b %d %H:%M:%S %Y %Z")
+            days   = (expiry - _dt.utcnow()).days
+            if days < 0:
+                days_html = f'<span class="badge bg-danger ms-2">EXPIRED {abs(days)}d ago</span>'
+            elif days <= 14:
+                days_html = f'<span class="badge bg-warning text-dark ms-2">{days}d remaining</span>'
+            elif days <= 30:
+                days_html = f'<span class="badge bg-info text-dark ms-2">{days}d remaining</span>'
+            else:
+                days_html = f'<span class="badge bg-success ms-2">{days}d remaining</span>'
+        except Exception:
+            pass
+
+        icon  = "shield-check" if not self_signed else "shield-exclamation"
+        color = "success" if not self_signed else "warning"
+
+        return HTMLResponse(f"""
+<div class="border rounded p-3" style="background:var(--sk-bg);">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <i class="bi bi-{icon} text-{color} fs-5"></i>
+    <strong>Installed Certificate</strong>
+    <span class="badge bg-secondary">{cert_type}</span>
+  </div>
+  <div class="row g-1 small">
+    <div class="col-sm-3 text-muted">Issued to</div>
+    <div class="col-sm-9 font-monospace">{issued_to}</div>
+    <div class="col-sm-3 text-muted">Issued by</div>
+    <div class="col-sm-9 font-monospace">{issued_by}</div>
+    <div class="col-sm-3 text-muted">Valid from</div>
+    <div class="col-sm-9">{not_before}</div>
+    <div class="col-sm-3 text-muted">Expires</div>
+    <div class="col-sm-9">{not_after}{days_html}</div>
+  </div>
+</div>""")
+    except Exception as exc:
+        return HTMLResponse(
+            f'<div class="text-warning small"><i class="bi bi-exclamation-triangle me-1"></i>'
+            f'Could not read certificate: {exc}</div>'
+        )
+
+
 @router.post("/generate-ssl", response_class=HTMLResponse)
 async def generate_ssl(request: Request):
     """Generate a self-signed certificate, enable HTTPS on port 443, and restart."""

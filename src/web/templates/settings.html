@@ -680,18 +680,13 @@
                 <input type="hidden" name="ssl_certfile" value="{{ ssl_certfile }}">
                 <input type="hidden" name="ssl_keyfile"  value="{{ ssl_keyfile }}">
 
-                {% if ssl_certfile or ssl_keyfile %}
-                <div class="text-muted small mb-2">
-                  <i class="bi bi-shield-check text-success me-1"></i>
-                  Certificate installed:
-                  <code>{{ ssl_certfile | default('—') }}</code>
+                <!-- Live cert info — loaded on page open -->
+                <div id="ssl-cert-info" class="mb-2"
+                     hx-get="/settings/ssl-info"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                  <span class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>Loading certificate info…</span>
                 </div>
-                {% else %}
-                <div class="text-muted small mb-2">
-                  <i class="bi bi-exclamation-triangle text-warning me-1"></i>
-                  No certificate uploaded yet — HTTPS will not work until one is provided.
-                </div>
-                {% endif %}
 
                 <button type="submit" class="btn btn-accent btn-sm text-nowrap">
                   <i class="bi bi-save me-1"></i>Save &amp; Restart Web Service
@@ -723,7 +718,8 @@
                     <i class="bi bi-magic me-1"></i>Generate Self-Signed
                   </button>
                 </div>
-                <div id="ssl-result" class="mt-2 small"></div>
+                <div id="ssl-result" class="mt-2 small"
+                     hx-on::after-swap="htmx.trigger('#ssl-cert-info', 'load')"></div>
               </div>
 
               <!-- Option 2: Let's Encrypt -->
@@ -740,7 +736,8 @@
                   <div>
                     <label class="form-label small text-muted mb-1">Domain name</label>
                     <input type="text" class="form-control form-control-sm font-monospace"
-                           id="le-domain" placeholder="kegerator.example.com" style="width:240px;">
+                           id="le-domain" name="domain"
+                           placeholder="kegerator.example.com" style="width:240px;">
                   </div>
                   <button type="button" class="btn btn-outline-secondary btn-sm"
                           hx-post="/settings/letsencrypt"
@@ -748,7 +745,6 @@
                           hx-swap="innerHTML"
                           hx-disabled-elt="this"
                           hx-include="#le-domain"
-                          hx-vals="js:{domain: document.getElementById('le-domain').value}"
                           hx-on::before-request="this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Requesting…'"
                           hx-on::after-request="this.innerHTML='<i class=\'bi bi-lock me-1\'></i>Get Certificate'">
                     <i class="bi bi-lock me-1"></i>Get Certificate
