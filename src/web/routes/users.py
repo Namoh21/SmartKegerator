@@ -7,9 +7,12 @@ from pathlib import Path
 from fastapi import APIRouter, Form, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
+from typing import Optional
+
 from data.models import User, UNKNOWN_USER_ID
 from web.server import get_config, get_db, templates, ctx
 from web.helpers import user_stats
+from web.auth import hash_password
 
 router = APIRouter(prefix="/users")
 
@@ -69,6 +72,13 @@ async def user_detail(user_id: int, request: Request, page: int = Query(default=
         for p in user.image_paths
     ]
 
+    # Admin status for this user
+    admin_record     = db.get_admin_by_user_id(user_id)
+    user_is_admin    = admin_record is not None
+    user_admin_id    = admin_record["id"]       if admin_record else None
+    user_admin_uname = admin_record["username"] if admin_record else None
+    current_admin_id = request.session.get("admin_id")
+
     return templates.TemplateResponse(
         request,
         "user_detail.html",
@@ -76,7 +86,11 @@ async def user_detail(user_id: int, request: Request, page: int = Query(default=
             payments=pays, photo_items=photo_items,
             is_unknown_user=(user_id == UNKNOWN_USER_ID),
             page=page, total_pages=total_pages, total_pours=total_pours,
-            page_size=_DETAIL_PAGE_SIZE),
+            page_size=_DETAIL_PAGE_SIZE,
+            user_is_admin=user_is_admin,
+            user_admin_id=user_admin_id,
+            user_admin_username=user_admin_uname,
+            current_admin_id=current_admin_id),
     )
 
 
@@ -105,6 +119,46 @@ async def user_delete(user_id: int):
         db.delete_face_encodings_for_user(user_id)
         db.delete_user(user_id)
     return RedirectResponse("/users/", status_code=303)
+
+
+@router.post("/{user_id}/admin/promote", response_class=RedirectResponse)
+async def user_promote(
+    user_id:  int,
+    request:  Request,
+    username: str = Form(...),
+    password: str = Form(...),
+):
+    if not request.session.get("admin_username"):
+        return RedirectResponse(f"/users/{user_id}", status_code=303)
+    db       = get_db()
+    username = username.strip()
+    if not username or len(password) < 8:
+        return RedirectResponse(f"/users/{user_id}?error=invalid", status_code=303)
+    if not db.get_user(user_id):
+        return RedirectResponse("/users/", status_code=303)
+    if db.is_user_admin(user_id):
+        return RedirectResponse(f"/users/{user_id}", status_code=303)
+    if db.get_admin_by_username(username):
+        return RedirectResponse(f"/users/{user_id}?error=taken", status_code=303)
+    db.promote_user_to_admin(user_id, username, hash_password(password))
+    return RedirectResponse(f"/users/{user_id}", status_code=303)
+
+
+@router.post("/{user_id}/admin/demote", response_class=RedirectResponse)
+async def user_demote(user_id: int, request: Request):
+    if not request.session.get("admin_username"):
+        return RedirectResponse(f"/users/{user_id}", status_code=303)
+    db = get_db()
+    # Prevent removing the last admin or demoting yourself
+    admin = db.get_admin_by_user_id(user_id)
+    if not admin:
+        return RedirectResponse(f"/users/{user_id}", status_code=303)
+    if db.admin_count() <= 1:
+        return RedirectResponse(f"/users/{user_id}?error=last", status_code=303)
+    if request.session.get("admin_id") == admin["id"]:
+        return RedirectResponse(f"/users/{user_id}?error=self", status_code=303)
+    db.delete_admin(admin["id"])
+    return RedirectResponse(f"/users/{user_id}", status_code=303)
 
 
 @router.post("/{user_id}/payment", response_class=RedirectResponse)

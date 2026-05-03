@@ -634,6 +634,16 @@ class Database:
             cur.execute("SELECT user_id FROM admins WHERE user_id IS NOT NULL")
             return {r["user_id"] for r in cur.fetchall()}
 
+    def get_admin_by_user_id(self, user_id: int) -> Optional[dict]:
+        """Return the admin row linked to a drinking user, or None."""
+        with self._cursor() as cur:
+            cur.execute(
+                "SELECT id, username, display_name, user_id FROM admins WHERE user_id = ?",
+                (user_id,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
     def get_admin_by_username(self, username: str) -> Optional[dict]:
         with self._cursor() as cur:
             cur.execute(

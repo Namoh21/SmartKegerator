@@ -167,10 +167,6 @@ async def settings_page(request: Request):
     settings = db.get_all_settings()
     cfg      = _read_yaml()
     admins   = db.get_all_admins() if request.session.get("admin_username") else []
-    all_users      = db.get_all_users() if request.session.get("admin_username") else []
-    admin_user_ids = db.get_admin_user_ids() if request.session.get("admin_username") else set()
-    non_admin_users  = [u for u in all_users if u.id not in admin_user_ids]
-    current_admin_id = request.session.get("admin_id")
     server_ip   = _get_local_ip()
     web_cfg     = cfg.get("web", {})
     server_port = int(web_cfg.get("port", 8080))
@@ -206,8 +202,7 @@ async def settings_page(request: Request):
         request,
         "settings.html",
         ctx(request, settings=settings, yaml_config=cfg, gpio_pins=GPIO_PINS,
-            admins=admins, non_admin_users=non_admin_users,
-            current_admin_id=current_admin_id, themes=THEMES,
+            admins=admins, themes=THEMES,
             server_ip=server_ip, server_port=server_port,
             ssl_enabled=ssl_enabled, ssl_certfile=ssl_certfile, ssl_keyfile=ssl_keyfile,
             log_levels=LEVEL_LABELS, current_log_level=current_level,
