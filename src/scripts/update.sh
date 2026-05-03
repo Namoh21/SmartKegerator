@@ -39,17 +39,32 @@ REPO_SRC="${REPO_DIR}/src"
 CHANNEL_FILE="${INSTALL_DIR}/update_channel"
 DB_PATH="${INSTALL_DIR}/data/smartkegerator.db"
 BRANCH="master"
-# Prefer the channel file; fall back to the DB setting (written by the web UI)
-if [[ -f "${CHANNEL_FILE}" ]]; then
-    BRANCH=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
-elif [[ -f "${DB_PATH}" ]] && command -v sqlite3 &>/dev/null; then
-    BRANCH=$(sqlite3 "${DB_PATH}" \
-        "SELECT value FROM settings WHERE key='update_channel' LIMIT 1;" 2>/dev/null || echo "master")
-    BRANCH=$(echo "${BRANCH}" | tr -d '[:space:]')
-    # Write the file for next time so we don't need sqlite3
-    echo "${BRANCH}" > "${CHANNEL_FILE}" 2>/dev/null || true
+# Read channel exclusively from the DB — the DB is the single source of truth
+# written by the web UI.  The channel file (/opt/.../update_channel) is only
+# used as a last resort when sqlite3 is not available, and is always rewritten
+# (chowned to REAL_USER) so the web service can update it on the next save.
+if [[ -f "${DB_PATH}" ]] && command -v sqlite3 &>/dev/null; then
+    _db_branch=$(sqlite3 "${DB_PATH}" \
+        "SELECT value FROM settings WHERE key='update_channel' LIMIT 1;" 2>/dev/null)
+    _db_branch=$(echo "${_db_branch}" | tr -d '[:space:]')
+    if [[ "${_db_branch}" == "dev" || "${_db_branch}" == "master" ]]; then
+        BRANCH="${_db_branch}"
+    elif [[ -f "${CHANNEL_FILE}" ]]; then
+        # DB had no entry yet — fall back to file and seed the DB
+        _file_branch=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
+        [[ "${_file_branch}" == "dev" || "${_file_branch}" == "master" ]] && BRANCH="${_file_branch}"
+        sqlite3 "${DB_PATH}" \
+            "INSERT OR REPLACE INTO settings (key,value) VALUES ('update_channel','${BRANCH}');" \
+            2>/dev/null || true
+    fi
+elif [[ -f "${CHANNEL_FILE}" ]]; then
+    _file_branch=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
+    [[ "${_file_branch}" == "dev" || "${_file_branch}" == "master" ]] && BRANCH="${_file_branch}"
 fi
-[[ "${BRANCH}" == "dev" || "${BRANCH}" == "master" ]] || BRANCH="master"
+# Always write the resolved channel back to the file and ensure the web
+# service (non-root user) can overwrite it on the next save.
+echo "${BRANCH}" > "${CHANNEL_FILE}"
+chown "${REAL_USER}:${REAL_USER}" "${CHANNEL_FILE}" 2>/dev/null || true
 info "Update channel: ${BRANCH}"
 git -C "${REPO_DIR}" fetch origin
 git -C "${REPO_DIR}" reset --hard "origin/${BRANCH}"
