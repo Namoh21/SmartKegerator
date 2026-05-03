@@ -638,7 +638,7 @@ class Database:
         """Return the admin row linked to a drinking user, or None."""
         with self._cursor() as cur:
             cur.execute(
-                "SELECT id, username, display_name, user_id FROM admins WHERE user_id = ?",
+                "SELECT id, username, user_id FROM admins WHERE user_id = ?",
                 (user_id,)
             )
             row = cur.fetchone()
