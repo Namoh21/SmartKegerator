@@ -39,17 +39,25 @@ REPO_SRC="${REPO_DIR}/src"
 CHANNEL_FILE="${INSTALL_DIR}/update_channel"
 DB_PATH="${INSTALL_DIR}/data/smartkegerator.db"
 BRANCH="master"
-# Prefer the channel file; fall back to the DB setting (written by the web UI)
-if [[ -f "${CHANNEL_FILE}" ]]; then
-    BRANCH=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
-elif [[ -f "${DB_PATH}" ]] && command -v sqlite3 &>/dev/null; then
+# DB is the primary source of truth (matches web UI); file is a fallback
+# when sqlite3 is unavailable. Always write the file after reading so both
+# stay in sync for the next run.
+if [[ -f "${DB_PATH}" ]] && command -v sqlite3 &>/dev/null; then
     BRANCH=$(sqlite3 "${DB_PATH}" \
-        "SELECT value FROM settings WHERE key='update_channel' LIMIT 1;" 2>/dev/null || echo "master")
+        "SELECT value FROM settings WHERE key='update_channel' LIMIT 1;" 2>/dev/null || echo "")
     BRANCH=$(echo "${BRANCH}" | tr -d '[:space:]')
-    # Write the file for next time so we don't need sqlite3
-    echo "${BRANCH}" > "${CHANNEL_FILE}" 2>/dev/null || true
+    # Fall back to file if DB had no entry yet
+    if [[ "${BRANCH}" != "dev" && "${BRANCH}" != "master" ]]; then
+        if [[ -f "${CHANNEL_FILE}" ]]; then
+            BRANCH=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
+        fi
+    fi
+elif [[ -f "${CHANNEL_FILE}" ]]; then
+    BRANCH=$(cat "${CHANNEL_FILE}" | tr -d '[:space:]')
 fi
 [[ "${BRANCH}" == "dev" || "${BRANCH}" == "master" ]] || BRANCH="master"
+# Keep the file in sync with whatever we resolved
+echo "${BRANCH}" > "${CHANNEL_FILE}" 2>/dev/null || true
 info "Update channel: ${BRANCH}"
 git -C "${REPO_DIR}" fetch origin
 git -C "${REPO_DIR}" reset --hard "origin/${BRANCH}"
