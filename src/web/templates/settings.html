@@ -692,72 +692,15 @@
                 </button>
               </form>
 
-              <!-- Certificate options -->
+              <!-- Upload certificate -->
               {% if is_admin %}
               <hr class="border-secondary mt-3">
-
-              <!-- Option 1: Generate self-signed -->
-              <div class="mt-3 mb-3">
-                <div class="fw-semibold small mb-1">
-                  <i class="bi bi-magic me-1"></i>Option 1 — Generate self-signed certificate
-                </div>
-                <div class="text-muted small mb-2">
-                  Creates a certificate for this device's IP address instantly.
-                  Android and browsers will show a security warning — tap
-                  <em>Advanced → Proceed</em> to accept it.
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                  <button type="button" class="btn btn-outline-secondary btn-sm"
-                          hx-post="/settings/generate-ssl"
-                          hx-target="#ssl-result"
-                          hx-swap="innerHTML"
-                          hx-disabled-elt="this"
-                          hx-on::before-request="this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Generating…'"
-                          hx-on::after-request="this.innerHTML='<i class=\'bi bi-magic me-1\'></i>Generate Self-Signed'">
-                    <i class="bi bi-magic me-1"></i>Generate Self-Signed
-                  </button>
-                </div>
-                <div id="ssl-result" class="mt-2 small"
-                     hx-on::after-swap="htmx.trigger('#ssl-cert-info', 'load')"></div>
-              </div>
-
-              <!-- Option 2: Let's Encrypt -->
-              <div class="mt-3 mb-3">
-                <div class="fw-semibold small mb-1">
-                  <i class="bi bi-lock me-1"></i>Option 2 — Let's Encrypt (fully trusted)
-                </div>
-                <div class="text-muted small mb-2">
-                  Provides a free, browser-trusted certificate with no security warnings.
-                  <strong>Requires:</strong> a public domain name pointing to this device
-                  and port 80 forwarded from your router. Not suitable for LAN-only installs.
-                </div>
-                <div class="d-flex gap-2 align-items-end flex-wrap">
-                  <div>
-                    <label class="form-label small text-muted mb-1">Domain name</label>
-                    <input type="text" class="form-control form-control-sm font-monospace"
-                           id="le-domain" name="domain"
-                           placeholder="kegerator.example.com" style="width:240px;">
-                  </div>
-                  <button type="button" class="btn btn-outline-secondary btn-sm"
-                          hx-post="/settings/letsencrypt"
-                          hx-target="#ssl-result"
-                          hx-swap="innerHTML"
-                          hx-disabled-elt="this"
-                          hx-include="#le-domain"
-                          hx-on::before-request="this.innerHTML='<span class=\'spinner-border spinner-border-sm me-1\'></span>Requesting…'"
-                          hx-on::after-request="this.innerHTML='<i class=\'bi bi-lock me-1\'></i>Get Certificate'">
-                    <i class="bi bi-lock me-1"></i>Get Certificate
-                  </button>
-                </div>
-              </div>
-
-              <!-- Option 3: Upload your own -->
               <div class="mt-2">
                 <div class="fw-semibold small mb-1">
-                  <i class="bi bi-upload me-1"></i>Option 3 — Upload your own certificate
+                  <i class="bi bi-upload me-1"></i>Upload certificate
                 </div>
                 <div class="text-muted small mb-2">
-                  Use an existing certificate from any CA. Requires both the certificate and private key.
+                  Upload a certificate and private key from any CA. Both files are required.
                 </div>
                 <form method="post" action="/settings/upload-ssl"
                       enctype="multipart/form-data"
