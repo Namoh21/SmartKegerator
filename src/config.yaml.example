@@ -15,12 +15,16 @@ taps:
 
 hardware:
   # Camera
+  # Recommended hardware: Raspberry Pi Camera Module 3 (CSI ribbon, Pi 5)
+  #   — picamera2 backend is used automatically for CSI cameras
+  #   — continuous autofocus is enabled automatically on Camera Module 3
+  #   — for a USB webcam, set camera_index to the /dev/video* device number
   camera_index: 0
-  camera_width: 640
-  camera_height: 480
+  camera_width: 1280           # Camera Module 3: 1280×720 for a good balance of
+  camera_height: 720           #   field-of-view, face-recognition accuracy, and CPU load.
   camera_use_color: true
-  camera_swap_red_blue: false  # swap R↔B channels — enable if red objects appear blue
-  camera_mirror: true         # flip preview horizontally (mirror effect for user positioning)
+  camera_swap_red_blue: false  # swap R↔B channels — enable only if red objects appear blue
+  camera_mirror: true          # flip preview horizontally (mirror effect for user positioning)
   camera_leds_pin: 18
 
   # Flow meter calibration (shared across all taps)
@@ -44,7 +48,9 @@ hardware:
 recognition:
   enabled: true
   confidence_threshold: 0.55   # lower = stricter (face_recognition distance metric)
-  detection_model: "hog"       # "hog" (faster, CPU) or "cnn" (accurate, needs more CPU)
+  detection_model: "hog"       # "hog" (fast) or "cnn" (more accurate, ~10× slower)
+                                # Pi 5: auto-promoted to "cnn" at runtime for better accuracy
+                                # Pi 3: "cnn" is auto-downgraded to "hog" due to RAM limits
 
 data:
   database_path: /opt/smartkegerator/smartkegerator.db
