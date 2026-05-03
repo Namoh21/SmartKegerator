@@ -1158,33 +1158,35 @@
             {% if is_admin %}
             <div class="mb-4">
               <div class="text-muted small mb-2 fw-semibold">Update channel</div>
-              <div class="d-flex gap-4 mb-2">
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="channel" id="ch-stable"
-                         value="master" {% if update_channel == 'master' %}checked{% endif %}>
-                  <label class="form-check-label" for="ch-stable">
-                    <i class="bi bi-shield-check me-1 text-success"></i>
-                    <strong>Stable</strong>
-                    <div class="text-muted small">master branch — tested releases</div>
-                  </label>
+              <form id="channel-form">
+                <div class="d-flex gap-4 mb-2">
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="channel" id="ch-stable"
+                           value="master" {% if update_channel == 'master' %}checked{% endif %}>
+                    <label class="form-check-label" for="ch-stable">
+                      <i class="bi bi-shield-check me-1 text-success"></i>
+                      <strong>Stable</strong>
+                      <div class="text-muted small">master branch — tested releases</div>
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="channel" id="ch-dev"
+                           value="dev" {% if update_channel == 'dev' %}checked{% endif %}>
+                    <label class="form-check-label" for="ch-dev">
+                      <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
+                      <strong>Dev</strong> <span class="text-warning small">(unstable)</span>
+                      <div class="text-muted small">dev branch — latest, may have bugs</div>
+                    </label>
+                  </div>
                 </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="channel" id="ch-dev"
-                         value="dev" {% if update_channel == 'dev' %}checked{% endif %}>
-                  <label class="form-check-label" for="ch-dev">
-                    <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
-                    <strong>Dev</strong> <span class="text-warning small">(unstable)</span>
-                    <div class="text-muted small">dev branch — latest, may have bugs</div>
-                  </label>
-                </div>
-              </div>
-              <button type="button" class="btn btn-sm btn-outline-secondary"
-                      hx-post="/settings/update-channel"
-                      hx-target="#channel-result"
-                      hx-swap="innerHTML"
-                      hx-include="[name='channel']:checked">
-                <i class="bi bi-save me-1"></i>Save Channel
-              </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        hx-post="/settings/update-channel"
+                        hx-target="#channel-result"
+                        hx-swap="innerHTML"
+                        hx-include="#channel-form">
+                  <i class="bi bi-save me-1"></i>Save Channel
+                </button>
+              </form>
               <div id="channel-result" class="mt-2 small"></div>
             </div>
             {% endif %}
