@@ -676,23 +676,59 @@
                     </label>
                   </div>
                 </div>
-                <div class="mb-2">
-                  <label class="form-label small text-muted mb-1">SSL certificate file (full path)</label>
-                  <input type="text" class="form-control form-control-sm font-monospace"
-                         name="ssl_certfile" value="{{ ssl_certfile }}"
-                         placeholder="/etc/ssl/certs/smartkegerator.crt">
+                <!-- Hidden path fields — populated automatically by upload -->
+                <input type="hidden" name="ssl_certfile" value="{{ ssl_certfile }}">
+                <input type="hidden" name="ssl_keyfile"  value="{{ ssl_keyfile }}">
+
+                {% if ssl_certfile or ssl_keyfile %}
+                <div class="text-muted small mb-2">
+                  <i class="bi bi-shield-check text-success me-1"></i>
+                  Certificate installed:
+                  <code>{{ ssl_certfile | default('—') }}</code>
                 </div>
-                <div class="mb-3">
-                  <label class="form-label small text-muted mb-1">SSL key file (full path)</label>
-                  <input type="text" class="form-control form-control-sm font-monospace"
-                         name="ssl_keyfile" value="{{ ssl_keyfile }}"
-                         placeholder="/etc/ssl/private/smartkegerator.key">
+                {% else %}
+                <div class="text-muted small mb-2">
+                  <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                  No certificate uploaded yet — HTTPS will not work until one is provided.
                 </div>
+                {% endif %}
 
                 <button type="submit" class="btn btn-accent btn-sm text-nowrap">
                   <i class="bi bi-save me-1"></i>Save &amp; Restart Web Service
                 </button>
               </form>
+
+              <!-- Certificate upload -->
+              {% if is_admin %}
+              <hr class="border-secondary mt-3">
+              <div class="mt-3">
+                <div class="fw-semibold small mb-2">
+                  <i class="bi bi-upload me-1"></i>Upload SSL Certificate
+                </div>
+                <form method="post" action="/settings/upload-ssl"
+                      enctype="multipart/form-data"
+                      class="d-flex flex-wrap gap-3 align-items-end">
+                  <div>
+                    <label class="form-label small text-muted mb-1">Certificate (.crt / .pem)</label>
+                    <input type="file" class="form-control form-control-sm" name="certfile"
+                           accept=".crt,.pem,.cer">
+                  </div>
+                  <div>
+                    <label class="form-label small text-muted mb-1">Private key (.key / .pem)</label>
+                    <input type="file" class="form-control form-control-sm" name="keyfile"
+                           accept=".key,.pem">
+                  </div>
+                  <div>
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                      <i class="bi bi-upload me-1"></i>Upload &amp; Save
+                    </button>
+                  </div>
+                </form>
+                <div class="text-muted small mt-2">
+                  Files are saved to <code>/opt/smartkegerator/ssl/</code> and applied automatically.
+                </div>
+              </div>
+              {% endif %}
               <div class="form-text text-muted mt-2">
                 Enter <code>{% if ssl_enabled %}https{% else %}http{% endif %}://{{ server_ip }}:{{ server_port }}</code> in the Android app setup screen.
                 The web service will restart automatically after saving.
@@ -1105,6 +1141,18 @@
   input[type=radio]:checked + .theme-swatch { box-shadow: 0 0 0 3px var(--sk-accent); }
 </style>
 <script nonce="{{ csp_nonce }}">
+// Auto-switch port when HTTPS toggle changes
+(function() {
+  var cb = document.getElementById('ssl_enabled');
+  if (!cb) return;
+  cb.addEventListener('change', function() {
+    var p = this.closest('form').querySelector('[name=port]');
+    if (!p) return;
+    if (this.checked && (p.value === '80' || p.value === '8080')) p.value = '443';
+    else if (!this.checked && p.value === '443') p.value = '80';
+  });
+})();
+
 function _updateTapRows() {
   const sel = document.getElementById('tapCountSelect');
   if (!sel) return;

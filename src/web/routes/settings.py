@@ -382,6 +382,56 @@ async def settings_save_admin_timeout(
 
 
 # ---------------------------------------------------------------------------
+# SSL certificate upload
+# ---------------------------------------------------------------------------
+
+_SSL_DIR = Path("/opt/smartkegerator/ssl")
+
+
+@router.post("/upload-ssl", response_class=RedirectResponse)
+async def upload_ssl(
+    request:  Request,
+    certfile: Optional[object] = None,
+    keyfile:  Optional[object] = None,
+):
+    from fastapi import UploadFile
+    import shutil
+
+    _SSL_DIR.mkdir(parents=True, exist_ok=True)
+
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    cfg["web"].setdefault("ssl", {})
+
+    # Accept UploadFile objects from the form
+    form   = await request.form()
+    cert   = form.get("certfile")
+    key    = form.get("keyfile")
+
+    if cert and hasattr(cert, "filename") and cert.filename:
+        dest = _SSL_DIR / "server.crt"
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(cert.file, f)
+        cfg["web"]["ssl"]["certfile"] = str(dest)
+        log.info("SSL certificate uploaded to %s", dest)
+
+    if key and hasattr(key, "filename") and key.filename:
+        dest = _SSL_DIR / "server.key"
+        dest.chmod(0o600) if dest.exists() else None
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(key.file, f)
+        try:
+            dest.chmod(0o600)
+        except Exception:
+            pass
+        cfg["web"]["ssl"]["keyfile"] = str(dest)
+        log.info("SSL key uploaded to %s", dest)
+
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
+# ---------------------------------------------------------------------------
 # Web server port
 # ---------------------------------------------------------------------------
 
