@@ -21,16 +21,18 @@ class KegResponse(BaseModel):
     liters_capacity:  float
     liters_remaining: float
     pct_remaining:    float
+    initial_fill_pct: float
     price:            float
     price_per_pint:   Optional[float]
 
 
 class KegRequest(BaseModel):
-    beer_id:      int
-    capacity:     float
-    price:        float
-    date_bought:  str   = ""
-    warmest_temp: float = 0.0
+    beer_id:          int
+    capacity:         float
+    price:            float
+    date_bought:      str   = ""
+    warmest_temp:     float = 0.0
+    initial_fill_pct: float = 100.0
 
 
 def _out(db, keg: Keg) -> KegResponse:
@@ -43,6 +45,7 @@ def _out(db, keg: Keg) -> KegResponse:
         liters_capacity  = keg.liters_capacity,
         liters_remaining = keg.liters_remaining,
         pct_remaining    = keg.percent_remaining,
+        initial_fill_pct = keg.initial_fill_pct,
         price            = keg.price,
         price_per_pint   = keg.price_for_ounces(16.0),
     )
@@ -67,6 +70,7 @@ async def add_keg(body: KegRequest):
     keg = Keg(
         id=None, beer_id=body.beer_id, date_bought=_parse_date(body.date_bought),
         liters_capacity=body.capacity, price=body.price, warmest_temp=body.warmest_temp,
+        initial_fill_pct=max(0.0, min(100.0, body.initial_fill_pct)),
     )
     db.save_keg(keg)
     return _out(db, keg)
@@ -78,11 +82,12 @@ async def update_keg(keg_id: int, body: KegRequest):
     keg = db.get_keg(keg_id)
     if not keg:
         raise HTTPException(404, "Keg not found")
-    keg.beer_id         = body.beer_id
-    keg.liters_capacity = body.capacity
-    keg.price           = body.price
-    keg.warmest_temp    = body.warmest_temp
-    keg.date_bought     = _parse_date(body.date_bought) if body.date_bought else keg.date_bought
+    keg.beer_id          = body.beer_id
+    keg.liters_capacity  = body.capacity
+    keg.price            = body.price
+    keg.warmest_temp     = body.warmest_temp
+    keg.initial_fill_pct = max(0.0, min(100.0, body.initial_fill_pct))
+    keg.date_bought      = _parse_date(body.date_bought) if body.date_bought else keg.date_bought
     db.save_keg(keg)
     return _out(db, keg)
 

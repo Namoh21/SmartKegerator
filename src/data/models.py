@@ -34,7 +34,13 @@ class Keg:
     liters_capacity: float
     price: float
     warmest_temp: float
-    liters_poured: float = 0.0   # populated by DB from pours table on load
+    liters_poured:   float = 0.0    # populated by DB from pours table on load
+    initial_fill_pct: float = 100.0  # % full when first tapped (0–100)
+
+    @property
+    def liters_offset(self) -> float:
+        """Liters already consumed before tracking started (from initial fill < 100%)."""
+        return self.liters_capacity * (1.0 - max(0.0, min(100.0, self.initial_fill_pct)) / 100.0)
 
     @property
     def price_per_liter(self) -> float:
@@ -42,7 +48,7 @@ class Keg:
 
     @property
     def liters_remaining(self) -> float:
-        return max(0.0, self.liters_capacity - self.liters_poured)
+        return max(0.0, self.liters_capacity - self.liters_offset - self.liters_poured)
 
     @property
     def percent_remaining(self) -> float:

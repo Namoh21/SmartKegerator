@@ -64,3 +64,11 @@
            value="{{ '%.1f'|format(keg.warmest_temp) if keg else '0.0' }}">
   </div>
 </div>
+<div class="mb-3">
+  <label class="form-label">Initial fill <span class="text-accent fw-bold js-fill-display">{{ (keg.initial_fill_pct | int) if keg else 100 }}%</span></label>
+  <input type="range" class="form-range" name="initial_fill_pct"
+         min="0" max="100" step="1"
+         value="{{ keg.initial_fill_pct | int if keg else 100 }}"
+         oninput="this.previousElementSibling.querySelector('.js-fill-display').textContent = this.value + '%'">
+  <div class="form-text">Set to less than 100% if this keg was already partially used when tapped.</div>
+</div>

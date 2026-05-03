@@ -243,6 +243,13 @@ class Database:
         except sqlite3.OperationalError:
             pass  # column already exists
 
+        # Track initial fill percentage for kegs tapped partially used
+        try:
+            with self._cursor() as cur:
+                cur.execute("ALTER TABLE kegs ADD COLUMN initial_fill_pct REAL NOT NULL DEFAULT 100.0")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+
         # For existing admins with no linked user, create a user record for each
         with self._cursor() as cur:
             cur.execute("SELECT id, username FROM admins WHERE user_id IS NULL")
@@ -356,19 +363,20 @@ class Database:
 
     def save_keg(self, keg: Keg) -> Keg:
         date_str = keg.date_bought.strftime("%Y-%m-%d")
+        fill_pct  = max(0.0, min(100.0, keg.initial_fill_pct))
         with self._cursor() as cur:
             if keg.id is None:
                 cur.execute(
-                    "INSERT INTO kegs (beer_id, date_bought, liters_capacity, price, warmest_temp) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp),
+                    "INSERT INTO kegs (beer_id, date_bought, liters_capacity, price, warmest_temp, initial_fill_pct) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp, fill_pct),
                 )
                 keg.id = cur.lastrowid
             else:
                 cur.execute(
-                    "INSERT OR REPLACE INTO kegs (id, beer_id, date_bought, liters_capacity, price, warmest_temp) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (keg.id, keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp),
+                    "INSERT OR REPLACE INTO kegs (id, beer_id, date_bought, liters_capacity, price, warmest_temp, initial_fill_pct) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (keg.id, keg.beer_id, date_str, keg.liters_capacity, keg.price, keg.warmest_temp, fill_pct),
                 )
         return keg
 
@@ -772,6 +780,7 @@ def _row_to_keg(row: sqlite3.Row) -> Keg:
         price=row["price"],
         warmest_temp=row["warmest_temp"],
         liters_poured=row["liters_poured"],
+        initial_fill_pct=row["initial_fill_pct"] if "initial_fill_pct" in row.keys() else 100.0,
     )
 
 
