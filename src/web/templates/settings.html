@@ -685,8 +685,7 @@
                   {% for pid, pmeta in email_presets.items() %}
                   <div class="col-6 col-md-4 col-lg-3">
                     <div class="card h-100 preset-card {% if notif.notif_email_preset == pid %}border-accent{% endif %}"
-                         style="cursor:pointer;" data-preset="{{ pid }}"
-                         onclick="selectPreset('{{ pid }}')">
+                         style="cursor:pointer;" data-preset="{{ pid }}">
                       <div class="card-body py-2 px-3 text-center">
                         <div class="fw-semibold small">{{ pmeta.label }}</div>
                       </div>
@@ -1498,12 +1497,18 @@ function selectPreset(pid) {
     var n = document.getElementById('note-' + p);
     if (n) n.classList.toggle('d-none', p !== pid);
   });
-  var p = _presets[pid];
-  if (p && p.host) {
-    document.getElementById('smtpHost').value     = p.host;
-    document.getElementById('smtpPort').value     = p.port;
-    document.getElementById('smtpSecurity').value = p.security;
+  var preset = _presets[pid];
+  if (preset && preset.host) {
+    document.getElementById('smtpHost').value     = preset.host;
+    document.getElementById('smtpPort').value     = preset.port;
+    document.getElementById('smtpSecurity').value = preset.security;
   }
 }
+
+// Attach click handler via JS — inline onclick is blocked by CSP script-src
+document.addEventListener('click', function(e) {
+  var card = e.target.closest('.preset-card[data-preset]');
+  if (card) selectPreset(card.dataset.preset);
+});
 </script>
 {% endblock %}

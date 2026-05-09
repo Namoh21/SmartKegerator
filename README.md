@@ -352,6 +352,14 @@ journalctl --user -u smartkegerator-web -f
 
 ---
 
+## Support
+
+If you find this project useful, donations are appreciated!
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-yellow)](https://buymeacoffee.com/Namoh21)
+
+---
+
 ## Architecture
 
 ```
