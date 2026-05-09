@@ -57,16 +57,6 @@ PRESETS: dict[str, dict] = {
             "Use your full email address as the username."
         ),
     },
-    "microsoft365": {
-        "label":    "Microsoft 365 (work/school)",
-        "host":     "smtp.office365.com",
-        "port":     587,
-        "security": "starttls",
-        "note":     (
-            "For work or school Microsoft 365 accounts. "
-            "Your IT admin may need to enable SMTP AUTH for your account in the Microsoft 365 admin center."
-        ),
-    },
     "custom": {
         "label":    "Custom / Exchange / Other",
         "host":     "",

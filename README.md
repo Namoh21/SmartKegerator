@@ -352,6 +352,21 @@ journalctl --user -u smartkegerator-web -f
 
 ---
 
+## License
+
+This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
+You are free to use, modify, and distribute this software under the terms of the GPLv3.
+
+---
+
+## Support
+
+If you find this project useful, donations are appreciated!
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-yellow)](https://buymeacoffee.com/Namoh21)
+
+---
+
 ## Architecture
 
 ```
