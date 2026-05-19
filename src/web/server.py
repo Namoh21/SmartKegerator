@@ -31,7 +31,6 @@ import uvicorn
 import yaml
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -136,10 +135,9 @@ async def lifespan(app: FastAPI):
     _configure_logging(_config, "web")
     _apply_level(_db.get_setting("log_level", "high"))
 
-    # Serve user photos as static files
+    # User photos are served via authenticated routes (see web/routes/users.py).
     photos_dir = Path(_config["data"]["user_photos_dir"])
     photos_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/photos", StaticFiles(directory=str(photos_dir)), name="photos")
 
     yield
 
@@ -371,20 +369,22 @@ class _SecurityHeaders(BaseHTTPMiddleware):
 
 class _AdminAuthMiddleware(BaseHTTPMiddleware):
     """
-    First-run redirect + mutation protection.
+    First-run redirect + auth for reads and mutations.
 
     - If no admins exist: redirect everything to /admin/setup.
-    - POST/PUT/DELETE/PATCH: require an active admin session.
-    - GET requests and static files: always public.
+    - POST/PUT/DELETE/PATCH: require an active admin session (except login/setup).
+    - GET: public by default; when web.require_login_for_read is true, admin required.
+    - REST API (/api/) uses JWT and is handled separately.
     """
-    _SKIP_PREFIXES = ("/photos/", "/api/")
+    _SKIP_PREFIXES = ("/api/",)
+    _PUBLIC_GET    = {"/admin/login", "/admin/setup"}
     _PUBLIC_POSTS  = {"/admin/login", "/admin/setup", "/admin/logout",
                       "/register", "/logout"}
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
 
-        # Pass static files straight through
+        # REST API — JWT auth on each endpoint
         if any(path.startswith(p) for p in self._SKIP_PREFIXES):
             return await call_next(request)
 
@@ -396,31 +396,43 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
         except Exception:
             pass  # DB not ready yet during startup
 
+        is_admin = bool(request.session.get("admin_username"))
+
         # Admin session timeout — sliding window
-        if request.session.get("admin_username"):
+        if is_admin:
             timeout_mins = _config.get("web", {}).get("admin_timeout_minutes")
             if timeout_mins:
                 login_time = request.session.get("login_time", 0)
                 if time.time() - login_time > timeout_mins * 60:
                     request.session.clear()
                     return RedirectResponse("/?expired=1", status_code=303)
-                else:
-                    request.session["login_time"] = time.time()
+                request.session["login_time"] = time.time()
+                is_admin = True
+
+        # Optional: require admin login to view any page (balances, pour history, etc.)
+        if (
+            request.method == "GET"
+            and _config.get("web", {}).get("require_login_for_read")
+            and path not in self._PUBLIC_GET
+            and not is_admin
+        ):
+            return RedirectResponse(
+                f"/admin/login?next={quote(path, safe='/')}",
+                status_code=303,
+            )
 
         # Protect all mutation requests
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
-            if path not in self._PUBLIC_POSTS:
-                if not request.session.get("admin_username"):
-                    # Redirect to login, then come back to the page the form was on
-                    referer = request.headers.get("referer", "/")
-                    try:
-                        next_path = urlparse(referer).path or "/"
-                    except Exception:
-                        next_path = "/"
-                    return RedirectResponse(
-                        f"/admin/login?next={quote(next_path, safe='/')}",
-                        status_code=303,
-                    )
+            if path not in self._PUBLIC_POSTS and not is_admin:
+                referer = request.headers.get("referer", "/")
+                try:
+                    next_path = urlparse(referer).path or "/"
+                except Exception:
+                    next_path = "/"
+                return RedirectResponse(
+                    f"/admin/login?next={quote(next_path, safe='/')}",
+                    status_code=303,
+                )
 
         return await call_next(request)
 

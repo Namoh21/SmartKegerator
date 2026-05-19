@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+import html
 import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Form, Query, Request, Response
+from fastapi import APIRouter, Form, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from typing import Optional
 
 from data.models import User, UNKNOWN_USER_ID
 from web.server import get_config, get_db, templates, ctx
-from web.helpers import user_stats
+from web.helpers import is_admin_session, kiosk_status, user_stats
 from web.auth import hash_password
 
 router = APIRouter(prefix="/users")
@@ -33,7 +34,8 @@ async def user_list(request: Request):
     return templates.TemplateResponse(
         request,
         "users.html",
-        ctx(request, stats=stats, admin_user_ids=db.get_admin_user_ids()),
+        ctx(request, stats=stats, admin_user_ids=db.get_admin_user_ids(),
+            kiosk=kiosk_status(db)),
     )
 
 
@@ -68,7 +70,7 @@ async def user_detail(user_id: int, request: Request, page: int = Query(default=
     enriched = [{"pour": p, "beer_name": beer_for_keg(p.keg_id)} for p in pours_page]
 
     photo_items = [
-        (p, f"/photos/{user_id}/{Path(p).name}")
+        (p, f"/users/photos/{user_id}/{Path(p).name}")
         for p in user.image_paths
     ]
 
@@ -172,11 +174,47 @@ async def add_payment(user_id: int, amount: float = Form(...)):
 
 
 # ---------------------------------------------------------------------------
+# Face training photos (admin-only — not served as public static files)
+# ---------------------------------------------------------------------------
+
+@router.get("/photos/{user_id}/{filename}")
+async def serve_user_photo(user_id: int, filename: str, request: Request):
+    """Serve a face-training photo; requires admin session."""
+    if not is_admin_session(request):
+        raise HTTPException(status_code=403, detail="Admin login required")
+
+    photos_root = Path(get_config()["data"]["user_photos_dir"]).resolve()
+    safe_name   = Path(filename).name
+    if safe_name != filename or ".." in filename:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    path = (photos_root / str(user_id) / safe_name).resolve()
+    try:
+        path.relative_to(photos_root)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    user = get_db().get_user(user_id)
+    if not user or not path.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    # Only serve files registered for this user
+    allowed = {Path(p).resolve() for p in user.image_paths}
+    if path not in allowed:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    return FileResponse(str(path), media_type="image/jpeg",
+                        headers={"Cache-Control": "private, max-age=3600"})
+
+
+# ---------------------------------------------------------------------------
 # User thumbnail — server-side center-cropped square JPEG
 # ---------------------------------------------------------------------------
 
 @router.get("/{user_id}/thumbnail")
-async def user_thumbnail(user_id: int):
+async def user_thumbnail(user_id: int, request: Request):
+    if not is_admin_session(request):
+        raise HTTPException(status_code=403, detail="Admin login required")
     """Return an 80×80 center-cropped JPEG thumbnail for the user's first photo.
     Generated on the fly from the original training photo using OpenCV."""
     import io
@@ -227,13 +265,15 @@ async def user_thumbnail(user_id: int):
 # ---------------------------------------------------------------------------
 
 @router.get("/camera/preview")
-async def camera_preview_image():
+async def camera_preview_image(request: Request):
+    if not is_admin_session(request):
+        raise HTTPException(status_code=403, detail="Admin login required")
     config = get_config()
     path   = Path(config["data"]["user_photos_dir"]).parent / "camera_preview.jpg"
     if not path.exists():
         return Response(status_code=204)   # no content yet — browser shows nothing
     return FileResponse(str(path), media_type="image/jpeg",
-                        headers={"Cache-Control": "no-store"})
+                        headers={"Cache-Control": "no-store, private"})
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +309,7 @@ async def capture_poll(user_id: int, req_id: str, response: Response):
             detail = payload[6:].lstrip(":") or "Camera not ready — is the touchscreen app running?"
             return HTMLResponse(
                 f'<span class="text-danger">'
-                f'<i class="bi bi-x-circle me-1"></i>{detail}'
+                f'<i class="bi bi-x-circle me-1"></i>{html.escape(detail)}'
                 f'</span>'
             )
         # Success — tell HTMX to do a full page refresh so the new photo appears

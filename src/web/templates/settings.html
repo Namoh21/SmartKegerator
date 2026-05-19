@@ -870,6 +870,30 @@
       {% if is_admin %}
       <div class="tab-pane fade {% if active_tab == 'admins' %}show active{% endif %}" id="pane-admins">
 
+        <!-- Privacy -->
+        <div class="card mb-3">
+          <div class="card-header"><i class="bi bi-shield-lock me-2"></i><strong>Privacy</strong></div>
+          <div class="card-body">
+            <form method="post" action="/settings/privacy">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="require_login_for_read"
+                       id="require_login_for_read" value="1"
+                       {% if yaml_config.get('web', {}).get('require_login_for_read') %}checked{% endif %}>
+                <label class="form-check-label" for="require_login_for_read">
+                  Require admin login to view all pages
+                </label>
+              </div>
+              <p class="text-muted small mb-3">
+                When enabled, guests cannot see the dashboard, user balances, or pour history.
+                Face-training photos and the live camera preview always require admin login.
+              </p>
+              <button type="submit" class="btn btn-accent btn-sm">
+                <i class="bi bi-save me-1"></i>Save privacy settings
+              </button>
+            </form>
+          </div>
+        </div>
+
         <!-- Session timeout -->
         <div class="card mb-3">
           <div class="card-header"><i class="bi bi-clock-history me-2"></i><strong>Admin Session Timeout</strong></div>
@@ -980,7 +1004,8 @@
               </div>
               {% endif %}
               <div class="form-text text-muted mt-2">
-                Enter <code>{% if ssl_enabled %}https{% else %}http{% endif %}://{{ server_ip }}:{{ server_port }}</code> in the Android app setup screen.
+                Enter <code>{% if ssl_enabled %}https{% else %}http{% endif %}://{{ server_ip }}:{{ server_port }}</code> in the Android app setup screen
+                (use <strong>https</strong> when accessing via Cloudflare Tunnel or another reverse proxy).
                 The web service will restart automatically after saving.
               </div>
             </div>

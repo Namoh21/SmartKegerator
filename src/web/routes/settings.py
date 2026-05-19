@@ -405,6 +405,18 @@ async def settings_save_admin_timeout(
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
+@router.post("/privacy", response_class=RedirectResponse)
+async def settings_save_privacy(
+    require_login_for_read: Optional[str] = Form(None),
+):
+    """Persist web privacy options (require login to view pages)."""
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    cfg["web"]["require_login_for_read"] = require_login_for_read is not None
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
 # ---------------------------------------------------------------------------
 # SSL certificate upload
 # ---------------------------------------------------------------------------

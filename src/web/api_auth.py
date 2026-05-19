@@ -2,8 +2,8 @@
 JWT authentication for the mobile REST API (/api/v1/).
 
 Admins authenticate with POST /api/v1/auth/login and receive a Bearer
-token.  All write endpoints require that token; read endpoints are public
-(mirroring the web interface's read-only anonymous access).
+token.  All write endpoints require that token; most read endpoints require
+admin auth as well (GET /api/v1/config is public for app discovery).
 """
 from __future__ import annotations
 

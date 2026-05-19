@@ -7,10 +7,43 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
+from fastapi import Request
+
 from data.database import Database
 from data.models import Beer, Keg, UNKNOWN_USER_ID
 
 OUNCES_PER_LITER = 33.814
+
+# Touchscreen GUI writes gui_heartbeat_ts periodically; web treats stale after 90 s.
+GUI_HEARTBEAT_KEY = "gui_heartbeat_ts"
+GUI_HEARTBEAT_STALE_SECS = 90
+
+
+def is_admin_session(request: Request) -> bool:
+    try:
+        return bool(request.session.get("admin_username"))
+    except Exception:
+        return False
+
+
+def require_login_for_read(config: dict) -> bool:
+    return bool(config.get("web", {}).get("require_login_for_read", False))
+
+
+def kiosk_status(db: Database) -> dict:
+    """Return touchscreen app online state from the last GUI heartbeat."""
+    raw = db.get_setting(GUI_HEARTBEAT_KEY, "")
+    try:
+        ts = float(raw) if raw else 0.0
+    except ValueError:
+        ts = 0.0
+    now = time.time()
+    online = ts > 0 and (now - ts) <= GUI_HEARTBEAT_STALE_SECS
+    return {
+        "online":       online,
+        "last_seen":    datetime.fromtimestamp(ts) if ts > 0 else None,
+        "stale_seconds": int(now - ts) if ts > 0 else None,
+    }
 PINT_OZ          = 16.0
 RATE_LOOKBACK_DAYS = 14   # days of history used to estimate pour rate
 
@@ -88,7 +121,7 @@ class UserStats:
     last_pour_at:   Optional[datetime]
 
 
-def user_stats(db: Database, user_id: int, photos_url_prefix: str = "/photos") -> UserStats:
+def user_stats(db: Database, user_id: int, photos_url_prefix: str = "/users/photos") -> UserStats:
     user   = db.get_user(user_id)
     pours  = db.get_pours_for_user(user_id)
     balance = db.balance_for_user(user_id)
@@ -118,7 +151,7 @@ def user_stats(db: Database, user_id: int, photos_url_prefix: str = "/photos") -
     photo_url: Optional[str] = None
     if user and user.image_paths:
         p = user.image_paths[0]
-        # Convert absolute path to URL: /photos/{user_id}/{filename}
+        # Convert absolute path to URL: /users/photos/{user_id}/{filename}
         photo_url = f"{photos_url_prefix}/{user_id}/{__import__('pathlib').Path(p).name}"
 
     return UserStats(

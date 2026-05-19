@@ -39,6 +39,7 @@ from hardware.temp_sensor import TempSensorManager
 from recognition.face_recognizer import FaceRecognizer
 from ui.main_window import MainWindow
 from ui.pouring_window import PouringWindow
+from web.helpers import GUI_HEARTBEAT_KEY
 
 log = logging.getLogger(__name__)
 
@@ -178,6 +179,13 @@ class App(QObject):
         self._capture_timer.setInterval(2000)
         self._capture_timer.timeout.connect(self._check_web_capture_request)
         self._capture_timer.start()
+
+        # Heartbeat so the web UI can show kiosk online/offline status
+        self._heartbeat_timer = QTimer(self)
+        self._heartbeat_timer.setInterval(30_000)
+        self._heartbeat_timer.timeout.connect(self._write_gui_heartbeat)
+        self._heartbeat_timer.start()
+        self._write_gui_heartbeat()
 
     # ------------------------------------------------------------------
     # Hardware startup
@@ -455,6 +463,10 @@ class App(QObject):
         if self._fullscreen:
             w.showFullScreen()
         w.exec()
+
+    def _write_gui_heartbeat(self) -> None:
+        """Let the web interface detect whether the touchscreen app is running."""
+        self._db.set_setting(GUI_HEARTBEAT_KEY, str(time.time()))
 
     def _check_web_capture_request(self) -> None:
         """Poll DB for a photo capture request from the web UI."""

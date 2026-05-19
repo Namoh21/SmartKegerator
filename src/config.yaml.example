@@ -73,6 +73,13 @@ ui:
 
 web:
   port: 8080    # web interface port — accessible at http://<pi-ip>:8080
-
-admin:
-  password: "1234"
+  # When true, all pages (dashboard, users, pours, etc.) require admin login.
+  # Face photos and camera preview always require admin login regardless.
+  require_login_for_read: false
+  # Optional: auto-log-out inactive admin sessions (minutes). Omit or null = no timeout.
+  # admin_timeout_minutes: 30
+  # HTTPS for remote access (e.g. Cloudflare Tunnel). Enable in Settings → Administrators.
+  # ssl:
+  #   enabled: true
+  #   certfile: /opt/smartkegerator/ssl/server.crt
+  #   keyfile: /opt/smartkegerator/ssl/server.key
