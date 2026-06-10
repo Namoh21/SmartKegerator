@@ -44,7 +44,7 @@ async def login(body: LoginRequest):
     if not admin or not verify_password(body.password, admin["password_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Invalid username or password")
-    token, expires_at = create_token(admin["id"], admin["username"])
+    token, expires_at = create_token(admin["id"], admin["username"], admin["password_hash"])
     return TokenResponse(token=token, expires_at=expires_at, username=admin["username"])
 
 
