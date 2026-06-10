@@ -405,6 +405,18 @@ async def settings_save_admin_timeout(
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 
+@router.post("/privacy", response_class=RedirectResponse)
+async def settings_save_privacy(
+    require_login_for_read: Optional[str] = Form(None),
+):
+    """Persist web privacy options (require login to view pages)."""
+    cfg = _read_yaml()
+    cfg.setdefault("web", {})
+    cfg["web"]["require_login_for_read"] = require_login_for_read is not None
+    _write_yaml(cfg)
+    return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
+
+
 # ---------------------------------------------------------------------------
 # SSL certificate upload
 # ---------------------------------------------------------------------------
@@ -648,6 +660,7 @@ async def admin_delete(admin_id: int, request: Request):
 
 @router.post("/admins/{admin_id}/password", response_class=RedirectResponse)
 async def admin_change_password(
+    request:   Request,
     admin_id:  int,
     password:  str = Form(...),
     password2: str = Form(...),
@@ -656,7 +669,14 @@ async def admin_change_password(
         return RedirectResponse("/settings/?error=mismatch&tab=admins", status_code=303)
     if len(password) < 8:
         return RedirectResponse("/settings/?error=short&tab=admins", status_code=303)
-    get_db().change_admin_password(admin_id, hash_password(password))
+    new_hash = hash_password(password)
+    get_db().change_admin_password(admin_id, new_hash)
+    # Changing the password revokes that admin's sessions and API tokens
+    # (they carry a fingerprint of the old hash). When changing our own
+    # password, refresh the fingerprint so we stay logged in here.
+    if request.session.get("admin_id") == admin_id:
+        from web.auth import credential_fingerprint
+        request.session["pwd"] = credential_fingerprint(new_hash)
     return RedirectResponse("/settings/?saved=1&tab=admins", status_code=303)
 
 

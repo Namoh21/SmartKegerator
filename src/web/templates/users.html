@@ -2,6 +2,28 @@
 {% block title %}Users — SmartKegerator{% endblock %}
 
 {% block content %}
+{% if kiosk is defined %}
+<div class="alert alert-{{ 'success' if kiosk.online else 'warning' }} d-flex align-items-center gap-2 mb-3 py-2" role="status">
+  <i class="bi bi-{{ 'display' if kiosk.online else 'display-fill' }} fs-5"></i>
+  <span>
+    <strong>Touchscreen kiosk:</strong>
+    {% if kiosk.online %}
+      Online
+      {% if kiosk.last_seen %}
+      <span class="text-muted fw-normal">· last heartbeat {{ kiosk.last_seen.strftime('%H:%M:%S') }}</span>
+      {% endif %}
+    {% else %}
+      Offline
+      {% if kiosk.stale_seconds is not none %}
+      <span class="text-muted fw-normal">· no heartbeat for {{ kiosk.stale_seconds }}s — start the kiosk app on the Pi</span>
+      {% else %}
+      <span class="text-muted fw-normal">· kiosk app has not reported in yet</span>
+      {% endif %}
+    {% endif %}
+  </span>
+</div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="text-accent mb-0"><i class="bi bi-people me-2"></i>Users</h2>
   {% if is_admin %}
@@ -63,7 +85,7 @@
           </div>
 
           <div class="d-flex justify-content-center">
-            {% if s.photo_url %}
+            {% if is_admin and s.photo_url %}
             <img src="/users/{{ s.user_id }}/thumbnail" alt="{{ s.name }}"
                  class="rounded-circle"
                  style="width:40px;height:40px;display:block;max-width:none;">

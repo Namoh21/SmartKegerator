@@ -644,6 +644,15 @@ class Database:
             row = cur.fetchone()
             return dict(row) if row else None
 
+    def get_admin_by_id(self, admin_id: int) -> Optional[dict]:
+        with self._cursor() as cur:
+            cur.execute(
+                "SELECT id, username, password_hash, user_id FROM admins WHERE id = ?",
+                (admin_id,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
     def get_admin_by_username(self, username: str) -> Optional[dict]:
         with self._cursor() as cur:
             cur.execute(

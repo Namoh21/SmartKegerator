@@ -5,8 +5,8 @@ import logging
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from web.auth import hash_password, verify_password
-from web.server import get_db, templates, ctx
+from web.auth import credential_fingerprint, hash_password, verify_password
+from web.server import clear_setup_code, get_db, get_setup_code, templates, ctx
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +19,8 @@ _SETUP_ERRORS = {
     "mismatch": "Passwords do not match.",
     "short":    f"Password must be at least {_MIN_PASSWORD_LEN} characters.",
     "taken":    "That username is already taken.",
+    "code":     "Invalid setup code. Find it on the kegerator screen or in the "
+                "web service log (journalctl --user -u smartkegerator-web).",
 }
 
 _LOGIN_ERRORS = {
@@ -50,12 +52,17 @@ async def setup_submit(
     display_name: str = Form(""),
     password:     str = Form(...),
     password2:    str = Form(...),
+    setup_code:   str = Form(""),
 ):
     db       = get_db()
     username = username.strip()
 
     if db.has_any_admin():
         return RedirectResponse("/", status_code=302)
+
+    import hmac as _hmac
+    if not _hmac.compare_digest(setup_code.strip().upper(), get_setup_code()):
+        return RedirectResponse("/admin/setup?error=code", status_code=303)
 
     if not username or not password:
         return RedirectResponse("/admin/setup?error=empty", status_code=303)
@@ -67,6 +74,7 @@ async def setup_submit(
         return RedirectResponse("/admin/setup?error=taken", status_code=303)
 
     db.add_admin(username, hash_password(password), display_name=display_name)
+    clear_setup_code()
     return RedirectResponse("/admin/login?created=1", status_code=303)
 
 
@@ -108,6 +116,7 @@ async def login_submit(
         import time as _time
         request.session["admin_username"] = admin["username"]
         request.session["admin_id"]       = admin["id"]
+        request.session["pwd"]            = credential_fingerprint(admin["password_hash"])
         request.session["login_time"]     = _time.time()
         if admin.get("user_id"):
             linked = db.get_user(admin["user_id"])

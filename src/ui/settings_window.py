@@ -185,10 +185,9 @@ class SettingsWindow(QDialog):
         ))
 
         layout.addWidget(self._build_group(
-            "ADMIN",
+            "DISPLAY",
             [
-                ("admin", "password",   "Admin password", "password", None),
-                ("ui",    "fullscreen", "Fullscreen mode", "check",   None),
+                ("ui", "fullscreen", "Fullscreen mode", "check", None),
             ],
         ))
 

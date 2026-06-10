@@ -22,3 +22,13 @@ def verify_password(password: str, stored: str) -> bool:
         return hmac.compare_digest(key, check)
     except Exception:
         return False
+
+
+def credential_fingerprint(password_hash: str) -> str:
+    """Short non-reversible fingerprint of a stored password hash.
+
+    Embedded in web sessions and API tokens so that changing an admin's
+    password (or deleting the admin) invalidates all previously issued
+    sessions and tokens for that account.
+    """
+    return hashlib.sha256(password_hash.encode()).hexdigest()[:16]

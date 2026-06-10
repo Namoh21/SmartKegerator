@@ -25,7 +25,8 @@
     <h5 class="text-white mb-0">Create Administrator Account</h5>
     <p class="text-muted small mt-1 mb-0">
       This account can make changes to settings, beers, kegs, and users.
-      Everyone else gets read-only access.
+      Enable “Require admin login to view all pages” in Settings → Administrators
+      if you want to hide balances and pour history from guests.
     </p>
   </div>
 
@@ -36,6 +37,14 @@
   {% endif %}
 
   <form method="post" action="/admin/setup" autocomplete="off">
+    <div class="mb-3">
+      <label class="form-label">Setup code</label>
+      <input type="text" class="form-control" name="setup_code"
+             placeholder="Shown on the kegerator screen / service log"
+             required autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <div class="form-text small">Proves you have access to the device, not just the network.</div>
+    </div>
+
     <div class="mb-3">
       <label class="form-label">Display name <span class="text-muted small">(shown in pour history)</span></label>
       <input type="text" class="form-control" name="display_name"

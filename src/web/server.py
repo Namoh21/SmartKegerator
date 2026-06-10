@@ -31,7 +31,6 @@ import uvicorn
 import yaml
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -66,12 +65,55 @@ def _load_session_secret() -> str:
 _SESSION_SECRET = _load_session_secret()
 
 # ---------------------------------------------------------------------------
-# App-level shared state
+# First-run setup code — generated when the server starts with no admin
+# account, printed to the log and shared with the kiosk via the database.
+# The /admin/setup form must echo it back, so a stranger on the network
+# can't claim the admin account just by reaching port 8080 first.
 # ---------------------------------------------------------------------------
 
-_db:          Optional[Database] = None
-_config:      dict               = {}
-_config_path: str                = ""
+_setup_code: Optional[str] = None
+
+
+def get_setup_code() -> str:
+    global _setup_code
+    if _setup_code is None:
+        _setup_code = secrets.token_hex(4).upper()
+    return _setup_code
+
+
+def clear_setup_code() -> None:
+    """Called after the first admin is created."""
+    global _setup_code
+    _setup_code = None
+    try:
+        get_db().set_setting("web_setup_code", "")
+    except Exception:
+        pass
+
+# ---------------------------------------------------------------------------
+# App-level shared state
+#
+# Config is loaded at import time (not in lifespan) so middleware options and
+# the __main__ entry point below can read web.* settings — lifespan runs too
+# late for either.
+# ---------------------------------------------------------------------------
+
+_db: Optional[Database] = None
+
+
+def _resolve_config_path() -> str:
+    default = Path(__file__).parent.parent / "config.yaml"
+    if len(sys.argv) > 1 and Path(sys.argv[1]).suffix in (".yaml", ".yml"):
+        return sys.argv[1]
+    return str(default)
+
+
+_config_path: str = _resolve_config_path()
+try:
+    with open(_config_path, "r") as _f:
+        _config: dict = yaml.safe_load(_f) or {}
+except OSError:
+    _config = {}
 
 
 def get_db() -> Database:
@@ -119,27 +161,29 @@ def _setup_templates(templates: Jinja2Templates) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _db, _config, _config_path
+    global _db
 
-    _default_config = Path(__file__).parent.parent / "config.yaml"
-    _config_path = (
-        sys.argv[1]
-        if len(sys.argv) > 1 and Path(sys.argv[1]).suffix in (".yaml", ".yml")
-        else str(_default_config)
-    )
-    with open(_config_path, "r") as f:
-        _config = yaml.safe_load(f)
-
+    reload_config()
     _db = Database(_config["data"]["database_path"])
+
+    if not _db.has_any_admin():
+        code = get_setup_code()
+        log = __import__("logging").getLogger(__name__)
+        log.warning("=" * 60)
+        log.warning("FIRST-RUN SETUP — no admin account exists yet.")
+        log.warning("Setup code (required on /admin/setup):  %s", code)
+        log.warning("=" * 60)
+        # Also share with the touchscreen app (same SQLite DB) so it can
+        # display the code on the kiosk screen.
+        _db.set_setting("web_setup_code", code)
 
     from log_config import configure as _configure_logging, apply_level as _apply_level
     _configure_logging(_config, "web")
     _apply_level(_db.get_setting("log_level", "high"))
 
-    # Serve user photos as static files
+    # User photos are served via authenticated routes (see web/routes/users.py).
     photos_dir = Path(_config["data"]["user_photos_dir"])
     photos_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/photos", StaticFiles(directory=str(photos_dir)), name="photos")
 
     yield
 
@@ -216,9 +260,13 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _client_ip(request: Request) -> str:
-        fwd = request.headers.get("X-Forwarded-For", "")
-        if fwd:
-            return fwd.split(",")[0].strip()
+        # X-Forwarded-For is client-controlled and would let an attacker
+        # rotate identities to bypass rate limits and lockouts. Only honor
+        # it when the operator says a trusted reverse proxy sits in front.
+        if _config.get("web", {}).get("trusted_proxy"):
+            fwd = request.headers.get("X-Forwarded-For", "")
+            if fwd:
+                return fwd.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     def _prune(self, window: list[float], now: float) -> list[float]:
@@ -353,15 +401,24 @@ class _SecurityHeaders(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"]     = "camera=(), microphone=(), geolocation=()"
+        # CDN sources are pinned to the exact packages/versions the templates
+        # load, so an arbitrary script hosted on the same CDN can't run.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
-            f"style-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net; "
-            "font-src 'self' https://cdn.jsdelivr.net; "
+            f"script-src 'self' 'nonce-{nonce}' "
+            "https://unpkg.com/htmx.org@1.9.12 "
+            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/ "
+            "https://cdn.jsdelivr.net/npm/chart.js@4.4.2/; "
+            f"style-src 'self' 'nonce-{nonce}' "
+            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/ "
+            "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/; "
+            "font-src 'self' https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/; "
             "img-src 'self' data: https:; "
             "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         try:
             del response.headers["server"]
         except (KeyError, AttributeError):
@@ -371,20 +428,22 @@ class _SecurityHeaders(BaseHTTPMiddleware):
 
 class _AdminAuthMiddleware(BaseHTTPMiddleware):
     """
-    First-run redirect + mutation protection.
+    First-run redirect + auth for reads and mutations.
 
     - If no admins exist: redirect everything to /admin/setup.
-    - POST/PUT/DELETE/PATCH: require an active admin session.
-    - GET requests and static files: always public.
+    - POST/PUT/DELETE/PATCH: require an active admin session (except login/setup).
+    - GET: public by default; when web.require_login_for_read is true, admin required.
+    - REST API (/api/) uses JWT and is handled separately.
     """
-    _SKIP_PREFIXES = ("/photos/", "/api/")
+    _SKIP_PREFIXES = ("/api/",)
+    _PUBLIC_GET    = {"/admin/login", "/admin/setup"}
     _PUBLIC_POSTS  = {"/admin/login", "/admin/setup", "/admin/logout",
                       "/register", "/logout"}
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
 
-        # Pass static files straight through
+        # REST API — JWT auth on each endpoint
         if any(path.startswith(p) for p in self._SKIP_PREFIXES):
             return await call_next(request)
 
@@ -396,31 +455,72 @@ class _AdminAuthMiddleware(BaseHTTPMiddleware):
         except Exception:
             pass  # DB not ready yet during startup
 
+        is_admin = bool(request.session.get("admin_username"))
+
+        # Sessions are client-side signed cookies, so they can't be revoked
+        # server-side by themselves. Each session carries a fingerprint of
+        # the admin's password hash (set at login); if the password changed
+        # or the admin was deleted, the session is dead.
+        if is_admin:
+            try:
+                from web.auth import credential_fingerprint  # noqa: PLC0415
+                admin = get_db().get_admin_by_id(request.session.get("admin_id", -1))
+                if not admin or request.session.get("pwd") != credential_fingerprint(admin["password_hash"]):
+                    request.session.clear()
+                    is_admin = False
+            except Exception:
+                pass  # DB not ready during startup
+
+        # CSRF defense in depth (on top of SameSite=Lax cookies): reject
+        # mutations whose Origin / Sec-Fetch-Site headers say the request
+        # came from another site.
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            origin = request.headers.get("origin")
+            if origin and origin != "null":
+                try:
+                    if urlparse(origin).netloc != request.headers.get("host", ""):
+                        return Response("Cross-origin request rejected", status_code=403)
+                except Exception:
+                    return Response("Cross-origin request rejected", status_code=403)
+            fetch_site = request.headers.get("sec-fetch-site")
+            if fetch_site and fetch_site not in ("same-origin", "none"):
+                return Response("Cross-origin request rejected", status_code=403)
+
         # Admin session timeout — sliding window
-        if request.session.get("admin_username"):
+        if is_admin:
             timeout_mins = _config.get("web", {}).get("admin_timeout_minutes")
             if timeout_mins:
                 login_time = request.session.get("login_time", 0)
                 if time.time() - login_time > timeout_mins * 60:
                     request.session.clear()
                     return RedirectResponse("/?expired=1", status_code=303)
-                else:
-                    request.session["login_time"] = time.time()
+                request.session["login_time"] = time.time()
+                is_admin = True
+
+        # Optional: require admin login to view any page (balances, pour history, etc.)
+        if (
+            request.method == "GET"
+            and _config.get("web", {}).get("require_login_for_read")
+            and path not in self._PUBLIC_GET
+            and not is_admin
+        ):
+            return RedirectResponse(
+                f"/admin/login?next={quote(path, safe='/')}",
+                status_code=303,
+            )
 
         # Protect all mutation requests
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
-            if path not in self._PUBLIC_POSTS:
-                if not request.session.get("admin_username"):
-                    # Redirect to login, then come back to the page the form was on
-                    referer = request.headers.get("referer", "/")
-                    try:
-                        next_path = urlparse(referer).path or "/"
-                    except Exception:
-                        next_path = "/"
-                    return RedirectResponse(
-                        f"/admin/login?next={quote(next_path, safe='/')}",
-                        status_code=303,
-                    )
+            if path not in self._PUBLIC_POSTS and not is_admin:
+                referer = request.headers.get("referer", "/")
+                try:
+                    next_path = urlparse(referer).path or "/"
+                except Exception:
+                    next_path = "/"
+                return RedirectResponse(
+                    f"/admin/login?next={quote(next_path, safe='/')}",
+                    status_code=303,
+                )
 
         return await call_next(request)
 
@@ -443,7 +543,9 @@ app.add_middleware(_AdminAuthMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=_SESSION_SECRET,
-    https_only=False,   # set True in prod when SSL is enabled
+    # Mark cookies Secure whenever SSL is on, so the admin session can never
+    # leak over a stray plain-HTTP request.
+    https_only=bool(_config.get("web", {}).get("ssl", {}).get("enabled", False)),
     same_site="lax",    # blocks CSRF from cross-site POSTs; lax allows top-level nav
 )
 
