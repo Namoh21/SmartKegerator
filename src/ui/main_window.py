@@ -128,6 +128,23 @@ class MainWindow(QWidget):
         self._capture_banner_timer.setSingleShot(True)
         self._capture_banner_timer.timeout.connect(lambda: self._capture_banner.setVisible(False))
 
+        # Web first-run setup code — the web service writes this DB setting
+        # while it is waiting for an admin account to be created, so we show
+        # it on the kiosk where only someone with physical access can read it.
+        self._setup_code_banner = QLabel("")
+        self._setup_code_banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._setup_code_banner.setStyleSheet(
+            f"background:{self._c['accent']}; color:{self._c['bg']};"
+            f"font-size:18px; font-weight:bold; padding:8px; border-radius:4px;"
+        )
+        self._setup_code_banner.setVisible(False)
+        root.insertWidget(1, self._setup_code_banner)
+
+        self._setup_code_timer = QTimer()
+        self._setup_code_timer.timeout.connect(self._refresh_setup_code)
+        self._setup_code_timer.start(10_000)
+        self._refresh_setup_code()
+
         # Clock — tick every second
         self._clock = QTimer()
         self._clock.timeout.connect(self._update_clock)
@@ -274,6 +291,21 @@ class MainWindow(QWidget):
         row.addWidget(self._settings_btn)
 
         return bar
+
+    # ------------------------------------------------------------------
+    # Web setup code banner
+    # ------------------------------------------------------------------
+
+    def _refresh_setup_code(self) -> None:
+        try:
+            code = self._db.get_setting("web_setup_code", "").strip()
+        except Exception:
+            code = ""
+        if code:
+            self._setup_code_banner.setText(
+                f"🌐  Web setup code: {code}  —  enter it at http://<this-pi>:8080/admin/setup"
+            )
+        self._setup_code_banner.setVisible(bool(code))
 
     # ------------------------------------------------------------------
     # Clock

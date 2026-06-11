@@ -938,8 +938,11 @@ async def check_updates(request: Request):
     )
 
 
-_UPDATE_LOG  = Path("/tmp/sk-update.log")
-_UPDATE_DONE = Path("/tmp/sk-update.done")
+# Keep update state out of /tmp: a predictable root-written path in a
+# world-writable directory is a symlink-attack target.
+_UPDATE_STATE_DIR = Path("/opt/smartkegerator/logs")
+_UPDATE_LOG  = _UPDATE_STATE_DIR / "sk-update.log"
+_UPDATE_DONE = _UPDATE_STATE_DIR / "sk-update.done"
 
 
 def _run_update_thread() -> None:
@@ -982,6 +985,7 @@ async def update_now(request: Request):
             f'Update script not found at {_UPDATE_SCRIPT}.</span>'
         )
 
+    _UPDATE_STATE_DIR.mkdir(parents=True, exist_ok=True)
     for p in (_UPDATE_LOG, _UPDATE_DONE):
         try:
             p.unlink()

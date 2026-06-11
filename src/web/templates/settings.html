@@ -725,6 +725,11 @@
                     <option value="ssl"      {% if notif.notif_email_smtp_security == 'ssl' %}selected{% endif %}>SSL / TLS (port 465)</option>
                     <option value="none"     {% if notif.notif_email_smtp_security == 'none' %}selected{% endif %}>None (port 25)</option>
                   </select>
+                  <div class="form-text text-warning small{% if notif.notif_email_smtp_security != 'none' %} d-none{% endif %}"
+                       id="smtpSecurityWarning">
+                    <i class="bi bi-exclamation-triangle me-1"></i>&ldquo;None&rdquo; sends your
+                    password and emails unencrypted &mdash; use STARTTLS or SSL.
+                  </div>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label small fw-semibold">Username / login email <span class="text-danger">*</span></label>
@@ -1447,6 +1452,10 @@ _updateTapRows();
 // Delegated: tap count select, sensor ID buttons, log toggle buttons, confirm forms, secret toggle
 document.addEventListener('change', function(e) {
   if (e.target.id === 'tapCountSelect') _updateTapRows();
+  if (e.target.id === 'smtpSecurity') {
+    const warn = document.getElementById('smtpSecurityWarning');
+    if (warn) warn.classList.toggle('d-none', e.target.value !== 'none');
+  }
 });
 
 document.addEventListener('click', function(e) {

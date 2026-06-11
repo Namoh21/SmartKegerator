@@ -66,6 +66,17 @@ fi
 echo "${BRANCH}" > "${CHANNEL_FILE}"
 chown "${REAL_USER}:${REAL_USER}" "${CHANNEL_FILE}" 2>/dev/null || true
 info "Update channel: ${BRANCH}"
+
+# Refuse to update from an unexpected remote — this script runs as root, so a
+# swapped-out origin URL would mean executing arbitrary code with full
+# privileges on the next update.
+EXPECTED_ORIGIN="github.com/Namoh21/SmartKegerator"
+ACTUAL_ORIGIN=$(git -C "${REPO_DIR}" remote get-url origin 2>/dev/null || true)
+if [[ "${ACTUAL_ORIGIN}" != *"${EXPECTED_ORIGIN}"* ]]; then
+    echo "ERROR: origin remote is '${ACTUAL_ORIGIN}', expected ${EXPECTED_ORIGIN} — refusing to update." >&2
+    exit 1
+fi
+
 git -C "${REPO_DIR}" fetch origin
 git -C "${REPO_DIR}" reset --hard "origin/${BRANCH}"
 

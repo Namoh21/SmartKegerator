@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
-from web.api_auth import create_token, require_admin
+from web.api_auth import _bearer, create_token, require_admin
 from web.auth import verify_password
 from web.server import get_config, get_db
 
@@ -55,10 +56,19 @@ async def me(payload: dict = Depends(require_admin)):
 
 
 @router.get("/config", response_model=ConfigResponse)
-async def get_app_config():
-    """Return site-level settings the Android app needs at startup."""
+async def get_app_config(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+):
+    """Return site-level settings the Android app needs at startup.
+
+    Public by default for app discovery on the LAN. When the owner enables
+    web.require_login_for_read (privacy mode / tunnel exposure), a valid
+    admin token is required — same revocation checks as every other endpoint.
+    """
+    cfg = get_config()
+    if cfg.get("web", {}).get("require_login_for_read"):
+        await require_admin(creds)
     import socket
-    cfg  = get_config()
     ui   = cfg.get("ui",  {})
     port = int(cfg.get("web", {}).get("port", 8080))
     try:

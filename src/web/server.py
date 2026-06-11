@@ -176,6 +176,10 @@ async def lifespan(app: FastAPI):
         # Also share with the touchscreen app (same SQLite DB) so it can
         # display the code on the kiosk screen.
         _db.set_setting("web_setup_code", code)
+    else:
+        # Clear any stale code left over from an interrupted first run so
+        # the kiosk banner doesn't linger once an admin exists.
+        _db.set_setting("web_setup_code", "")
 
     from log_config import configure as _configure_logging, apply_level as _apply_level
     _configure_logging(_config, "web")
@@ -201,6 +205,11 @@ app = FastAPI(
     redoc_url=None,      # disable ReDoc
     openapi_url=None,    # disable /openapi.json
 )
+
+# Vendored front-end assets (Bootstrap, HTMX, Chart.js) — served locally so
+# the kiosk works offline and the CSP needs no third-party origins.
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
 
 # ── Middleware (last added = outermost = first to process requests) ─────────
@@ -401,18 +410,13 @@ class _SecurityHeaders(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"]        = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"]     = "camera=(), microphone=(), geolocation=()"
-        # CDN sources are pinned to the exact packages/versions the templates
-        # load, so an arbitrary script hosted on the same CDN can't run.
+        # All front-end assets are vendored under /static, so no third-party
+        # origins are needed. img-src keeps https: for external beer labels.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            f"script-src 'self' 'nonce-{nonce}' "
-            "https://unpkg.com/htmx.org@1.9.12 "
-            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/ "
-            "https://cdn.jsdelivr.net/npm/chart.js@4.4.2/; "
-            f"style-src 'self' 'nonce-{nonce}' "
-            "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/ "
-            "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/; "
-            "font-src 'self' https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/; "
+            f"script-src 'self' 'nonce-{nonce}'; "
+            f"style-src 'self' 'nonce-{nonce}'; "
+            "font-src 'self'; "
             "img-src 'self' data: https:; "
             "connect-src 'self'; "
             "frame-ancestors 'none';"
