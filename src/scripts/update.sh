@@ -70,9 +70,11 @@ info "Update channel: ${BRANCH}"
 # Refuse to update from an unexpected remote — this script runs as root, so a
 # swapped-out origin URL would mean executing arbitrary code with full
 # privileges on the next update.
-EXPECTED_ORIGIN="github.com/Namoh21/SmartKegerator"
+# Match both HTTPS (github.com/owner/repo) and SSH (git@github.com:owner/repo)
+# forms, case-insensitively — GitHub owner/repo names are case-insensitive.
+EXPECTED_ORIGIN="github.com[/:]namoh21/smartkegerator"
 ACTUAL_ORIGIN=$(git -C "${REPO_DIR}" remote get-url origin 2>/dev/null || true)
-if [[ "${ACTUAL_ORIGIN}" != *"${EXPECTED_ORIGIN}"* ]]; then
+if ! echo "${ACTUAL_ORIGIN}" | grep -qiE "${EXPECTED_ORIGIN}"; then
     echo "ERROR: origin remote is '${ACTUAL_ORIGIN}', expected ${EXPECTED_ORIGIN} — refusing to update." >&2
     exit 1
 fi
