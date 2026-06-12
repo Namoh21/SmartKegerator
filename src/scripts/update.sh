@@ -67,23 +67,41 @@ echo "${BRANCH}" > "${CHANNEL_FILE}"
 chown "${REAL_USER}:${REAL_USER}" "${CHANNEL_FILE}" 2>/dev/null || true
 info "Update channel: ${BRANCH}"
 
+# Run all git operations as the real user, never as root.  Root-run git
+# leaves root-owned files inside ~/SmartKegerator/.git, which then breaks
+# the user's own git commands (fetch/pull start requiring sudo).
+run_git() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        # -H so git finds the user's ~/.ssh and ~/.gitconfig, not root's
+        sudo -H -u "${REAL_USER}" git -C "${REPO_DIR}" "$@"
+    else
+        git -C "${REPO_DIR}" "$@"
+    fi
+}
+
+# One-time repair: earlier versions of this script ran git as root, so the
+# clone may contain root-owned files that block user git operations.
+if [[ "$(id -u)" -eq 0 ]]; then
+    chown -R "${REAL_USER}:${REAL_USER}" "${REPO_DIR}" 2>/dev/null || true
+fi
+
 # Refuse to update from an unexpected remote — this script runs as root, so a
 # swapped-out origin URL would mean executing arbitrary code with full
 # privileges on the next update.
 # Match both HTTPS (github.com/owner/repo) and SSH (git@github.com:owner/repo)
 # forms, case-insensitively — GitHub owner/repo names are case-insensitive.
 EXPECTED_ORIGIN="github.com[/:]namoh21/smartkegerator"
-ACTUAL_ORIGIN=$(git -C "${REPO_DIR}" remote get-url origin 2>/dev/null || true)
+ACTUAL_ORIGIN=$(run_git remote get-url origin 2>/dev/null || true)
 if ! echo "${ACTUAL_ORIGIN}" | grep -qiE "${EXPECTED_ORIGIN}"; then
     echo "ERROR: origin remote is '${ACTUAL_ORIGIN}', expected ${EXPECTED_ORIGIN} — refusing to update." >&2
     exit 1
 fi
 
-git -C "${REPO_DIR}" fetch origin
-git -C "${REPO_DIR}" reset --hard "origin/${BRANCH}"
+run_git fetch origin
+run_git reset --hard "origin/${BRANCH}"
 
 # Write the current commit hash so the web UI can display it without needing a git repo
-git -C "${REPO_DIR}" rev-parse --short HEAD > "${INSTALL_DIR}/GIT_HASH" 2>/dev/null || true
+run_git rev-parse --short HEAD > "${INSTALL_DIR}/GIT_HASH" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 2. Sync source files — preserves config.yaml, database, photos, videos
