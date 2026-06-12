@@ -9,7 +9,8 @@ PyQt6>=6.6.0
 pyqtgraph>=0.13.3
 
 # Camera and image processing
-opencv-python>=4.8.0
+# 4.8.1.78+ — earlier wheels bundle libwebp vulnerable to CVE-2023-4863
+opencv-python>=4.8.1.78
 
 # Facial recognition (dlib ResNet model — best accuracy on Pi 4)
 face-recognition>=1.3.0
@@ -29,10 +30,10 @@ numpy>=1.24.0
 # Web interface
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
-jinja2>=3.1.0
-python-multipart>=0.0.9   # form data parsing
+jinja2>=3.1.6              # 3.1.5/3.1.6 fix sandbox-breakout CVEs
+python-multipart>=0.0.27   # form data parsing; <0.0.27 has DoS + file-write CVEs
 aiofiles>=23.0.0           # static file serving
 httpx>=0.27.0              # async HTTP client for Untappd API proxy
 itsdangerous>=2.1.0        # required by SessionMiddleware (optional dep of starlette)
-PyJWT>=2.8.0               # JWT tokens for the mobile REST API
+PyJWT>=2.13.0              # JWT tokens for the mobile REST API; <2.12 accepts unknown crit headers
 google-auth>=2.29.0        # FCM push notifications (OAuth2 for service account)
