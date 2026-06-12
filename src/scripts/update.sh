@@ -127,7 +127,29 @@ sudo -u "${REAL_USER}" XDG_RUNTIME_DIR="/run/user/$(id -u ${REAL_USER})" \
     systemctl --user daemon-reload 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# 2c. Ensure sudoers rule exists for web-initiated reboot
+# 2c. Upgrade Python dependencies — security fixes land as raised version
+#     floors in requirements.txt, so they must be applied on update, not
+#     just on fresh installs.  pip's default "only-if-needed" strategy means
+#     packages already satisfying the floors are left untouched.
+# ---------------------------------------------------------------------------
+VENV_PIP="${INSTALL_DIR}/venv/bin/pip"
+if [[ -x "${VENV_PIP}" ]]; then
+    info "Upgrading Python dependencies to current security floors…"
+    if [[ "$(id -u)" -eq 0 ]]; then
+        sudo -u "${REAL_USER}" "${VENV_PIP}" install --upgrade --upgrade-strategy only-if-needed \
+            -r "${SRC_DIR}/requirements.txt" \
+            || warn "Dependency upgrade failed — continuing with existing packages."
+    else
+        "${VENV_PIP}" install --upgrade --upgrade-strategy only-if-needed \
+            -r "${SRC_DIR}/requirements.txt" \
+            || warn "Dependency upgrade failed — continuing with existing packages."
+    fi
+else
+    warn "venv pip not found at ${VENV_PIP} — skipping dependency upgrade."
+fi
+
+# ---------------------------------------------------------------------------
+# 2d. Ensure sudoers rule exists for web-initiated reboot
 # ---------------------------------------------------------------------------
 SUDOERS_FILE="/etc/sudoers.d/smartkegerator-reboot"
 SUDOERS_REBOOT="${REAL_USER} ALL=(ALL) NOPASSWD: /sbin/reboot"
